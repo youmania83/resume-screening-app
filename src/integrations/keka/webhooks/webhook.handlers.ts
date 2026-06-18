@@ -84,11 +84,19 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           "synced"
         ]);
         
-        // Trigger automated screening if it is a new candidate
+        // Trigger automated screening if it is a new candidate and score is not computed yet
         if (eventType === "candidate.created" && (c.aiScore === undefined || c.aiScore === null)) {
           // Trigger async automated resume screening
           kekaWorkflowService.screenCandidate(c.id).catch(err => {
             console.error(`❌ Automated screening failed for candidate ${c.id}:`, err);
+          });
+        }
+
+        // Onboarding Trigger Check
+        if (c.currentStage && (c.currentStage.toLowerCase() === "hired" || c.currentStage.toLowerCase() === "offer accepted" || c.currentStage.toLowerCase() === "offer_accepted")) {
+          console.log(`Candidate ${c.id} updated to finalized stage (${c.currentStage}). Triggering onboarding...`);
+          kekaWorkflowService.onboardCandidate(c.id).catch(err => {
+            console.error(`❌ Automated onboarding failed for candidate ${c.id}:`, err);
           });
         }
         break;
@@ -126,6 +134,14 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
         if (!candidateId || !stage) throw new Error("Missing candidateId or stage in payload");
         
         await kekaApplicationsService.moveCandidateStage(candidateId, stage);
+
+        // Onboarding Trigger Check
+        if (stage.toLowerCase() === "hired" || stage.toLowerCase() === "offer accepted" || stage.toLowerCase() === "offer_accepted") {
+          console.log(`Candidate ${candidateId} stage changed to finalized (${stage}). Triggering onboarding...`);
+          kekaWorkflowService.onboardCandidate(candidateId).catch(err => {
+            console.error(`❌ Automated onboarding failed for candidate ${candidateId}:`, err);
+          });
+        }
         break;
       }
 

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { query } from "../../lib/db";
 import { ensureJobAssessment } from "../../lib/assessmentService";
 import { sendAssessmentInviteEmail, sendInterviewScheduleEmail } from "../../lib/email";
+import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service";
 import crypto from "crypto";
 
 const router = Router();
@@ -479,6 +480,13 @@ router.post("/submit", async (req: any, res: any) => {
        WHERE id = $6;`,
       [assessmentScore, assessmentStatus, finalScore, nextStatus, kekaStatus, candidate.id]
     );
+
+    // Sync assessment completion stage with Keka ATS Integration Foundation
+    try {
+      await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
+    } catch (kekaErr) {
+      console.error("⚠️ Failed to sync assessment completion to Keka:", kekaErr);
+    }
 
     // Log Activity
     await query(
