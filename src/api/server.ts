@@ -36,6 +36,15 @@ app.use("/api/interview", interviewRouter);
 app.use("/api", kekaRouter);
 app.use("/api", zohoRouter);
 
+// 4. Global Express Error Handling Middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("🔥 Express Global Error caught:", err.stack || err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || "Internal Server Error",
+  });
+});
+
 const PORT = Number(process.env.PORT) || 4000;
 const server1 = app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Backend server listening on http://0.0.0.0:${PORT}`);
@@ -58,5 +67,15 @@ if (PORT !== 4000) {
     console.log(`⚠️ Port 4000 listen error: ${err.message}`);
   });
 }
+
+// 5. Node Process Crash-Guards for Asynchronous Background Workflows
+process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
+  console.error("🚨 Unhandled Promise Rejection at:", promise, "reason:", reason?.stack || reason);
+});
+
+process.on("uncaughtException", (error: Error) => {
+  console.error("🚨 Uncaught Exception thrown in backend process:", error.stack || error);
+  // Log critical error and prevent immediate process termination
+});
 
 export default app;
