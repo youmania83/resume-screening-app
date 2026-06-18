@@ -1,0 +1,32 @@
+import type { Metadata } from "next";
+import "../styles/globals.css";
+import { Toaster } from "sonner";
+
+import type { Viewport } from "next";
+
+export const metadata: Metadata = {
+  title: "Rison AI Tech — Enterprise Resume Screening Workstation",
+  description: "Next-gen candidate evaluation and AI-powered screening workspace.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" data-theme="light">
+      <body className="antialiased">
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
+    </html>
+  );
+}
+

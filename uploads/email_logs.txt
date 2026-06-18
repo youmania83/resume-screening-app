@@ -1,0 +1,56 @@
+
+================================================================================
+DATE: 2026-06-17T16:50:13.120Z
+TO: sarah.jenkins@example.com
+SUBJECT: Assessment Invitation: Senior Frontend Engineer Role - Rison AI Tech
+================================================================================
+Assessment Invitation body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px border #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; } .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .details-box { background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #0... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-17T16:55:55.357Z
+TO: sarah.jenkins@example.com
+SUBJECT: HR Interview Scheduled: Senior Frontend Engineer Role - Rison AI Tech
+================================================================================
+HR Interview Scheduled body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; } .header p { color: #a7f3d0; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .details-box { background-color: #f0fdf4; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #0... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-17T16:55:55.357Z
+TO: yogeshkumarwadhwa@localhost.com
+SUBJECT: [ALERT] Qualified Candidate: HR Interview Scheduled for Sarah Jenkins
+================================================================================
+Qualified Candidate Alert body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; } .header p { color: #c7d2fe; font-size: 13px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .score-box { background-color: #f5f3ff; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #4f46e5; } .score-row { display: flex; ... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-18T02:11:24.612Z
+TO: yogesh.wadhwa@risonai.tech
+SUBJECT: Assessment Invitation: Frontend Engineer Role - Rison AI Tech
+================================================================================
+Assessment Invitation body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px border #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; } .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .details-box { background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #0... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-18T02:11:56.721Z
+TO: yogesh.wadhwa@risonai.tech
+SUBJECT: Assessment Invitation: Frontend Engineer Role - Rison AI Tech
+================================================================================
+Assessment Invitation body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px border #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; } .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .details-box { background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #0... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-18T02:11:58.518Z
+TO: yogesh.wadhwa@risonai.tech
+SUBJECT: HR Interview Scheduled: Frontend Engineer Role - Rison AI Tech
+================================================================================
+HR Interview Scheduled body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; } .header p { color: #a7f3d0; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .details-box { background-color: #f0fdf4; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #0... (Full HTML written)
+================================================================================
+
+================================================================================
+DATE: 2026-06-18T02:11:58.519Z
+TO: yogeshkumarwadhwa@localhost.com
+SUBJECT: [ALERT] Qualified Candidate: HR Interview Scheduled for Yogesh Wadhwa
+================================================================================
+Qualified Candidate Alert body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; } .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); } .header { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); padding: 32px; text-align: center; } .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; } .header p { color: #c7d2fe; font-size: 13px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em; } .content { padding: 40px; } .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; } .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; } .score-box { background-color: #f5f3ff; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #4f46e5; } .score-row { display: flex; ... (Full HTML written)
+================================================================================

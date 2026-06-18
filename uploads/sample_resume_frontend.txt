@@ -1,0 +1,30 @@
+Sarah Jenkins
+Email: sarah.jenkins@example.com
+Phone: +1-555-019-2834
+Role: Senior Frontend Engineer
+
+Professional Summary:
+Dynamic and result-oriented Senior Frontend Engineer with 7 years of hands-on experience building complex SaaS dashboards and web applications. Expert in React 18/19, Next.js App Router, TypeScript, and modern styling architectures like Tailwind CSS. Proven track record of leading critical migrations, developing shared component libraries, and optimizing web performance to reduce Largest Contentful Paint (LCP) by 45% and Cumulative Layout Shift (CLS) to near zero.
+
+Technical Stack:
+- Core Languages: TypeScript, JavaScript (ES6+), HTML5, CSS3
+- Frameworks & Libraries: React, Next.js, Redux Toolkit, React Hook Form, Framer Motion
+- Styling: Tailwind CSS, CSS Modules, Styled Components
+- Build Tools: Webpack, Vite, Turbopack
+- Testing: Jest, React Testing Library, Cypress
+
+Work Experience:
+Lead Frontend Architect | Techsol Corp (2022 - Present)
+- Led the migration of legacy client dashboards to Next.js App Router, resulting in a 35% faster initial load time.
+- Architected and built the company's core design system and reusable component library, used by over 40 developers across 5 product lines.
+- Championed web performance initiatives, optimizing Core Web Vitals to improve Largest Contentful Paint (LCP) from 3.8s to 1.8s.
+- Collaborated with Product Managers and Designers to deliver high-fidelity, accessible interfaces matching WCAG 2.1 guidelines.
+
+Senior Frontend Developer | WebCore Solutions (2019 - 2022)
+- Developed responsive SaaS dashboards and workflows using React, TypeScript, and Tailwind CSS.
+- Implemented state management using Redux Toolkit, handling complex real-time data streaming feeds.
+- Integrated REST APIs and optimized network requests to minimize payload sizes.
+- Set up automated CI/CD build checks using GitHub Actions to run Jest tests on pull requests.
+
+Education:
+B.S. in Computer Science — Stanford University (Graduated 2019)
