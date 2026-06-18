@@ -13,6 +13,7 @@ import evaluateRouter from "./routes/evaluateRouter";
 import candidateRouter from "./routes/candidateRouter";
 import assessmentRouter from "./routes/assessmentRouter";
 import interviewRouter from "./routes/interviewRouter";
+import kekaRouter from "../integrations/keka/routes/keka.routes";
 import "../lib/initDb";
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use("/api/evaluate", evaluateRouter);
 app.use("/api/candidates", candidateRouter);
 app.use("/api/assessment", assessmentRouter);
 app.use("/api/interview", interviewRouter);
+app.use("/api", kekaRouter);
 
 const PORT = Number(process.env.PORT) || 4000;
 const server1 = app.listen(PORT, "0.0.0.0", () => {
