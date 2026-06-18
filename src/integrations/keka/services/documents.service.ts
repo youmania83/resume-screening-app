@@ -1,5 +1,7 @@
 // src/integrations/keka/services/documents.service.ts
 
+import fs from "fs";
+import path from "path";
 import { getKekaAdapter } from "../adapters";
 import { KekaDocument } from "../interfaces/Document";
 import { query } from "../../../lib/db";
@@ -14,6 +16,19 @@ export class KekaDocumentsService {
   }
 
   async downloadResume(candidateId: string): Promise<Buffer> {
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    const allowedExtensions = [".pdf", ".docx", ".doc", ".txt"];
+
+    if (fs.existsSync(uploadsDir)) {
+      for (const ext of allowedExtensions) {
+        const filePath = path.join(uploadsDir, `resume-${candidateId}${ext}`);
+        if (fs.existsSync(filePath)) {
+          console.log(`📁 Found local resume for candidate ${candidateId} at ${filePath}`);
+          return fs.readFileSync(filePath);
+        }
+      }
+    }
+
     return this.getAdapter().downloadResume(candidateId);
   }
 

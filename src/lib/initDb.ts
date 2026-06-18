@@ -51,6 +51,7 @@ async function init() {
         certifications TEXT[],
         projects TEXT[],
         keywords TEXT[],
+        education VARCHAR,
         status VARCHAR DEFAULT 'applied',
         application_source VARCHAR NOT NULL,
         assessment_score INT,
@@ -190,6 +191,7 @@ async function init() {
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS source_system VARCHAR;
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS sync_status VARCHAR;
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS education VARCHAR;
 
       ALTER TABLE interviews ADD COLUMN IF NOT EXISTS external_id VARCHAR;
       ALTER TABLE interviews ADD COLUMN IF NOT EXISTS source_system VARCHAR;

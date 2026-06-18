@@ -3,6 +3,8 @@ import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { zohoConfig } from "../integrations/zoho/config/zoho.config";
+import { zohoMailService } from "../integrations/zoho/services/zohoMail.service";
 
 dotenv.config();
 
@@ -150,6 +152,11 @@ export async function sendAssessmentInviteEmail(params: {
     </body>
     </html>
   `;
+
+  if (zohoConfig.enabled) {
+    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    return { success: true, mock: false };
+  }
 
   const transporter = getTransporter();
   if (!transporter) {
@@ -331,6 +338,12 @@ export async function sendInterviewScheduleEmail(params: {
     </body>
     </html>
   `;
+
+  if (zohoConfig.enabled) {
+    await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
+    await zohoMailService.sendEmail(params.hrEmail, hrSubject, hrHtml);
+    return { success: true, mock: false };
+  }
 
   const transporter = getTransporter();
   if (!transporter) {
