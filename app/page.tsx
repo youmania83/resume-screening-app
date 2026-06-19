@@ -526,9 +526,9 @@ export default function Dashboard() {
     const sourceName = c.applicationSource || "Careers Page";
     
     return (
-      <div className="bg-slate-50 dark:bg-slate-900/30 p-3 rounded-lg border border-slate-200/50 dark:border-slate-800/50 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-200/40 dark:border-slate-800/40 pb-1.5 mb-1">
-          <span className="text-[10px] font-bold uppercase text-slate-550 dark:text-slate-400 tracking-wider">Recruitment Funnel Progress</span>
+      <div className="bg-secondary/40 p-3 rounded-lg border border-border/50 space-y-3">
+        <div className="flex items-center justify-between border-b border-border/40 pb-1.5 mb-1">
+          <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Recruitment Funnel Progress</span>
           <Badge variant="outline" className={`text-[8.5px] font-bold uppercase tracking-wider px-2 py-0 border ${
             c.status === "rejected" ? "border-red-200 bg-red-50 text-red-700 dark:border-red-950/20 dark:bg-red-950/10 dark:text-red-400" :
             c.status === "onboarded" ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-950/20 dark:bg-emerald-950/10 dark:text-emerald-450" :
@@ -538,14 +538,14 @@ export default function Dashboard() {
           </Badge>
         </div>
         
-        <div className="relative border-l border-slate-200 dark:border-slate-800 pl-4.5 space-y-3.5 text-[11px] leading-tight select-none">
+        <div className="relative border-l border-border pl-4.5 space-y-3.5 text-[11px] leading-tight select-none">
           
           {/* Step 1: Application Ingested */}
           <div className="relative">
             <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] text-white">✓</span>
             <div>
-              <span className="font-bold text-slate-850 dark:text-slate-200 block">1. Ingested from {sourceName}</span>
-              <span className="text-[9.5px] text-slate-500 font-semibold block mt-0.5">Resume collected automatically via Ingestion Engine.</span>
+              <span className="font-bold text-foreground block">1. Ingested from {sourceName}</span>
+              <span className="text-[9.5px] text-muted-foreground font-semibold block mt-0.5">Resume collected automatically via Ingestion Engine.</span>
             </div>
           </div>
 
@@ -557,10 +557,10 @@ export default function Dashboard() {
               <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] text-white">✓</span>
             )}
             <div>
-              <span className="font-bold text-slate-850 dark:text-slate-200 block">
+              <span className="font-bold text-foreground block">
                 2. AI Parsing & JD Match Score: {c.score}/100
               </span>
-              <span className="text-[9.5px] text-slate-500 font-semibold block mt-0.5">
+              <span className="text-[9.5px] text-muted-foreground font-semibold block mt-0.5">
                 {isRejected && c.score < 70 
                   ? "Rejected: Score below threshold (70%). Moved to Keka Rejected Pool."
                   : `Passed screening (Score >= 70%). Assessment invite sent.`
@@ -573,7 +573,7 @@ export default function Dashboard() {
           {(!isRejected || c.score >= 70) && (
             <div className="relative">
               {c.status === "applied" ? (
-                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
+                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-secondary border border-border dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
               ) : c.status === "shortlisted" ? (
                 <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-amber-500 flex items-center justify-center text-[7px] text-white animate-pulse">⌁</span>
               ) : isRejected && c.assessmentStatus === "failed" ? (
@@ -582,10 +582,10 @@ export default function Dashboard() {
                 <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] text-white">✓</span>
               )}
               <div>
-                <span className="font-bold text-slate-850 dark:text-slate-200 block">
+                <span className="font-bold text-foreground block">
                   3. Candidate Technical Assessment
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-semibold block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground font-semibold block mt-0.5">
                   {c.status === "shortlisted" 
                     ? "Pending candidate response. Invite email sent."
                     : c.assessmentStatus === "failed" 
@@ -609,13 +609,13 @@ export default function Dashboard() {
               ) : (c.status === "selected" || c.status === "onboarded") ? (
                 <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] text-white">✓</span>
               ) : (
-                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
+                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-secondary border border-border dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
               )}
               <div>
-                <span className="font-bold text-slate-850 dark:text-slate-200 block">
+                <span className="font-bold text-foreground block">
                   4. HR Interview Round (Manager Evaluation)
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-semibold block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground font-semibold block mt-0.5">
                   {c.status === "interviewing"
                     ? `Scheduled with HR Manager Yogesh Wadhwa on ${c.interviewScheduledDate ? new Date(c.interviewScheduledDate).toLocaleDateString() : 'TBD'}.`
                     : isRejected && c.interviewFeedback
@@ -637,13 +637,13 @@ export default function Dashboard() {
               ) : c.status === "selected" ? (
                 <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-amber-500 flex items-center justify-center text-[7px] text-white animate-pulse">⌁</span>
               ) : (
-                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
+                <span className="absolute -left-[24.5px] top-0.5 h-3.5 w-3.5 rounded-full bg-secondary border border-border dark:border-slate-700 flex items-center justify-center text-[7px] text-slate-400">•</span>
               )}
               <div>
-                <span className="font-bold text-slate-850 dark:text-slate-200 block">
+                <span className="font-bold text-foreground block">
                   5. Selection & Keka HRMS Onboarding
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-semibold block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground font-semibold block mt-0.5">
                   {c.status === "onboarded"
                     ? "Onboarded. Sync complete with Keka HRMS onboarding workflow."
                     : c.status === "selected"
@@ -1648,29 +1648,29 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
   if (!mounted) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
-          <p className="text-sm text-slate-500 font-medium">Loading workstation...</p>
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <p className="text-xs text-muted-foreground font-semibold tracking-wide">Loading workstation...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50/60 dark:bg-[#090d16] font-sans antialiased text-slate-900 dark:text-slate-100">
+    <div className="flex h-screen overflow-hidden bg-background font-sans antialiased text-foreground">
       
       {/* 1. LEFT SIDEBAR */}
-      <aside className="w-[220px] flex-shrink-0 bg-white dark:bg-[#0c111e] border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between z-20 select-none">
+      <aside className="w-[220px] flex-shrink-0 bg-card border-r border-border flex flex-col justify-between z-20 select-none">
         <div>
           {/* Logo */}
-          <div className="h-14 flex items-center px-5 border-b border-slate-200 dark:border-slate-800 gap-2.5">
-            <div className="h-6.5 w-6.5 bg-slate-900 dark:bg-slate-100 rounded flex items-center justify-center shadow-sm">
-              <Sparkles className="h-4 w-4 text-white dark:text-slate-900" />
+          <div className="h-14 flex items-center px-4.5 border-b border-border gap-2.5">
+            <div className="h-6.5 w-6.5 bg-foreground text-background rounded flex items-center justify-center shadow-xs">
+              <Sparkles className="h-3.5 w-3.5" />
             </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-slate-950 dark:text-slate-50">Rison AI Tech</span>
-              <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-semibold leading-none">RECRUIT SUITE</span>
+              <span className="font-bold text-sm tracking-tight text-foreground">Rison AI Tech</span>
+              <span className="block text-[9px] text-muted-foreground font-bold tracking-wider leading-none">RECRUIT SUITE</span>
             </div>
           </div>
 
@@ -1691,13 +1691,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id as any)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-semibold transition-all ${
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
                     isActive 
-                      ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50" 
-                      : "text-slate-650 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
+                      ? "bg-secondary text-foreground shadow-xs border border-border/50" 
+                      : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground border border-transparent"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-slate-950 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}`} />
+                  <Icon className={`h-4 w-4 ${isActive ? "text-foreground" : "text-muted-foreground/80"}`} />
                   {item.label}
                 </button>
               )
@@ -1706,26 +1706,26 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="p-3 border-t border-border">
           <button 
             onClick={() => setActiveTab("settings")}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
               activeTab === "settings"
-                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:text-slate-900"
+                ? "bg-secondary text-foreground shadow-xs border border-border/50"
+                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground border border-transparent"
             }`}
           >
-            <Settings className="h-4 w-4 text-slate-400" />
+            <Settings className="h-4 w-4 text-muted-foreground/80" />
             Workspace Settings
           </button>
           
-          <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-            <div className="h-7 w-7 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-300 shadow-inner">
+          <div className="mt-3 p-2.5 bg-secondary/40 rounded-lg border border-border flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-foreground border border-border shadow-xs">
               YK
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[10px] font-semibold text-slate-800 dark:text-slate-200 truncate">Yogesh Wadhwa</span>
-              <span className="block text-[9px] text-slate-500 truncate">Techsol Admin</span>
+              <span className="block text-[10px] font-bold text-foreground truncate leading-tight">Yogesh Wadhwa</span>
+              <span className="block text-[9px] text-muted-foreground truncate font-medium">Techsol Admin</span>
             </div>
           </div>
         </div>
@@ -1735,12 +1735,12 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
         {/* 2. STICKY TOP NAVIGATION */}
-        <header className="h-14 bg-white dark:bg-[#0c111e] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 z-10 select-none">
+        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 z-10 select-none">
           <div className="flex items-center gap-4">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Enterprise Console</span>
-            <div className="h-4 w-px bg-slate-250 dark:bg-slate-800" />
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Enterprise Console</span>
+            <div className="h-4 w-px bg-border" />
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 border-slate-200 text-slate-700 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-350">
+              <Badge variant="outline" className="text-[10px] font-semibold px-2.5 py-0.5 text-foreground bg-secondary/50 border-border">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
                 DeepSeek-Coder v1.5 API Connected
               </Badge>
@@ -1749,16 +1749,16 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
           <div className="flex items-center gap-5">
             {/* Status Badges */}
-            <div className="flex items-center gap-4 text-xs font-semibold text-slate-650 dark:text-slate-400">
+            <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
               <div className="flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-slate-400" />
-                <span>Screened: <strong className="text-slate-900 dark:text-slate-100 font-bold">{totalScreenedCount}</strong></span>
+                <Users className="h-3.5 w-3.5 text-muted-foreground/80" />
+                <span>Screened: <strong className="text-foreground font-bold">{totalScreenedCount}</strong></span>
               </div>
               
               <div className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <Clock className="h-3.5 w-3.5 text-muted-foreground/80" />
                 <span>Processing: 
-                  <strong className="text-slate-900 dark:text-slate-100 font-bold ml-1">
+                  <strong className="text-foreground font-bold ml-1">
                     {activeProcessingCount > 0 ? (
                       <span className="text-amber-600 dark:text-amber-400 animate-pulse">{activeProcessingCount} active</span>
                     ) : (
@@ -1769,18 +1769,18 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
               </div>
 
               <div className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-slate-400" />
-                <span>API Credits: <strong className="text-slate-900 dark:text-slate-100 font-bold">{credits} Remaining</strong></span>
+                <Activity className="h-3.5 w-3.5 text-muted-foreground/80" />
+                <span>API Credits: <strong className="text-foreground font-bold">{credits} Remaining</strong></span>
               </div>
             </div>
 
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
+            <div className="h-4 w-px bg-border" />
 
             {/* Dark Mode toggle */}
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setIsDark(!isDark)} 
-                className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                 title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {isDark ? "☀️" : "🌙"}
@@ -1790,7 +1790,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
         </header>
 
         {/* 3. WORKSPACE CONTAINER */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50/50 dark:bg-[#090d16]">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">
           
           <AnimatePresence mode="wait">
             
@@ -1811,18 +1811,18 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   <div className="lg:col-span-4 space-y-4">
                     
                     {/* Job Import Module */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                          <Briefcase className="h-3.5 w-3.5 text-slate-500" />
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
+                          <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
                           Import Job Description
                         </CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Import from URL, file, or paste raw text to configure AI evaluation vectors.</CardDescription>
+                        <CardDescription className="text-[10px] text-muted-foreground">Import from URL, file, or paste raw text to configure AI evaluation vectors.</CardDescription>
                       </CardHeader>
                       <CardContent className="pt-4 space-y-4">
                         
                         <Tabs value={importTab} onValueChange={(v) => setImportTab(v as any)} className="w-full">
-                          <TabsList className="grid grid-cols-3 w-full bg-slate-100 dark:bg-slate-900 p-0.5 rounded text-[11px] h-8">
+                          <TabsList className="grid grid-cols-3 w-full bg-secondary p-0.5 rounded text-[11px] h-8">
                             <TabsTrigger value="url" className="text-[11px] py-1 rounded">URL Link</TabsTrigger>
                             <TabsTrigger value="file" className="text-[11px] py-1 rounded">Document</TabsTrigger>
                             <TabsTrigger value="text" className="text-[11px] py-1 rounded">Raw Text</TabsTrigger>
@@ -1830,7 +1830,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                           <TabsContent value="url" className="pt-3.5 space-y-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">LinkedIn or Career Page Link</label>
+                              <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">LinkedIn or Career Page Link</label>
                               <div className="relative">
                                 <Link2 className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                                 <input 
@@ -1838,7 +1838,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                   placeholder="e.g. linkedin.com/jobs/view/12345..."
                                   value={importUrl}
                                   onChange={(e) => setImportUrl(e.target.value)}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded pl-8.5 pr-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-400 text-slate-900 dark:text-slate-200"
+                                  className="w-full bg-secondary/40 border border-border rounded pl-8.5 pr-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground dark:text-slate-200"
                                 />
                               </div>
                             </div>
@@ -1846,10 +1846,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                           <TabsContent value="file" className="pt-3.5 space-y-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Upload JD Document</label>
+                              <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Upload JD Document</label>
                               <div 
                                 onClick={() => jdFileInputRef.current?.click()}
-                                className="border border-dashed border-slate-250 dark:border-slate-800 rounded p-4 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-900/10 hover:border-slate-400 dark:hover:border-slate-700 flex flex-col items-center justify-center gap-1.5"
+                                className="border border-dashed border-border rounded p-4 text-center cursor-pointer bg-secondary/30 dark:bg-slate-900/10 hover:border-slate-400 dark:hover:border-slate-700 flex flex-col items-center justify-center gap-1.5"
                               >
                                 <input 
                                   type="file" 
@@ -1859,7 +1859,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                   className="hidden"
                                 />
                                 <FileDown className="h-5 w-5 text-slate-400" />
-                                <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-255 truncate max-w-full px-2">
+                                <span className="text-[11px] font-semibold text-foreground dark:text-slate-255 truncate max-w-full px-2">
                                   {jdFile ? jdFile.name : "Select JD PDF or DOCX file"}
                                 </span>
                               </div>
@@ -1868,13 +1868,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                           <TabsContent value="text" className="pt-3.5 space-y-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Paste raw JD text</label>
+                              <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Paste raw JD text</label>
                               <textarea 
                                 placeholder="Paste job title, experience, responsibilities, and skills requirements..."
                                 value={jdTextPaste}
                                 onChange={(e) => setJdTextPaste(e.target.value)}
                                 rows={4}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded px-2.5 py-2 text-xs outline-none text-slate-900 dark:text-slate-200 resize-none font-mono"
+                                className="w-full bg-secondary/40 border border-border rounded px-2.5 py-2 text-xs outline-none text-foreground dark:text-slate-200 resize-none font-mono"
                               />
                             </div>
                           </TabsContent>
@@ -1902,16 +1902,16 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                     {/* Active Structured Job Profile View/Editor */}
                     {activeJD && (
-                      <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                        <CardHeader className="pb-2.5 border-b border-slate-100 dark:border-slate-900 flex flex-row items-center justify-between space-y-0">
+                      <Card className="shadow-sm border-border bg-card">
+                        <CardHeader className="pb-2.5 border-b border-border flex flex-row items-center justify-between space-y-0">
                           <div>
-                            <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Active Job Profile</CardTitle>
-                            <CardDescription className="text-[9px] text-slate-500 dark:text-slate-450"> Extracted structured vectors.</CardDescription>
+                            <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Active Job Profile</CardTitle>
+                            <CardDescription className="text-[9px] text-muted-foreground"> Extracted structured vectors.</CardDescription>
                           </div>
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-7 px-2 text-[10px] text-slate-550 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 font-semibold gap-1 border border-slate-200 dark:border-slate-800"
+                            className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200 font-semibold gap-1 border border-border"
                             onClick={() => setIsEditingJD(!isEditingJD)}
                           >
                             {isEditingJD ? (
@@ -1933,73 +1933,73 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             // --- EDITABLE VIEW ---
                             <div className="space-y-3">
                               <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Job Title</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Job Title</label>
                                 <input 
                                   type="text" 
                                   value={activeJD.title}
                                   onChange={(e) => setActiveJD({ ...activeJD, title: e.target.value })}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none font-semibold text-slate-900 dark:text-slate-100"
+                                  className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none font-semibold text-foreground"
                                 />
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Experience</label>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Experience</label>
                                   <input 
                                     type="text" 
                                     value={activeJD.experience}
                                     onChange={(e) => setActiveJD({ ...activeJD, experience: e.target.value })}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205"
+                                    className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205"
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Department</label>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Department</label>
                                   <input 
                                     type="text" 
                                     value={activeJD.department}
                                     onChange={(e) => setActiveJD({ ...activeJD, department: e.target.value })}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205"
+                                    className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205"
                                   />
                                 </div>
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Location</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Location</label>
                                 <input 
                                   type="text" 
                                   value={activeJD.location}
                                   onChange={(e) => setActiveJD({ ...activeJD, location: e.target.value })}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205"
+                                  className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205"
                                 />
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Required Skills (Comma-separated)</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Required Skills (Comma-separated)</label>
                                 <textarea 
                                   value={activeJD.requiredSkills.join(", ")}
                                   onChange={(e) => setActiveJD({ ...activeJD, requiredSkills: e.target.value.split(",").map(s => s.trim()) })}
                                   rows={2}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205 resize-none font-mono"
+                                  className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205 resize-none font-mono"
                                 />
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Preferred Skills</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Preferred Skills</label>
                                 <input 
                                   type="text" 
                                   value={activeJD.preferredSkills.join(", ")}
                                   onChange={(e) => setActiveJD({ ...activeJD, preferredSkills: e.target.value.split(",").map(s => s.trim()) })}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205"
+                                  className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205"
                                 />
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Education Required</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Education Required</label>
                                 <input 
                                   type="text" 
                                   value={activeJD.education}
                                   onChange={(e) => setActiveJD({ ...activeJD, education: e.target.value })}
-                                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-205"
+                                  className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground dark:text-slate-205"
                                 />
                               </div>
 
@@ -2016,8 +2016,8 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             // --- STRUCTURED READ-ONLY DISPLAY ---
                             <div className="space-y-3.5">
                               <div>
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{activeJD.title}</h3>
-                                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-[10px] text-slate-500 dark:text-slate-400 font-semibold select-none">
+                                <h3 className="text-sm font-bold text-foreground">{activeJD.title}</h3>
+                                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-[10px] text-muted-foreground font-semibold select-none">
                                   <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {activeJD.department}</span>
                                   <span>•</span>
                                   <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {activeJD.location}</span>
@@ -2027,10 +2027,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                               </div>
 
                               <div>
-                                <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-450 mb-1">Required Skills</span>
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Required Skills</span>
                                 <div className="flex flex-wrap gap-1">
                                   {activeJD.requiredSkills.map(s => (
-                                    <Badge key={s} variant="secondary" className="text-[9px] px-2 py-0.5 border border-slate-200 bg-slate-50 text-slate-850 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-250">
+                                    <Badge key={s} variant="secondary" className="text-[9px] px-2 py-0.5 border border-border bg-secondary/40 text-foreground dark:bg-slate-900 border-border dark:text-slate-250">
                                       {s}
                                     </Badge>
                                   ))}
@@ -2039,10 +2039,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                               {activeJD.preferredSkills.length > 0 && (
                                 <div>
-                                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-450 mb-1">Preferred Skills</span>
+                                  <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Preferred Skills</span>
                                   <div className="flex flex-wrap gap-1">
                                     {activeJD.preferredSkills.map(s => (
-                                      <Badge key={s} variant="outline" className="text-[9px] px-2 py-0.5 text-slate-550 border-slate-200 dark:text-slate-400 dark:border-slate-850 select-none">
+                                      <Badge key={s} variant="outline" className="text-[9px] px-2 py-0.5 text-muted-foreground border-border dark:text-slate-400 dark:border-slate-850 select-none">
                                         {s}
                                       </Badge>
                                     ))}
@@ -2051,13 +2051,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                               )}
 
                               <div>
-                                <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-450 mb-0.5">Education Requirements</span>
-                                <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">{activeJD.education}</p>
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-0.5">Education Requirements</span>
+                                <p className="text-[10px] text-foreground/90 font-medium">{activeJD.education}</p>
                               </div>
 
                               <div>
-                                <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-450 mb-1">Key Responsibilities</span>
-                                <ul className="list-disc pl-4 space-y-0.5 text-[10px] text-slate-650 dark:text-slate-350 leading-relaxed font-medium">
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Key Responsibilities</span>
+                                <ul className="list-disc pl-4 space-y-0.5 text-[10px] text-muted-foreground dark:text-slate-350 leading-relaxed font-medium">
                                   {activeJD.responsibilities.slice(0, 3).map((r, i) => (
                                     <li key={i}>{r}</li>
                                   ))}
@@ -2065,11 +2065,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                               </div>
 
                               <div>
-                                <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-450 mb-1">AI Screening Criteria Matrix</span>
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">AI Screening Criteria Matrix</span>
                                 <ul className="space-y-1">
                                   {activeJD.screeningCriteria.map((c, i) => (
-                                    <li key={i} className="flex gap-2 text-[10px] leading-normal text-slate-600 dark:text-slate-400 font-medium">
-                                      <span className="h-3.5 w-3.5 rounded-full bg-slate-100 dark:bg-slate-900 flex-shrink-0 flex items-center justify-center text-[9px] font-bold text-slate-500">
+                                    <li key={i} className="flex gap-2 text-[10px] leading-normal text-muted-foreground font-medium">
+                                      <span className="h-3.5 w-3.5 rounded-full bg-secondary flex-shrink-0 flex items-center justify-center text-[9px] font-bold text-muted-foreground">
                                         {i + 1}
                                       </span>
                                       <span>{c}</span>
@@ -2089,13 +2089,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   <div className="lg:col-span-5 space-y-6">
                     
                     {/* Resume Ingestion Source Simulator */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
                           <Activity className="h-3.5 w-3.5 text-indigo-500" />
                           Resume Collection Engine (Simulator)
                         </CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <CardDescription className="text-[10px] text-muted-foreground">
                           Automatically pulls resumes from candidate application streams.
                         </CardDescription>
                       </CardHeader>
@@ -2106,7 +2106,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             size="sm"
                             disabled={isIngesting || !activeJD}
                             onClick={() => handleSimulatedIngestion("Keka HRMS")}
-                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-border text-foreground/90 hover:bg-secondary/40 dark:hover:bg-slate-900/50"
                           >
                             <Building2 className="h-4 w-4 text-emerald-500" />
                             Keka HRMS
@@ -2116,7 +2116,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             size="sm"
                             disabled={isIngesting || !activeJD}
                             onClick={() => handleSimulatedIngestion("Careers Email")}
-                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-border text-foreground/90 hover:bg-secondary/40 dark:hover:bg-slate-900/50"
                           >
                             <FileText className="h-4 w-4 text-sky-500" />
                             Careers Email
@@ -2126,7 +2126,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             size="sm"
                             disabled={isIngesting || !activeJD}
                             onClick={() => handleSimulatedIngestion("Careers Page")}
-                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                            className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-border text-foreground/90 hover:bg-secondary/40 dark:hover:bg-slate-900/50"
                           >
                             <Link2 className="h-4 w-4 text-amber-500" />
                             Careers Page
@@ -2136,10 +2136,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </Card>
 
                     {/* Resume Upload Area */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Bulk Resume Ingestion</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Drag & drop multiple resume files to evaluate simultaneously.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Bulk Resume Ingestion</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">Drag & drop multiple resume files to evaluate simultaneously.</CardDescription>
                       </CardHeader>
                       <CardContent className="pt-4">
                         <div
@@ -2150,8 +2150,8 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           onClick={triggerFileSelect}
                           className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 ${
                             dragActive 
-                              ? "border-slate-800 bg-slate-50/80 dark:border-slate-100 dark:bg-slate-900/60" 
-                              : "border-slate-200 hover:border-slate-400 dark:border-slate-800 dark:hover:border-slate-600 bg-slate-50/30 dark:bg-slate-900/10"
+                              ? "border-slate-800 bg-secondary/40/80 dark:border-border dark:bg-slate-900/60" 
+                              : "border-border hover:border-slate-400 border-border dark:hover:border-slate-600 bg-secondary/40"
                           }`}
                         >
                           <input 
@@ -2162,26 +2162,26 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             className="hidden" 
                             multiple
                           />
-                          <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-400">
+                          <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-slate-400">
                             <UploadCloud className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-xs font-bold text-slate-850 dark:text-slate-100">
+                            <p className="text-xs font-bold text-foreground dark:text-slate-100">
                               {Object.keys(uploadProgress).length > 0 
                                 ? `Uploading ${Object.keys(uploadProgress).length} file(s)...` 
                                 : "Drop PDF / DOCX resumes here"}
                             </p>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Supports multiple documents evaluated in parallel</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Supports multiple documents evaluated in parallel</p>
                           </div>
                         </div>
 
                         {/* File Uploading Progress Bars */}
                         {Object.keys(uploadProgress).length > 0 && (
-                          <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-800 space-y-2.5">
-                            <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Ingesting Streams</span>
+                          <div className="mt-4 p-3 bg-secondary/40 rounded border border-border space-y-2.5">
+                            <span className="block text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Ingesting Streams</span>
                             {Object.entries(uploadProgress).map(([fileId, progress]) => (
                               <div key={fileId} className="space-y-1">
-                                <div className="flex justify-between text-[9px] font-semibold text-slate-600 dark:text-slate-400">
+                                <div className="flex justify-between text-[9px] font-semibold text-muted-foreground">
                                   <span className="truncate max-w-[200px]">{fileId.split("-")[0]}</span>
                                   <span>{progress}%</span>
                                 </div>
@@ -2194,11 +2194,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </Card>
 
                     {/* Live Screening Queue */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900 flex flex-row items-center justify-between space-y-0">
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between space-y-0">
                         <div>
-                          <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-850 dark:text-slate-200">Live Screening Queue</CardTitle>
-                          <CardDescription className="text-[10px] text-slate-500 dark:text-slate-455">Real-time pipeline parsing updates.</CardDescription>
+                          <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Live Screening Queue</CardTitle>
+                          <CardDescription className="text-[10px] text-muted-foreground dark:text-slate-455">Real-time pipeline parsing updates.</CardDescription>
                         </div>
                         {screeningQueue.length > 0 && (
                           <Badge variant="warning" className="text-[9px] px-1.5 py-0.5">
@@ -2208,7 +2208,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                       </CardHeader>
                       <CardContent className="p-0">
                         {screeningQueue.length === 0 ? (
-                          <div className="py-8 px-4 text-center text-xs text-slate-450 font-semibold flex flex-col items-center gap-1.5">
+                          <div className="py-8 px-4 text-center text-xs text-muted-foreground/80 font-semibold flex flex-col items-center gap-1.5">
                             <Clock className="h-4 w-4 text-slate-400" />
                             <span>No active screening pipelines running.</span>
                           </div>
@@ -2218,19 +2218,19 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                               <div key={item.id} className="p-3.5 flex items-center justify-between gap-4">
                                 <div className="min-w-0 flex-1 space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold truncate text-slate-900 dark:text-slate-100">{item.name}</span>
-                                    <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-slate-200 text-slate-500 font-mono select-none">
+                                    <span className="text-xs font-semibold truncate text-foreground">{item.name}</span>
+                                    <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground font-mono select-none">
                                       {item.fileName}
                                     </Badge>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <div className="h-1.5 flex-1 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                                    <div className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden">
                                       <div 
-                                        className="h-full bg-slate-900 dark:bg-slate-100 transition-all duration-500" 
+                                        className="h-full bg-slate-900 dark:bg-secondary transition-all duration-500" 
                                         style={{ width: `${item.progress}%` }} 
                                       />
                                     </div>
-                                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 w-8 text-right">{item.progress}%</span>
+                                    <span className="text-[9px] font-bold text-muted-foreground w-8 text-right">{item.progress}%</span>
                                   </div>
                                 </div>
                                 
@@ -2255,10 +2255,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </Card>
 
                     {/* Candidate Ranking List */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Screened Candidates</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-555 dark:text-slate-450">Leaderboard of evaluated resumes ranked by AI score.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Screened Candidates</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">Leaderboard of evaluated resumes ranked by AI score.</CardDescription>
                       </CardHeader>
                       <CardContent className="p-0">
                         <Table>
@@ -2278,22 +2278,22 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 onClick={() => setSelectedCandidate(c)}
                                 className={`cursor-pointer transition-colors ${
                                   selectedCandidate?.id === c.id 
-                                    ? "bg-slate-100/70 dark:bg-slate-800/60 font-semibold" 
+                                    ? "bg-secondary/70 dark:bg-slate-800/60 font-semibold" 
                                     : ""
                                 }`}
                               >
-                                <TableCell className="pl-4 text-xs font-bold text-slate-450">#{idx + 1}</TableCell>
+                                <TableCell className="pl-4 text-xs font-bold text-muted-foreground/80">#{idx + 1}</TableCell>
                                 <TableCell>
                                    <div>
                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                       <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{c.name}</span>
+                                       <span className="text-xs font-bold text-foreground">{c.name}</span>
                                        {c.applicationSource && (
-                                         <span className="text-[7.5px] px-1 py-0.2 border border-slate-205 dark:border-slate-800 text-slate-450 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 rounded font-semibold select-none">
+                                         <span className="text-[7.5px] px-1 py-0.2 border border-slate-205 border-border text-muted-foreground/80 dark:text-slate-400 bg-secondary/40 rounded font-semibold select-none">
                                            {c.applicationSource}
                                          </span>
                                        )}
                                      </div>
-                                     <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold block mt-0.5">{c.role} • {c.experienceYears} yrs</span>
+                                     <span className="text-[9px] text-muted-foreground font-semibold block mt-0.5">{c.role} • {c.experienceYears} yrs</span>
                                    </div>
                                  </TableCell>
                                 <TableCell>
@@ -2335,12 +2335,12 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   {/* COLUMN 3: CANDIDATE DETAIL WORKSTATION (lg:col-span-4) */}
                   <div className="lg:col-span-4">
                     {selectedCandidate ? (
-                      <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e] sticky top-6">
-                        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
+                      <Card className="shadow-sm border-border bg-card sticky top-6">
+                        <CardHeader className="pb-3 border-b border-border">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1.5">
-                                <Badge variant="outline" className="text-[8px] uppercase tracking-wider text-slate-500 font-bold px-2 py-0 border-slate-200 dark:border-slate-800 select-none">
+                                <Badge variant="outline" className="text-[8px] uppercase tracking-wider text-muted-foreground font-bold px-2 py-0 border-border select-none">
                                   Screened Profile
                                 </Badge>
                                 <button
@@ -2351,13 +2351,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                   <Trash2 className="h-3 w-3" />
                                 </button>
                               </div>
-                              <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-50">{selectedCandidate.name}</CardTitle>
-                              <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{selectedCandidate.role} • {selectedCandidate.experienceYears} Years Exp</CardDescription>
+                              <CardTitle className="text-sm font-bold text-foreground dark:text-slate-50">{selectedCandidate.name}</CardTitle>
+                              <CardDescription className="text-[10px] text-muted-foreground mt-0.5">{selectedCandidate.role} • {selectedCandidate.experienceYears} Years Exp</CardDescription>
                             </div>
                             
                             {/* Overall Fit Score Circle */}
                             <div className="flex flex-col items-center">
-                              <div className="relative h-12 w-12 rounded-full border-3 border-slate-100 dark:border-slate-800 flex items-center justify-center select-none shadow-sm bg-slate-50/50 dark:bg-slate-900/50">
+                              <div className="relative h-12 w-12 rounded-full border-3 border-border flex items-center justify-center select-none shadow-sm bg-secondary/30 dark:bg-slate-900/50">
                                 <span className={`text-xs font-bold ${
                                   selectedCandidate.score >= 85 
                                     ? "text-emerald-600 dark:text-emerald-400" 
@@ -2368,7 +2368,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                   {selectedCandidate.score}
                                 </span>
                               </div>
-                              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-450 mt-1.5 text-center leading-none">Fit Score</span>
+                              <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground/80 mt-1.5 text-center leading-none">Fit Score</span>
                             </div>
                           </div>
                         </CardHeader>
@@ -2379,13 +2379,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           {renderRecruitmentTimeline(selectedCandidate)}
                           
                           {/* Details Row */}
-                          <div className="grid grid-cols-2 gap-3.5 bg-slate-50/50 dark:bg-slate-900/30 p-2.5 rounded border border-slate-200/40 dark:border-slate-850/40">
+                          <div className="grid grid-cols-2 gap-3.5 bg-secondary/30 dark:bg-slate-900/30 p-2.5 rounded border border-border/40 dark:border-slate-850/40">
                             <div>
-                              <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Confidence Level</span>
-                              <span className="font-semibold text-[11px] text-slate-800 dark:text-slate-200">{selectedCandidate.confidence}</span>
+                              <span className="block text-[9px] uppercase font-bold text-muted-foreground">Confidence Level</span>
+                              <span className="font-semibold text-[11px] text-foreground">{selectedCandidate.confidence}</span>
                             </div>
                             <div>
-                              <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Risk Profile</span>
+                              <span className="block text-[9px] uppercase font-bold text-muted-foreground">Risk Profile</span>
                               <Badge 
                                 variant={selectedCandidate.riskLevel === "Low" ? "success" : selectedCandidate.riskLevel === "Medium" ? "warning" : "destructive"} 
                                 className="text-[8px] px-1 py-0 font-bold"
@@ -2397,21 +2397,21 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                           {/* Recommendation Statement */}
                           <div>
-                            <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">AI Recommendation Summary</span>
-                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-semibold bg-slate-50/30 dark:bg-slate-900/10 p-2.5 rounded border border-slate-100 dark:border-slate-900 text-[11px]">
+                            <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1">AI Recommendation Summary</span>
+                            <p className="text-foreground/90 leading-relaxed font-semibold bg-secondary/40 p-2.5 rounded border border-border text-[11px]">
                               {selectedCandidate.recommendation}
                             </p>
                           </div>
 
                           {/* Experience Match */}
                           <div>
-                            <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">Experience Alignment</span>
-                            <p className="text-slate-650 dark:text-slate-350 leading-relaxed text-[11px] font-medium">{selectedCandidate.experienceMatch}</p>
+                            <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1">Experience Alignment</span>
+                            <p className="text-muted-foreground dark:text-slate-350 leading-relaxed text-[11px] font-medium">{selectedCandidate.experienceMatch}</p>
                           </div>
 
                           {/* Skill Gap Analysis (visual checklist) */}
                           <div className="space-y-1.5">
-                            <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Skills Alignment Matrix</span>
+                            <span className="block text-[9px] uppercase font-bold text-muted-foreground">Skills Alignment Matrix</span>
                             
                             <div className="flex flex-wrap gap-1">
                               {selectedCandidate.matchedSkills.map(skill => (
@@ -2428,9 +2428,9 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             
                             {selectedCandidate.keywords && selectedCandidate.keywords.length > 0 && (
                               <div className="pt-1.5 flex flex-wrap gap-1 items-center">
-                                <span className="text-[8.5px] uppercase font-bold text-slate-400 dark:text-slate-500 mr-1 select-none">Keywords:</span>
+                                <span className="text-[8.5px] uppercase font-bold text-slate-400 dark:text-muted-foreground mr-1 select-none">Keywords:</span>
                                 {selectedCandidate.keywords.map((kw) => (
-                                  <span key={kw} className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 px-1.5 py-0.5 rounded select-none border border-slate-200/40 dark:border-slate-800/40">
+                                  <span key={kw} className="text-[9px] font-semibold text-muted-foreground bg-secondary/60 px-1.5 py-0.5 rounded select-none border border-border/40">
                                     {kw}
                                   </span>
                                 ))}
@@ -2441,10 +2441,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           {/* Strengths & Weaknesses (bullet columns) */}
                           <div className="space-y-3">
                             <div>
-                              <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1 text-emerald-600 dark:text-emerald-450">
+                              <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1 flex items-center gap-1 text-emerald-600 dark:text-emerald-450">
                                 <ThumbsUp className="h-2.5 w-2.5 inline" /> Core Strengths
                               </span>
-                              <ul className="space-y-1 pl-3.5 list-disc text-slate-650 dark:text-slate-300 text-[11px] leading-relaxed font-medium">
+                              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground dark:text-slate-300 text-[11px] leading-relaxed font-medium">
                                 {selectedCandidate.strengths.map((s, i) => (
                                   <li key={i}>{s}</li>
                                 ))}
@@ -2453,10 +2453,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             
                             {selectedCandidate.weaknesses.length > 0 && (
                               <div>
-                                <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1 text-amber-600 dark:text-amber-450">
+                                <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1 flex items-center gap-1 text-amber-600 dark:text-amber-450">
                                   <ThumbsDown className="h-2.5 w-2.5 inline" /> Attention Areas
                                 </span>
-                                <ul className="space-y-1 pl-3.5 list-disc text-slate-650 dark:text-slate-300 text-[11px] leading-relaxed font-medium">
+                                <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground dark:text-slate-300 text-[11px] leading-relaxed font-medium">
                                   {selectedCandidate.weaknesses.map((w, i) => (
                                     <li key={i}>{w}</li>
                                   ))}
@@ -2478,13 +2478,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             {/* Certifications and Projects */}
                             {((selectedCandidate.certifications && selectedCandidate.certifications.length > 0) || 
                               (selectedCandidate.projects && selectedCandidate.projects.length > 0)) && (
-                              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
                                 {selectedCandidate.certifications && selectedCandidate.certifications.length > 0 && (
                                   <div>
-                                    <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                    <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1">
                                       🎖 Certifications
                                     </span>
-                                    <ul className="space-y-0.5 list-disc pl-3 text-[10px] text-slate-650 dark:text-slate-300 leading-relaxed font-medium">
+                                    <ul className="space-y-0.5 list-disc pl-3 text-[10px] text-muted-foreground dark:text-slate-300 leading-relaxed font-medium">
                                       {selectedCandidate.certifications.map((cert, idx) => (
                                         <li key={idx} className="truncate max-w-full" title={cert}>{cert}</li>
                                       ))}
@@ -2493,10 +2493,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 )}
                                 {selectedCandidate.projects && selectedCandidate.projects.length > 0 && (
                                   <div>
-                                    <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                    <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-1">
                                       📁 Key Projects
                                     </span>
-                                    <ul className="space-y-0.5 list-disc pl-3 text-[10px] text-slate-650 dark:text-slate-300 leading-relaxed font-medium">
+                                    <ul className="space-y-0.5 list-disc pl-3 text-[10px] text-muted-foreground dark:text-slate-300 leading-relaxed font-medium">
                                       {selectedCandidate.projects.map((proj, idx) => (
                                         <li key={idx} className="truncate max-w-full" title={proj}>{proj}</li>
                                       ))}
@@ -2508,13 +2508,13 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           </div>
 
                           {/* Contact details */}
-                          <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50 grid grid-cols-1 gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                            <span>Education: <strong className="text-slate-850 dark:text-slate-250 font-bold">{selectedCandidate.education}</strong></span>
-                            <span>Contact: <strong className="text-slate-850 dark:text-slate-250 font-bold">{selectedCandidate.email} • {selectedCandidate.phone}</strong></span>
+                          <div className="pt-2 border-t border-border/50 grid grid-cols-1 gap-1 text-[10px] text-muted-foreground font-semibold">
+                            <span>Education: <strong className="text-foreground dark:text-slate-250 font-bold">{selectedCandidate.education}</strong></span>
+                            <span>Contact: <strong className="text-foreground dark:text-slate-250 font-bold">{selectedCandidate.email} • {selectedCandidate.phone}</strong></span>
                           </div>
 
                           {/* Recruitment Stage Interactive Panels */}
-                          <div className="pt-2.5 border-t border-slate-200/50 dark:border-slate-800/50 space-y-3">
+                          <div className="pt-2.5 border-t border-border/50 space-y-3">
                             
                             {/* Shortlisted / Assessment Pending Stage */}
                             {selectedCandidate.status === "shortlisted" && (
@@ -2522,11 +2522,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 <span className="block text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-400">
                                   ✉ Assessment Invited
                                 </span>
-                                <p className="text-[10px] text-slate-650 dark:text-slate-400 leading-normal">
+                                <p className="text-[10px] text-muted-foreground leading-normal">
                                   The candidate has been automatically emailed a link to complete the technical assessment test.
                                 </p>
                                 <div className="space-y-1.5 pt-1.5 border-t border-indigo-100/55 dark:border-indigo-950/40">
-                                  <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                     Simulated Test Score (0-100)
                                   </label>
                                   <div className="flex gap-2">
@@ -2536,7 +2536,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                       max="100"
                                       value={assessmentScoreInput}
                                       onChange={(e) => setAssessmentScoreInput(Math.min(100, Math.max(0, Number(e.target.value))))}
-                                      className="w-16 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-semibold"
+                                      className="w-16 bg-white dark:bg-slate-900 border border-border rounded px-2 py-1 text-xs outline-none text-foreground font-semibold"
                                     />
                                     <Button 
                                       size="sm" 
@@ -2562,12 +2562,12 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                     Scheduled
                                   </Badge>
                                 </div>
-                                <div className="text-[10px] text-slate-650 dark:text-slate-400 leading-normal space-y-1 select-text">
+                                <div className="text-[10px] text-muted-foreground leading-normal space-y-1 select-text">
                                   <p><strong>Interviewer:</strong> Yogesh Wadhwa (HR Manager)</p>
                                   <p><strong>Date/Time:</strong> {selectedCandidate.interviewScheduledDate ? new Date(selectedCandidate.interviewScheduledDate).toLocaleString() : "TBD"}</p>
                                 </div>
                                 <div className="space-y-1.5 pt-2 border-t border-indigo-100/55 dark:border-indigo-950/40">
-                                  <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                     HR Interview Evaluation Notes
                                   </label>
                                   <textarea 
@@ -2575,7 +2575,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                     value={interviewFeedbackInput}
                                     onChange={(e) => setInterviewFeedbackInput(e.target.value)}
                                     rows={2}
-                                    className="w-full bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded px-2 py-1.5 text-xs outline-none text-slate-850 dark:text-slate-200 resize-none"
+                                    className="w-full bg-white dark:bg-slate-900 border border-border rounded px-2 py-1.5 text-xs outline-none text-foreground resize-none"
                                   />
                                   <div className="grid grid-cols-2 gap-2 pt-1">
                                     <Button 
@@ -2607,7 +2607,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 <span className="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-450">
                                   🎉 Candidate Selected
                                 </span>
-                                <p className="text-[10px] text-slate-650 dark:text-slate-350 leading-normal">
+                                <p className="text-[10px] text-muted-foreground dark:text-slate-350 leading-normal">
                                   The candidate has successfully cleared all selection rounds! You can now migrate their file and initiate the employee onboarding workflow in Keka HRMS.
                                 </p>
                                 <Button 
@@ -2629,7 +2629,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 <span className="block text-[11px] font-bold text-emerald-800 dark:text-emerald-450">
                                   Moved to Keka Onboarding Workflow
                                 </span>
-                                <p className="text-[9.5px] text-slate-500 dark:text-slate-400">
+                                <p className="text-[9.5px] text-muted-foreground">
                                   Candidate data successfully synced with HRMS. The onboarding checklist is now active in Keka.
                                 </p>
                               </div>
@@ -2641,7 +2641,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 <span className="block text-[10px] uppercase font-bold text-rose-700 dark:text-rose-450">
                                   ✗ Candidate Rejected
                                 </span>
-                                <div className="text-[9.5px] text-slate-600 dark:text-slate-400 font-semibold space-y-1">
+                                <div className="text-[9.5px] text-muted-foreground font-semibold space-y-1">
                                   <p><strong>HRMS Status:</strong> Moved to Keka Rejected Pool</p>
                                   {selectedCandidate.assessmentScore !== undefined && (
                                     <p><strong>Test Result:</strong> Failed ({selectedCandidate.assessmentScore}/100)</p>
@@ -2656,11 +2656,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                             {/* Activity Logs Panel */}
                             {selectedCandidate.activityLogs && selectedCandidate.activityLogs.length > 0 && (
-                              <div className="p-2.5 bg-slate-50 dark:bg-slate-900/10 rounded border border-slate-200/50 dark:border-slate-800/50 space-y-1.5 select-text">
-                                <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                              <div className="p-2.5 bg-secondary/40/10 rounded border border-border/50 space-y-1.5 select-text">
+                                <span className="block text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
                                   Pipeline Activity Audit Logs
                                 </span>
-                                <div className="max-h-[100px] overflow-y-auto custom-scrollbar space-y-1 text-[9px] font-medium text-slate-600 dark:text-slate-400 leading-normal">
+                                <div className="max-h-[100px] overflow-y-auto custom-scrollbar space-y-1 text-[9px] font-medium text-muted-foreground leading-normal">
                                   {selectedCandidate.activityLogs.map((log, idx) => (
                                     <div key={idx} className="flex gap-1.5 items-start">
                                       <span className="text-slate-400 font-mono flex-shrink-0">
@@ -2699,7 +2699,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             variant="outline" 
                             size="sm"
                             onClick={() => handleDecision(selectedCandidate.id, "hold")}
-                            className="text-xs font-semibold border-slate-250 text-slate-700 dark:text-slate-250 dark:border-slate-800"
+                            className="text-xs font-semibold border-border text-foreground/90 dark:text-slate-250 border-border"
                           >
                             Hold
                           </Button>
@@ -2714,11 +2714,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                         </CardFooter>
                       </Card>
                     ) : (
-                      <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e] h-[400px] flex items-center justify-center p-6 text-center">
+                      <Card className="shadow-sm border-border bg-card h-[400px] flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-2 text-slate-400">
                           <User className="h-10 w-10 text-slate-300" />
                           <p className="text-xs font-bold">No Candidate Selected</p>
-                          <p className="text-[10px] max-w-xs leading-normal text-slate-500 mt-0.5">Select an analyzed candidate from the list on the left to review match details, risk levels, and issue decision updates.</p>
+                          <p className="text-[10px] max-w-xs leading-normal text-muted-foreground mt-0.5">Select an analyzed candidate from the list on the left to review match details, risk levels, and issue decision updates.</p>
                         </div>
                       </Card>
                     )}
@@ -2747,12 +2747,12 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     { title: "Average AI Score", value: "79.2", desc: "For open JD profiles", change: "+1.3%" },
                     { title: "Time to Screen", value: "4.2s", desc: "From upload to score", change: "-0.5s" },
                   ].map((stat, i) => (
-                    <Card key={i} className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
+                    <Card key={i} className="shadow-sm border-border bg-card">
                       <CardContent className="p-4 flex items-center justify-between">
                         <div className="space-y-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450">{stat.title}</span>
-                          <span className="block text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{stat.value}</span>
-                          <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-semibold">{stat.desc}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">{stat.title}</span>
+                          <span className="block text-2xl font-bold text-foreground dark:text-slate-50 tracking-tight">{stat.value}</span>
+                          <span className="block text-[10px] text-muted-foreground font-semibold">{stat.desc}</span>
                         </div>
                         <div className="text-right">
                           <Badge variant="success" className="text-[9px] px-1.5 font-bold">
@@ -2769,10 +2769,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   
                   {/* Left block (charts) lg:col-span-8 */}
                   <div className="lg:col-span-8 space-y-6">
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Evaluation Funnel</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Pass through metrics across candidates pipelines.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Evaluation Funnel</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">Pass through metrics across candidates pipelines.</CardDescription>
                       </CardHeader>
                       <CardContent className="h-[220px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -2792,10 +2792,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </Card>
 
                     {/* Table View of Rankings */}
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Enterprise Candidate Rankings</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Consolidated evaluation leaderboard for active departments.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Enterprise Candidate Rankings</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">Consolidated evaluation leaderboard for active departments.</CardDescription>
                       </CardHeader>
                       <CardContent className="p-0">
                         <Table>
@@ -2813,11 +2813,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           <TableBody>
                             {candidates.map((c, idx) => (
                               <TableRow key={c.id}>
-                                <TableCell className="pl-4 text-xs font-semibold text-slate-450">#{idx + 1}</TableCell>
-                                <TableCell className="font-bold text-xs text-slate-850 dark:text-slate-100">{c.name}</TableCell>
-                                <TableCell className="text-xs text-slate-600 dark:text-slate-400 font-semibold">{c.role}</TableCell>
-                                <TableCell className="text-xs text-slate-500 font-semibold">{c.experienceYears} Years</TableCell>
-                                <TableCell className="text-xs font-bold text-slate-650">{c.matchPercent}%</TableCell>
+                                <TableCell className="pl-4 text-xs font-semibold text-muted-foreground/80">#{idx + 1}</TableCell>
+                                <TableCell className="font-bold text-xs text-foreground dark:text-slate-100">{c.name}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground font-semibold">{c.role}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
+                                <TableCell className="text-xs font-bold text-muted-foreground">{c.matchPercent}%</TableCell>
                                 <TableCell>
                                   <span className={`text-xs font-bold ${
                                     c.score >= 85 ? "text-emerald-600" : c.score >= 70 ? "text-amber-600" : "text-red-500"
@@ -2848,10 +2848,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                   {/* Right block lg:col-span-4 */}
                   <div className="lg:col-span-4 space-y-6">
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Match Distribution</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Percentage ratio of screening scores.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Match Distribution</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">Percentage ratio of screening scores.</CardDescription>
                       </CardHeader>
                       <CardContent className="h-[200px] flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
@@ -2876,10 +2876,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                       </CardContent>
                     </Card>
 
-                    <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                      <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Recent Audit Logs</CardTitle>
-                        <CardDescription className="text-[10px] text-slate-555 dark:text-slate-450">AI screening pipeline activities.</CardDescription>
+                    <Card className="shadow-sm border-border bg-card">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Recent Audit Logs</CardTitle>
+                        <CardDescription className="text-[10px] text-muted-foreground">AI screening pipeline activities.</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3.5">
                         {[
@@ -2888,10 +2888,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           { time: "1 day ago", candidate: "Arjun Mehta", action: "Matched & added to Keka ATS" },
                         ].map((log, i) => (
                           <div key={i} className="flex gap-3 text-xs leading-normal">
-                            <span className="text-[9px] text-slate-500 font-mono w-20 flex-shrink-0 pt-0.5">{log.time}</span>
+                            <span className="text-[9px] text-muted-foreground font-mono w-20 flex-shrink-0 pt-0.5">{log.time}</span>
                             <div>
-                              <strong className="text-slate-800 dark:text-slate-250 block font-bold">{log.candidate}</strong>
-                              <span className="text-slate-500 dark:text-slate-400 text-[10px] block mt-0.5 font-semibold">{log.action}</span>
+                              <strong className="text-foreground block font-bold">{log.candidate}</strong>
+                              <span className="text-muted-foreground text-[10px] block mt-0.5 font-semibold">{log.action}</span>
                             </div>
                           </div>
                         ))}
@@ -2913,11 +2913,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                 transition={{ duration: 0.15 }}
                 className="space-y-6"
               >
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900 flex flex-row items-center justify-between space-y-0">
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between space-y-0">
                     <div>
-                      <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">Candidate Pipeline Database</CardTitle>
-                      <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Search, filter and access evaluations logs.</CardDescription>
+                      <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Candidate Pipeline Database</CardTitle>
+                      <CardDescription className="text-[10px] text-muted-foreground">Search, filter and access evaluations logs.</CardDescription>
                     </div>
                     <div className="relative w-72">
                       <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -2926,19 +2926,19 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                         placeholder="Search name, skills or role..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md pl-9 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                        className="w-full bg-secondary/40 border border-border rounded-md pl-9 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground font-semibold"
                       />
                     </div>
                   </CardHeader>
 
                   {/* Filter Toolbar */}
-                  <div className="px-6 py-2.5 border-b border-slate-100 dark:border-slate-900 bg-slate-50/30 dark:bg-[#0b0f19]/10 flex flex-wrap items-center gap-4 text-xs select-none">
+                  <div className="px-6 py-2.5 border-b border-border bg-secondary/40 flex flex-wrap items-center gap-4 text-xs select-none">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">Match Rating:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">Match Rating:</span>
                       <select 
                         value={scoreFilter} 
                         onChange={(e) => setScoreFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Match Ratings</option>
                         <option value="high">High Match (≥85%)</option>
@@ -2948,11 +2948,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">Pipeline Status:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">Pipeline Status:</span>
                       <select 
                         value={statusFilter} 
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Statuses</option>
                         <option value="applied">Applied</option>
@@ -2963,11 +2963,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">Experience:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">Experience:</span>
                       <select 
                         value={expFilter} 
                         onChange={(e) => setExpFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Experience Levels</option>
                         <option value="entry">Entry (0-2 Yrs)</option>
@@ -2977,11 +2977,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">Target Role:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">Target Role:</span>
                       <select 
                         value={roleFilter} 
                         onChange={(e) => setRoleFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Roles</option>
                         {uniqueRoles.map(role => (
@@ -2999,7 +2999,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                           setRoleFilter("all")
                           setSearchQuery("")
                         }}
-                        className="text-[9px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 uppercase transition-colors mr-2"
+                        className="text-[9px] font-bold text-muted-foreground hover:text-foreground dark:hover:text-slate-200 uppercase transition-colors mr-2"
                       >
                         Clear All Filters
                       </button>
@@ -3031,7 +3031,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                       <TableBody>
                         {filteredCandidates.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-12 text-slate-450 dark:text-slate-500 font-semibold text-xs bg-slate-50/10 dark:bg-transparent">
+                            <TableCell colSpan={8} className="text-center py-12 text-muted-foreground/80 dark:text-muted-foreground font-semibold text-xs bg-secondary/40/10 dark:bg-transparent">
                               No candidates found matching the selected search and filter criteria.
                             </TableCell>
                           </TableRow>
@@ -3047,17 +3047,17 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                             >
                               <TableCell className="pl-6">
                                 <div>
-                                  <span className="text-xs font-bold block text-slate-900 dark:text-slate-100">{c.name}</span>
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-0.5">{c.email}</span>
+                                  <span className="text-xs font-bold block text-foreground">{c.name}</span>
+                                  <span className="text-[10px] text-muted-foreground font-semibold block mt-0.5">{c.email}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-xs text-slate-800 dark:text-slate-200 font-semibold">{c.role}</TableCell>
-                              <TableCell className="text-xs text-slate-600 dark:text-slate-400 font-semibold">{c.experienceYears} Years</TableCell>
-                              <TableCell className="text-xs text-slate-500 font-mono font-semibold">{c.appliedDate}</TableCell>
+                              <TableCell className="text-xs text-foreground font-semibold">{c.role}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
+                              <TableCell className="text-xs text-muted-foreground font-mono font-semibold">{c.appliedDate}</TableCell>
                               <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-[280px]">
                                   {c.matchedSkills.map(s => (
-                                    <Badge key={s} variant="outline" className="text-[8px] bg-slate-50 dark:bg-slate-900 px-1 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-semibold select-none">
+                                    <Badge key={s} variant="outline" className="text-[8px] bg-secondary/40 px-1 border border-border text-foreground/90 font-semibold select-none">
                                       {s}
                                     </Badge>
                                   ))}
@@ -3070,7 +3070,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                   }`}>
                                     {c.score}%
                                   </span>
-                                  <div className="w-16 h-1 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden select-none">
+                                  <div className="w-16 h-1 bg-secondary rounded-full overflow-hidden select-none">
                                     <div 
                                       className={`h-full ${
                                         c.score >= 85 ? "bg-emerald-500" : c.score >= 70 ? "bg-amber-500" : "bg-red-500"
@@ -3124,7 +3124,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Enterprise Job Listings</h2>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">Manage positions and respective AI search vectors.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Manage positions and respective AI search vectors.</p>
                   </div>
                   <Button 
                     variant="default" 
@@ -3142,11 +3142,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {jobs.map((job, i) => (
-                    <Card key={i} className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
+                    <Card key={i} className="shadow-sm border-border bg-card">
                       <CardHeader className="pb-3 border-b border-slate-105 dark:border-slate-900/60">
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">{job.title}</CardTitle>
+                            <CardTitle className="text-sm font-bold text-foreground">{job.title}</CardTitle>
                             <CardDescription className="text-[10px] mt-0.5 font-semibold">{job.dept} • {job.loc}</CardDescription>
                           </div>
                           <Badge variant={job.status === "Active" ? "success" : "secondary"} className="text-[8px] uppercase tracking-wider">
@@ -3155,20 +3155,20 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                         </div>
                       </CardHeader>
                       <CardContent className="pt-4 text-xs space-y-2">
-                        <div className="flex justify-between text-[11px] text-slate-500 font-semibold">
+                        <div className="flex justify-between text-[11px] text-muted-foreground font-semibold">
                           <span>Experience Vector:</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{job.exp}</span>
+                          <span className="font-bold text-foreground">{job.exp}</span>
                         </div>
-                        <div className="flex justify-between text-[11px] text-slate-500 font-semibold">
+                        <div className="flex justify-between text-[11px] text-muted-foreground font-semibold">
                           <span>Candidates Evaluated:</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{job.candidates}</span>
+                          <span className="font-bold text-foreground">{job.candidates}</span>
                         </div>
                       </CardContent>
-                      <CardFooter className="pb-4 pt-0 flex justify-between gap-2 border-t border-slate-100 dark:border-slate-900/60 mt-3">
+                      <CardFooter className="pb-4 pt-0 flex justify-between gap-2 border-t border-border/60 mt-3">
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          className="w-full text-xs mt-3 border-slate-250 text-slate-700 dark:text-slate-300 dark:border-slate-800 font-semibold"
+                          className="w-full text-xs mt-3 border-border text-foreground/90 border-border font-semibold"
                           onClick={() => {
                             setActiveJD(job.jd)
                             setActiveTab("screening")
@@ -3227,14 +3227,14 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   ].map((stat, i) => {
                     const Icon = stat.icon;
                     return (
-                      <Card key={i} className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
+                      <Card key={i} className="shadow-sm border-border bg-card">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{stat.title}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stat.title}</span>
                           <Icon className={`h-4.5 w-4.5 ${stat.color}`} />
                         </CardHeader>
                         <CardContent className="pb-4">
-                          <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{stat.value}</div>
-                          <span className="text-[9px] text-slate-450 dark:text-slate-500 mt-1 block font-semibold">{stat.desc}</span>
+                          <div className="text-2xl font-bold tracking-tight text-foreground">{stat.value}</div>
+                          <span className="text-[9px] text-muted-foreground/80 dark:text-muted-foreground mt-1 block font-semibold">{stat.desc}</span>
                         </CardContent>
                       </Card>
                     );
@@ -3242,11 +3242,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                 </div>
 
                 {/* Main Dashboard Card */}
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900 flex flex-row items-center justify-between space-y-0">
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between space-y-0">
                     <div>
-                      <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">AI Assessment Dashboard</CardTitle>
-                      <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400">Track candidate test results, final score weights, and cheating violations.</CardDescription>
+                      <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">AI Assessment Dashboard</CardTitle>
+                      <CardDescription className="text-[10px] text-muted-foreground">Track candidate test results, final score weights, and cheating violations.</CardDescription>
                     </div>
                     
                     {/* Search Field */}
@@ -3257,19 +3257,19 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                         placeholder="Search name or role..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md pl-9 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                        className="w-full bg-secondary/40 border border-border rounded-md pl-9 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground font-semibold"
                       />
                     </div>
                   </CardHeader>
 
                   {/* Filter Toolbar */}
-                  <div className="px-6 py-2.5 border-b border-slate-100 dark:border-slate-900 bg-slate-50/30 dark:bg-[#0b0f19]/10 flex flex-wrap items-center gap-4 text-xs select-none">
+                  <div className="px-6 py-2.5 border-b border-border bg-secondary/40 flex flex-wrap items-center gap-4 text-xs select-none">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">Test Status:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">Test Status:</span>
                       <select 
                         value={assessmentStatusFilter} 
                         onChange={(e) => setAssessmentStatusFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Test Statuses</option>
                         <option value="pending">Pending Attempt</option>
@@ -3280,11 +3280,11 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-slate-500">HR Rank:</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-455 dark:text-muted-foreground">HR Rank:</span>
                       <select 
                         value={statusFilter} 
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-white dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
+                        className="bg-white dark:bg-[#090d16] border border-border rounded px-2 py-0.5 outline-none text-[11px] font-semibold text-foreground/90 cursor-pointer focus:border-slate-400 dark:focus:border-slate-700"
                       >
                         <option value="all">All Ranks</option>
                         <option value="Qualified">Qualified (≥80%)</option>
@@ -3300,7 +3300,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-b border-slate-150 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-transparent text-[9.5px] uppercase font-bold text-slate-500 tracking-wider">
+                          <TableRow className="border-b border-slate-150 dark:border-slate-900 bg-secondary/30 dark:bg-slate-950/20 hover:bg-transparent text-[9.5px] uppercase font-bold text-muted-foreground tracking-wider">
                             <TableHead className="py-3 pl-6">Candidate Name</TableHead>
                             <TableHead className="py-3">Job Role</TableHead>
                             <TableHead className="py-3 text-center">Resume Score</TableHead>
@@ -3358,23 +3358,23 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                 : null;
 
                               return (
-                                <TableRow key={c.id} className="border-b border-slate-100 dark:border-slate-900/50 hover:bg-slate-50/30 dark:hover:bg-slate-900/10">
+                                <TableRow key={c.id} className="border-b border-border/50 hover:bg-secondary/40/30 dark:hover:bg-slate-900/10">
                                   {/* Name & Email */}
-                                  <TableCell className="py-3.5 pl-6 font-semibold text-slate-800 dark:text-slate-200">
+                                  <TableCell className="py-3.5 pl-6 font-semibold text-foreground">
                                     <div className="flex flex-col">
                                       <span>{c.name}</span>
-                                      <span className="text-[10px] text-slate-500 font-medium">{c.email}</span>
+                                      <span className="text-[10px] text-muted-foreground font-medium">{c.email}</span>
                                     </div>
                                   </TableCell>
 
                                   {/* Role */}
-                                  <TableCell className="py-3.5 text-slate-650 dark:text-slate-350 font-medium">
+                                  <TableCell className="py-3.5 text-muted-foreground dark:text-slate-350 font-medium">
                                     {c.role}
                                   </TableCell>
 
                                   {/* Resume Score */}
                                   <TableCell className="py-3.5 text-center">
-                                    <Badge variant="outline" className="text-[10px] font-mono font-bold bg-slate-50/50 border-slate-200 text-slate-700 dark:bg-slate-900/20 dark:border-slate-800 dark:text-slate-300">
+                                    <Badge variant="outline" className="text-[10px] font-mono font-bold bg-secondary/30 border-border text-foreground/90 dark:bg-slate-900/20 border-border dark:text-slate-300">
                                       {resumeScore}%
                                     </Badge>
                                   </TableCell>
@@ -3394,7 +3394,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                         <Clock className="h-3 w-3" /> Sent
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider select-none">—</span>
+                                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider select-none">—</span>
                                     )}
                                   </TableCell>
 
@@ -3403,15 +3403,15 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                     {finalScore !== undefined && finalScore !== null ? (
                                       <Badge className={`text-[10px] font-mono font-extrabold px-2 ${
                                         finalScore >= 80 
-                                          ? "bg-emerald-500 text-slate-950" 
+                                          ? "bg-emerald-500 text-foreground" 
                                           : finalScore >= 60 
-                                          ? "bg-amber-500 text-slate-950" 
+                                          ? "bg-amber-500 text-foreground" 
                                           : "bg-rose-500 text-white"
                                       }`}>
                                         {Number(finalScore).toFixed(1)}%
                                       </Badge>
                                     ) : (
-                                      <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider select-none">—</span>
+                                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider select-none">—</span>
                                     )}
                                   </TableCell>
 
@@ -3421,12 +3421,12 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                       <Badge variant="outline" className={`text-[10px] font-mono font-bold px-2 py-0.5 border ${
                                         violations > 0 
                                           ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-950/20 dark:bg-rose-950/10 dark:text-rose-400" 
-                                          : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-900/20"
+                                          : "border-border bg-secondary/40 text-muted-foreground border-border dark:bg-slate-900/20"
                                       }`}>
                                         {violations} {violations === 1 ? "violation" : "violations"}
                                       </Badge>
                                     ) : (
-                                      <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider select-none">—</span>
+                                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider select-none">—</span>
                                     )}
                                   </TableCell>
 
@@ -3445,7 +3445,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                         Pending
                                       </Badge>
                                     ) : (
-                                      <Badge variant="outline" className="text-[9.5px] font-bold uppercase px-2 py-0 border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-850 dark:bg-transparent">
+                                      <Badge variant="outline" className="text-[9.5px] font-bold uppercase px-2 py-0 border-border bg-secondary/40 text-slate-400 dark:border-slate-850 dark:bg-transparent">
                                         Not Invited
                                       </Badge>
                                     )}
@@ -3460,14 +3460,14 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                         ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-950/20 dark:bg-amber-950/10 dark:text-amber-450" :
                                       c.status === "Rejected" || c.status === "rejected"
                                         ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-950/20 dark:bg-rose-950/10 dark:text-rose-400" :
-                                      "border-slate-200 bg-slate-50 text-slate-650 dark:border-slate-800 dark:bg-slate-900/20 dark:text-slate-400"
+                                      "border-border bg-secondary/40 text-muted-foreground border-border dark:bg-slate-900/20 dark:text-slate-400"
                                     }`}>
                                       {c.status}
                                     </Badge>
                                   </TableCell>
 
                                   {/* Submit Date */}
-                                  <TableCell className="py-3.5 text-center font-mono font-medium text-slate-500 dark:text-slate-400 select-none">
+                                  <TableCell className="py-3.5 text-center font-mono font-medium text-muted-foreground select-none">
                                     {submissionDate || "—"}
                                   </TableCell>
 
@@ -3476,7 +3476,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                     {!isInvited && resumeScore >= 70 && (
                                       <Button 
                                         size="sm"
-                                        className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 text-[10px] px-2 py-1 font-bold rounded"
+                                        className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-secondary dark:hover:bg-white dark:text-foreground text-[10px] px-2 py-1 font-bold rounded"
                                         onClick={() => handleSendAssessmentInvite(c.id)}
                                         disabled={isSendingInvite[c.id]}
                                       >
@@ -3488,7 +3488,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          className="text-[10px] px-2 py-1 font-bold rounded border-slate-200 text-slate-700 dark:border-slate-800 dark:text-slate-350 cursor-pointer"
+                                          className="text-[10px] px-2 py-1 font-bold rounded border-border text-foreground/90 border-border dark:text-slate-350 cursor-pointer"
                                           onClick={() => {
                                             const inviteUrl = `${window.location.origin.includes("localhost") ? "https://resume-screening-app-sage.vercel.app" : window.location.origin}/assessment/${c.assessmentToken}`;
                                             copyToClipboard(inviteUrl);
@@ -3498,7 +3498,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                         </Button>
                                         <Button
                                           size="sm"
-                                          className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 text-[10px] px-2 py-1 font-bold rounded cursor-pointer"
+                                          className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-secondary dark:hover:bg-white dark:text-foreground text-[10px] px-2 py-1 font-bold rounded cursor-pointer"
                                           onClick={() => handleSendAssessmentInvite(c.id)}
                                           disabled={isSendingInvite[c.id]}
                                         >
@@ -3510,7 +3510,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="text-[10px] px-2 py-1 font-bold rounded border-slate-200 text-slate-550 dark:border-slate-800 dark:text-slate-450 cursor-pointer"
+                                        className="text-[10px] px-2 py-1 font-bold rounded border-border text-muted-foreground border-border dark:text-muted-foreground/80 cursor-pointer"
                                         onClick={() => {
                                           setSelectedCandidate(c);
                                           setActiveTab("candidates");
@@ -3544,30 +3544,30 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
               >
                 <div>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">ATS Pipeline Stages</h2>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">Drag-and-drop simulated board mapping candidate workflows.</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Drag-and-drop simulated board mapping candidate workflows.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 overflow-x-auto custom-scrollbar pb-4 items-start">
                   
                   {/* Applied Column */}
-                  <div className="bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <span className="text-xs font-bold uppercase text-slate-500">Applied ({candidates.filter(c => c.status === "applied").length})</span>
+                  <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between border-b border-border pb-2">
+                      <span className="text-xs font-bold uppercase text-muted-foreground">Applied ({candidates.filter(c => c.status === "applied").length})</span>
                     </div>
                     {candidates.filter(c => c.status === "applied").map(c => (
                       <Card 
                         key={c.id} 
-                        className="shadow-sm border-slate-200 dark:border-slate-850 cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-white dark:bg-[#0c111e]"
+                        className="shadow-sm border-border cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-card"
                         onClick={() => {
                           setSelectedCandidate(c)
                           setActiveTab("screening")
                         }}
                       >
                         <CardContent className="p-3 space-y-2 text-xs">
-                          <span className="font-bold text-xs block truncate text-slate-900 dark:text-slate-100">{c.name}</span>
-                          <span className="text-[10px] text-slate-500 block truncate">{c.role}</span>
+                          <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
                           <div className="flex items-center justify-between mt-2.5">
-                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-slate-50 dark:bg-slate-900">{c.experienceYears} yrs exp</Badge>
+                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                             <span className="text-xs font-bold text-amber-600">{c.score}%</span>
                           </div>
                         </CardContent>
@@ -3576,24 +3576,24 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   </div>
 
                   {/* Shortlisted Column */}
-                  <div className="bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between border-b border-border pb-2">
                       <span className="text-xs font-bold uppercase text-emerald-600">Shortlisted ({candidates.filter(c => c.status === "shortlisted").length})</span>
                     </div>
                     {candidates.filter(c => c.status === "shortlisted").map(c => (
                       <Card 
                         key={c.id} 
-                        className="shadow-sm border-slate-200 dark:border-slate-850 cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-white dark:bg-[#0c111e]"
+                        className="shadow-sm border-border cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-card"
                         onClick={() => {
                           setSelectedCandidate(c)
                           setActiveTab("screening")
                         }}
                       >
                         <CardContent className="p-3 space-y-2 text-xs">
-                          <span className="font-bold text-xs block truncate text-slate-900 dark:text-slate-100">{c.name}</span>
-                          <span className="text-[10px] text-slate-500 block truncate">{c.role}</span>
+                          <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
                           <div className="flex items-center justify-between mt-2.5">
-                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-slate-50 dark:bg-slate-900">{c.experienceYears} yrs exp</Badge>
+                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                             <span className="text-xs font-bold text-emerald-650">{c.score}%</span>
                           </div>
                         </CardContent>
@@ -3602,24 +3602,24 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   </div>
 
                   {/* Interview Column */}
-                  <div className="bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between border-b border-border pb-2">
                       <span className="text-xs font-bold uppercase text-indigo-600">Interviewing ({candidates.filter(c => c.status === "interviewing").length})</span>
                     </div>
                     {candidates.filter(c => c.status === "interviewing").map(c => (
                       <Card 
                         key={c.id} 
-                        className="shadow-sm border-slate-200 dark:border-slate-850 cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-white dark:bg-[#0c111e]"
+                        className="shadow-sm border-border cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-card"
                         onClick={() => {
                           setSelectedCandidate(c)
                           setActiveTab("screening")
                         }}
                       >
                         <CardContent className="p-3 space-y-2 text-xs">
-                          <span className="font-bold text-xs block truncate text-slate-900 dark:text-slate-100">{c.name}</span>
-                          <span className="text-[10px] text-slate-500 block truncate">{c.role}</span>
+                          <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
                           <div className="flex items-center justify-between mt-2.5">
-                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-slate-50 dark:bg-slate-900">{c.experienceYears} yrs exp</Badge>
+                            <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                             <span className="text-xs font-bold text-indigo-600">{c.score}%</span>
                           </div>
                         </CardContent>
@@ -3628,22 +3628,22 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   </div>
 
                   {/* Hold / Rejected Column */}
-                  <div className="bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between border-b border-border pb-2">
                       <span className="text-xs font-bold uppercase text-rose-600">Hold / Rejected ({candidates.filter(c => c.status === "hold" || c.status === "rejected").length})</span>
                     </div>
                     {candidates.filter(c => c.status === "hold" || c.status === "rejected").map(c => (
                       <Card 
                         key={c.id} 
-                        className="shadow-sm border-slate-200 dark:border-slate-855 cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-white dark:bg-[#0c111e] opacity-70"
+                        className="shadow-sm border-border cursor-pointer hover:border-slate-400 dark:hover:border-slate-700 bg-card opacity-70"
                         onClick={() => {
                           setSelectedCandidate(c)
                           setActiveTab("screening")
                         }}
                       >
                         <CardContent className="p-3 space-y-2 text-xs">
-                          <span className="font-bold text-xs block truncate text-slate-900 dark:text-slate-100">{c.name}</span>
-                          <span className="text-[10px] text-slate-500 block truncate">{c.role}</span>
+                          <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
                           <div className="flex items-center justify-between mt-2.5">
                             <Badge 
                               variant={c.status === "hold" ? "warning" : "destructive"}
@@ -3679,10 +3679,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   {/* Daily Volume */}
-                  <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
+                  <Card className="shadow-sm border-border bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-805 dark:text-slate-200">Daily Upload Volume</CardTitle>
-                      <CardDescription className="text-[10px] text-slate-500">Evaluations triggered per week-day cycle.</CardDescription>
+                      <CardDescription className="text-[10px] text-muted-foreground">Evaluations triggered per week-day cycle.</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
@@ -3704,10 +3704,10 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                   </Card>
 
                   {/* Pie distribution */}
-                  <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
+                  <Card className="shadow-sm border-border bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-805 dark:text-slate-200">Candidate Score Split</CardTitle>
-                      <CardDescription className="text-[10px] text-slate-500">Division ratio of compatibility brackets.</CardDescription>
+                      <CardDescription className="text-[10px] text-muted-foreground">Division ratio of compatibility brackets.</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[250px] flex items-center justify-center">
                       <ResponsiveContainer width="100%" height="100%">
@@ -3747,48 +3747,48 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
               >
                 <div>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Workspace Integrations</h2>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">Manage ATS endpoints, credits, and evaluation weights.</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Manage ATS endpoints, credits, and evaluation weights.</p>
                 </div>
 
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                    <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">DeepSeek API Settings</CardTitle>
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 border-b border-border">
+                    <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">DeepSeek API Settings</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3 text-xs">
                     <div className="space-y-1">
-                      <span className="block text-[10px] uppercase font-bold text-slate-500">API Gateway Key</span>
+                      <span className="block text-[10px] uppercase font-bold text-muted-foreground">API Gateway Key</span>
                       <input 
                         type="password" 
                         value="••••••••••••••••••••••••••••••••••••••••" 
                         disabled 
-                        className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 font-mono text-[11px] text-slate-500 outline-none select-all"
+                        className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground outline-none select-all"
                       />
-                      <span className="text-[9px] text-slate-450 block mt-1">Configured securely in environment variables (`DEEPSEEK_API_KEY`)</span>
+                      <span className="text-[9px] text-muted-foreground/80 block mt-1">Configured securely in environment variables (`DEEPSEEK_API_KEY`)</span>
                     </div>
 
                     <div className="space-y-1.5 pt-2">
-                      <span className="block text-[10px] uppercase font-bold text-slate-500">Model Temperature</span>
+                      <span className="block text-[10px] uppercase font-bold text-muted-foreground">Model Temperature</span>
                       <div className="flex items-center gap-3">
                         <input type="range" min="0" max="1" step="0.1" defaultValue="0.3" disabled className="w-1/3 accent-slate-850" />
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400">0.3 (Deterministic default)</span>
+                        <span className="text-xs font-bold text-muted-foreground">0.3 (Deterministic default)</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c111e]">
-                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-900">
-                    <CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200">ATS & Google Sheets Synchronizations</CardTitle>
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 border-b border-border">
+                    <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">ATS & Google Sheets Synchronizations</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4 text-xs">
-                    <div className="space-y-1 pb-3 border-b border-slate-100 dark:border-slate-900">
-                      <span className="block text-[10px] uppercase font-bold text-slate-500">Google Sheets / Webhook Sync URL</span>
+                    <div className="space-y-1 pb-3 border-b border-border">
+                      <span className="block text-[10px] uppercase font-bold text-muted-foreground">Google Sheets / Webhook Sync URL</span>
                       <input 
                         type="url" 
                         placeholder="e.g. https://script.google.com/macros/s/... or https://hooks.zapier.com/..." 
                         value={webhookUrl}
                         onChange={(e) => setWebhookUrl(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 font-sans text-[11px] text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-slate-400 font-semibold"
+                        className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
                       />
                       <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
                         Input a Google App Script, Zapier, or Make Webhook. When a candidate's pipeline status is updated, the profile is posted instantly.
@@ -3802,7 +3802,7 @@ Keywords: React, Next.js, TypeScript, Tailwind, Core Web Vitals, Frontend Archit
                     ].map((integration, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div>
-                          <strong className="text-slate-800 dark:text-slate-200 font-bold block">{integration.name}</strong>
+                          <strong className="text-foreground font-bold block">{integration.name}</strong>
                           <span className="text-slate-455 text-[10px] block mt-0.5 font-semibold">{integration.desc}</span>
                         </div>
                         <Badge variant={integration.status === "Enabled" ? "success" : "secondary"} className="text-[9px] font-bold">

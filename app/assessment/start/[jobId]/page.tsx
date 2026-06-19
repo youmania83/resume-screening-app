@@ -112,10 +112,10 @@ export default function PublicAssessmentRegistrationPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-800">
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-800" />
-          <p className="text-sm text-slate-500 font-semibold tracking-wide">Initializing registration portal...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-slate-800" />
+          <p className="text-sm text-muted-foreground font-semibold tracking-wide">Initializing registration portal...</p>
         </div>
       </div>
     );
@@ -123,16 +123,16 @@ export default function PublicAssessmentRegistrationPage() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-800 px-4">
+      <div className="flex h-screen items-center justify-center bg-background text-foreground px-4">
         <div className="max-w-md w-full bg-white border border-red-200 rounded-xl p-8 text-center space-y-6 shadow-xl">
           <div className="h-14 w-14 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto text-red-600">
             <ShieldAlert className="h-7 w-7" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Access Restricted</h2>
-            <p className="text-sm text-slate-600 leading-relaxed">{error}</p>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Access Restricted</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">{error}</p>
           </div>
-          <div className="text-xs text-slate-400 border-t border-slate-100 pt-4">
+          <div className="text-xs text-slate-400 border-t border-border pt-4">
             If you believe this is a mistake, please contact the recruitment team.
           </div>
         </div>
@@ -141,7 +141,7 @@ export default function PublicAssessmentRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between py-8 px-4 sm:px-6 lg:px-8 select-none">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between py-8 px-4 sm:px-6 lg:px-8 select-none">
       <Toaster position="top-right" theme="light" closeButton />
       
       <div className="max-w-lg w-full mx-auto space-y-6">
@@ -150,22 +150,22 @@ export default function PublicAssessmentRegistrationPage() {
           <div className="h-12 w-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg">
             <Lock className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Rison AI Screening</h1>
-          <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Candidate Assessment Portal</p>
+          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Rison AI Screening</h1>
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Candidate Assessment Portal</p>
         </div>
 
         {/* Main Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 relative overflow-hidden">
+        <div className="bg-white border border-border rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 relative overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-slate-900 to-slate-700" />
           
           <div className="space-y-2">
-            <Badge variant="outline" className="text-[10px] font-extrabold tracking-wider uppercase bg-slate-50 border-slate-200 text-slate-600">
+            <Badge variant="outline" className="text-[10px] font-extrabold tracking-wider uppercase bg-background border-border text-muted-foreground">
               Technical Assessment Invitation
             </Badge>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-xl font-bold text-foreground tracking-tight">
               {jobTitle}
             </h2>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Enter your registration details below to start your timed technical assessment.
             </p>
           </div>
@@ -186,7 +186,7 @@ export default function PublicAssessmentRegistrationPage() {
                   placeholder="e.g. John Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-50/50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-slate-800 text-slate-800 font-medium transition-all"
+                  className="w-full bg-background/50 border border-border rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground font-medium transition-all"
                 />
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function PublicAssessmentRegistrationPage() {
                   placeholder="e.g. john@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-50/50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-slate-800 text-slate-800 font-medium transition-all"
+                  className="w-full bg-background/50 border border-border rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground font-medium transition-all"
                 />
               </div>
             </div>
@@ -225,25 +225,25 @@ export default function PublicAssessmentRegistrationPage() {
                   placeholder="e.g. +1 (555) 123-4567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-slate-50/50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-slate-800 text-slate-800 font-medium transition-all"
+                  className="w-full bg-background/50 border border-border rounded-lg pl-10 pr-4 py-3 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground font-medium transition-all"
                 />
               </div>
             </div>
 
             {/* Details Grid info */}
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs select-none">
+            <div className="grid grid-cols-2 gap-3 bg-background border border-border rounded-xl p-4 text-xs select-none">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-slate-650" />
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <span className="font-bold text-slate-900 block leading-none">15 Minutes</span>
-                  <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">Test duration</span>
+                  <span className="font-bold text-foreground block leading-none">15 Minutes</span>
+                  <span className="text-[10px] text-muted-foreground font-semibold block mt-0.5">Test duration</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-slate-650" />
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <span className="font-bold text-slate-900 block leading-none">10 MCQs</span>
-                  <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">Multiple Choice</span>
+                  <span className="font-bold text-foreground block leading-none">10 MCQs</span>
+                  <span className="text-[10px] text-muted-foreground font-semibold block mt-0.5">Multiple Choice</span>
                 </div>
               </div>
             </div>
