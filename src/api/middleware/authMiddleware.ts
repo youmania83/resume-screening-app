@@ -29,6 +29,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   // Public routes that bypass auth entirely
   const publicPaths = [
     "/api/auth/login",
+    "/api/auth/google-login",
     "/api/auth/register",
     "/api/auth/accept-invite",
     "/api/health",

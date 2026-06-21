@@ -101,10 +101,12 @@ router.delete("/:id", async (req, res, next) => {
 });
 
 // POST /api/jobs/extract – extracts structured data from job descriptions via DeepSeek
+// POST /api/jobs/extract – extracts structured data from job descriptions via DeepSeek
 router.post("/extract", async (req, res, _next) => {
+  let jdText = "";
   try {
     const { text, url } = req.body as { text?: string; url?: string };
-    let jdText = text || "";
+    jdText = text || "";
     
     if (url) {
       jdText = `URL Import: ${url}\n\n`;
@@ -234,30 +236,107 @@ ${jdText}`;
   } catch (err: any) {
     console.warn("JD AI extraction failed or API unconfigured, falling back to heuristic parser:", err.message);
     
-    const text = (req.body.text || "") + (req.body.url || "");
-    const titleMatch = text.match(/(?:title|position|role):\s*([^\n]+)/i);
-    const expMatch = text.match(/(\d+\s*-\s*\d+\s*years|\d+\s*\+\s*years)/i);
+    const text = jdText || (req.body.text || "") + (req.body.url || "");
     
+    // Heuristically find the title
+    let title = "SCM Executive";
+    const hiringMatch = text.match(/(?:we're\s+)?hiring:\s*([^\n💼📍|]+)/i);
+    const titleMatch = text.match(/(?:title|position|role):\s*([^\n]+)/i);
+    
+    if (hiringMatch && hiringMatch[1]) {
+      title = hiringMatch[1].trim();
+    } else if (titleMatch && titleMatch[1]) {
+      title = titleMatch[1].trim();
+    } else {
+      const urlToMatch = req.body.url || "";
+      const matches = urlToMatch.match(/\/posts\/([a-zA-Z0-9-_]+)/) || urlToMatch.match(/\/jobs\/view\/([a-zA-Z0-9-]+)/) || urlToMatch.match(/\/jobs\/([a-zA-Z0-9-]+)/) || urlToMatch.match(/\/careers\/([a-zA-Z0-9-]+)/);
+      if (matches && matches[1]) {
+        title = matches[1].replace(/[_-]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()).trim();
+      }
+    }
+    
+    const expMatch = text.match(/(\d+\s*-\s*\d+\s*years|\d+\s*\+\s*years)/i);
+    const experience = expMatch ? expMatch[0] : "2-5 Years";
+    
+    // Dynamic mock fallback details based on title keywords
+    let requiredSkills = ["Strategic Procurement", "Vendor Management", "SAP / ERP Systems", "Logistics", "Cost Optimization"];
+    let preferredSkills = ["GST Audits", "Advanced Excel Data Analysis"];
+    let education = "Bachelor's Degree in Business or Engineering";
+    let responsibilities = [
+      "Manage raw material procurement and vendor negotiations",
+      "Operate SAP ERP modules for purchase orders",
+      "Optimize inventory metrics and logistics TAT",
+      "Audit vendor performance quarterly"
+    ];
+    let keywords = ["Procurement", "SAP ERP", "Vendor Sourcing", "Logistics", "Inventory Control"];
+    let screeningCriteria = [
+      "Has 3+ years in industrial procurement",
+      "Familiar with SAP/Oracle ERP supply chain workflows",
+      "Demonstrated cost-saving vendor negotiations"
+    ];
+
+    const lowTitle = title.toLowerCase();
+    if (lowTitle.includes("talent") || lowTitle.includes("recruiter") || lowTitle.includes("hr") || lowTitle.includes("hiring")) {
+      requiredSkills = ["Talent Acquisition", "Recruitment", "Stakeholder Management", "ATS Platforms", "Sourcing"];
+      preferredSkills = ["Recruitment Analytics", "Employer Branding", "Team Management"];
+      education = "Bachelor's degree in Human Resources, Business Administration, or a related field";
+      responsibilities = [
+        "Develop and execute effective talent acquisition strategies.",
+        "Manage end-to-end recruitment processes across functions.",
+        "Partner with hiring managers to understand workforce requirements.",
+        "Build and maintain strong candidate pipelines."
+      ];
+      keywords = ["Recruiter", "ATS", "Talent Acquisition", "Sourcing", "Hiring"];
+      screeningCriteria = [
+        "Has 2+ years of full-cycle recruiting experience",
+        "Familiar with modern applicant tracking systems",
+        "Strong candidate sourcing skills on LinkedIn"
+      ];
+    } else if (lowTitle.includes("frontend") || lowTitle.includes("react") || lowTitle.includes("developer") || lowTitle.includes("engineer") || lowTitle.includes("ui") || lowTitle.includes("web")) {
+      requiredSkills = ["React", "TypeScript", "Next.js", "Tailwind CSS", "JavaScript"];
+      preferredSkills = ["State Management", "Performance Optimization"];
+      education = "B.S. in Computer Science or equivalent";
+      responsibilities = [
+        "Design and implement responsive, accessible user interfaces",
+        "Collaborate with UX/UI designers on layout patterns",
+        "Optimize web vital metrics and rendering speeds",
+        "Participate in code reviews and test validation"
+      ];
+      keywords = ["Frontend", "React", "TypeScript", "Next.js", "Web Vital"];
+      screeningCriteria = [
+        "Strong core JavaScript and TypeScript fundamentals",
+        "Experience building clean UI layout designs",
+        "Understanding of core web vital constraints"
+      ];
+    } else if (lowTitle.includes("devops") || lowTitle.includes("cloud") || lowTitle.includes("aws") || lowTitle.includes("sre")) {
+      requiredSkills = ["AWS Infrastructure", "Terraform", "Docker Containers", "Bash Scripting", "GitHub Actions"];
+      preferredSkills = ["Kubernetes (EKS)", "Prometheus & Grafana", "Argocd GitOps"];
+      education = "B.S. in Computer Engineering or related field";
+      responsibilities = [
+        "Deploy, monitor, and scale cloud infrastructure on AWS.",
+        "Manage infrastructure as code scripts using Terraform.",
+        "Automate deployment and release pipelines (CI/CD).",
+        "Ensure application logging and monitoring alerts are highly active."
+      ];
+      keywords = ["DevOps", "AWS", "Terraform", "Kubernetes", "CI/CD"];
+      screeningCriteria = [
+        "Has 3+ years managing production AWS environments.",
+        "Proficient writing and maintaining Terraform codebases.",
+        "Experienced with containerization and build pipelines."
+      ];
+    }
+
     res.json({
       success: true,
       jd: {
-        title: titleMatch ? titleMatch[1].trim() : "SCM Executive",
-        experience: expMatch ? expMatch[0] : "2-5 Years",
-        requiredSkills: ["Strategic Procurement", "Vendor Management", "SAP / ERP Systems", "Logistics", "Cost Optimization"],
-        preferredSkills: ["GST Audits", "Advanced Excel Data Analysis"],
-        education: "Bachelor's Degree in Business or Engineering",
-        responsibilities: [
-          "Manage raw material procurement and vendor negotiations",
-          "Operate SAP ERP modules for purchase orders",
-          "Optimize inventory metrics and logistics TAT",
-          "Audit vendor performance quarterly"
-        ],
-        keywords: ["Procurement", "SAP ERP", "Vendor Sourcing", "Logistics", "Inventory Control"],
-        screeningCriteria: [
-          "Has 3+ years in industrial procurement",
-          "Familiar with SAP/Oracle ERP supply chain workflows",
-          "Demonstrated cost-saving vendor negotiations"
-        ]
+        title,
+        experience,
+        requiredSkills,
+        preferredSkills,
+        education,
+        responsibilities,
+        keywords,
+        screeningCriteria
       }
     });
   }

@@ -13,6 +13,68 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleGoogleLogin = async (token: string) => {
+    setIsLoading(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+    try {
+      const res = await fetch(`${apiBase}/auth/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(`Account registered! Welcome, ${data.user.name}`);
+        localStorage.setItem("ira_user", JSON.stringify(data.user));
+        router.push("/");
+      } else {
+        toast.error(data.error || "Google Sign-In failed");
+      }
+    } catch (err) {
+      console.error("Google login failed:", err);
+      toast.error("Network error, please try again");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const initializeGoogleSignIn = () => {
+      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (clientId) {
+          (window as any).google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response: any) => {
+              await handleGoogleLogin(response.credential);
+            },
+          });
+          (window as any).google.accounts.id.renderButton(
+            document.getElementById("google-signin-button"),
+            { theme: "outline", size: "large", width: 370 }
+          );
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      if ((window as any).google?.accounts?.id) {
+        initializeGoogleSignIn();
+      } else {
+        const interval = setInterval(() => {
+          if ((window as any).google?.accounts?.id) {
+            initializeGoogleSignIn();
+            clearInterval(interval);
+          }
+        }, 100);
+        return () => clearInterval(interval);
+      }
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName || !userName || !email || !password) {
@@ -158,6 +220,30 @@ export default function RegisterPage() {
                 <span>Register Company</span>
               )}
             </button>
+
+            <div className="relative my-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase">
+                <span className="bg-card px-2 text-muted-foreground font-semibold">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="flex justify-center w-full min-h-[40px]">
+              <div id="google-signin-button" />
+            </div>
+
+            {process.env.NODE_ENV !== "production" && (
+              <button
+                type="button"
+                onClick={() => handleGoogleLogin("mock-google-token")}
+                className="w-full py-2 border border-dashed border-primary/40 text-primary hover:bg-primary/5 font-bold text-xs rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="h-3 w-3" />
+                <span>Dev Mock Google Signup</span>
+              </button>
+            )}
           </form>
         </section>
 

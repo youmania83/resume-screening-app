@@ -34,13 +34,28 @@ if (typeof window !== "undefined") {
           credentials: "include",
         };
 
+        const handleResponse = (response: Response) => {
+          if (
+            response.status === 401 &&
+            !url.includes("/api/auth/login") &&
+            !url.includes("/api/auth/register") &&
+            !url.includes("/api/auth/accept-invite")
+          ) {
+            localStorage.removeItem("ira_user");
+            if (window.location.pathname !== "/login") {
+              window.location.href = "/login?expired=true";
+            }
+          }
+          return response;
+        };
+
         if (typeof input === "string") {
-          return originalFetch(url, newInit);
+          return originalFetch(url, newInit).then(handleResponse);
         } else if (input instanceof URL) {
-          return originalFetch(new URL(url), newInit);
+          return originalFetch(new URL(url), newInit).then(handleResponse);
         } else {
           const newRequest = new Request(url, input as any);
-          return originalFetch(newRequest, newInit);
+          return originalFetch(newRequest, newInit).then(handleResponse);
         }
       }
 

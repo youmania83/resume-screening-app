@@ -2,6 +2,7 @@
 import { Router } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { hashPassword, comparePassword, hashToken } from "../../lib/auth.js";
 import { queryGlobal } from "../../lib/tenantDb.js";
 import { authMiddleware, requireRole } from "../middleware/authMiddleware.js";
@@ -9,6 +10,9 @@ import { rateLimiter } from "../middleware/security.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const oauthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+
 
 // POST /api/auth/register - Sign up a new Tenant & Owner user (Rate limited)
 router.post(
@@ -89,6 +93,159 @@ router.post(
       res.status(201).json({
         success: true,
         user: { id: userId, tenantId, name: userName, email, role: "owner" }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/auth/google-login - Sign in or register with Google (Rate limited)
+router.post(
+  "/google-login",
+  rateLimiter(15 * 60 * 1000, 20), // Max 20 logins/registrations per 15 minutes per IP
+  async (req, res, next) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        res.status(400).json({ success: false, error: "Google ID token is required" });
+        return;
+      }
+
+      let email = "";
+      let name = "";
+      let googleId = "";
+
+      const isMockToken = token === "mock-google-token";
+      const isDev = process.env.NODE_ENV !== "production";
+
+      if (isMockToken && isDev) {
+        email = "mock_google_recruiter@risonaitech.com";
+        name = "Mock Google Recruiter";
+        googleId = "mock-google-sub-id";
+      } else {
+        if (!GOOGLE_CLIENT_ID) {
+          res.status(500).json({
+            success: false,
+            error: "Google client ID is not configured on the server."
+          });
+          return;
+        }
+
+        try {
+          const ticket = await (oauthClient || new OAuth2Client(GOOGLE_CLIENT_ID)).verifyIdToken({
+            idToken: token,
+            audience: GOOGLE_CLIENT_ID,
+          });
+          const payload = ticket.getPayload();
+          if (!payload) {
+            res.status(400).json({ success: false, error: "Invalid Google ID token payload" });
+            return;
+          }
+          email = payload.email || "";
+          name = payload.name || payload.given_name || "Google User";
+          googleId = payload.sub;
+        } catch (err: any) {
+          res.status(400).json({ success: false, error: `Google authentication failed: ${err.message}` });
+          return;
+        }
+      }
+
+      if (!email) {
+        res.status(400).json({ success: false, error: "Google account does not have an email address" });
+        return;
+      }
+
+      // Check if user exists
+      const userRes = await queryGlobal("SELECT * FROM users WHERE email = $1 LIMIT 1;", [email]);
+      let userId: string;
+      let tenantId: string;
+      let role: string;
+      let userName: string;
+
+      if (userRes.rowCount === 0) {
+        // User does not exist, auto-onboard
+        tenantId = crypto.randomUUID();
+        userId = crypto.randomUUID();
+        role = "owner";
+        userName = name;
+
+        // Create Tenant
+        const companyName = `${userName}'s Workspace`;
+        await queryGlobal("INSERT INTO tenants (id, name) VALUES ($1, $2);", [tenantId, companyName]);
+
+        // Create Owner User with a secure randomized password
+        const randomPassword = crypto.randomBytes(32).toString("hex");
+        const pwdHash = await hashPassword(randomPassword);
+        await queryGlobal(
+          "INSERT INTO users (id, tenant_id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5, $6);",
+          [userId, tenantId, userName, email, pwdHash, role]
+        );
+
+        // Seed Default ATS Pipeline Stages for the Tenant
+        const defaultStages = [
+          "Applied", "Resume Received", "AI Screened", "Shortlisted", "Recruiter Review",
+          "Phone Screen", "Interview 1", "Interview 2", "Client Submission", "Offer Sent",
+          "Hired", "Rejected"
+        ];
+        for (let i = 0; i < defaultStages.length; i++) {
+          const stageId = crypto.randomUUID();
+          const stageName = defaultStages[i];
+          const isSystem = ["Applied", "AI Screened", "Hired", "Rejected"].includes(stageName);
+          await queryGlobal(
+            "INSERT INTO stages (id, tenant_id, name, order_index, is_system) VALUES ($1, $2, $3, $4, $5);",
+            [stageId, tenantId, stageName, i, isSystem]
+          );
+        }
+      } else {
+        const user = userRes.rows[0];
+        userId = user.id;
+        tenantId = user.tenant_id;
+        role = user.role;
+        userName = user.name;
+      }
+
+      // Generate JWT tokens
+      const accessToken = jwt.sign({ userId, tenantId, role, email }, JWT_SECRET, { expiresIn: "15m" });
+      const refreshToken = crypto.randomBytes(40).toString("hex");
+      const hashedRefreshToken = hashToken(refreshToken);
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours session
+
+      await queryGlobal(
+        "INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4);",
+        [crypto.randomUUID(), userId, hashedRefreshToken, expiresAt]
+      );
+
+      // Concurrent session limit (max 5 active sessions)
+      await queryGlobal(`
+        DELETE FROM refresh_tokens
+        WHERE id IN (
+          SELECT id FROM refresh_tokens
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+          OFFSET 5
+        );
+      `, [userId]);
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+      };
+
+      res.cookie("accessToken", accessToken, {
+        ...cookieOptions,
+        maxAge: 15 * 60 * 1000
+      });
+
+      res.cookie("refreshToken", refreshToken, {
+        ...cookieOptions,
+        maxAge: 8 * 60 * 60 * 1000
+      });
+
+      res.json({
+        success: true,
+        user: { id: userId, tenantId, name: userName, email, role }
       });
     } catch (err) {
       next(err);

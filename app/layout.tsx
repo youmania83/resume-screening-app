@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "../styles/globals.css";
 import { Toaster } from "sonner";
 import { ClientInitializer } from "@/src/components/providers/ClientInitializer";
+import Script from "next/script";
 
 import type { Viewport } from "next";
 
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light">
       <body className="antialiased">
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <ClientInitializer />
         {children}
         <Toaster position="top-right" richColors />
@@ -31,5 +33,6 @@ export default function RootLayout({
     </html>
   );
 }
+
 
 
