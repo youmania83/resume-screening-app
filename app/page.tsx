@@ -1,6 +1,7 @@
 // app/page.tsx
 "use client"
-import React, { useRef } from "react"
+import React, { useRef, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Briefcase, Users, Layers, Settings, Sparkles, FileCheck2, BarChart3, Activity, Award, UserCheck } from "lucide-react"
 import { Badge } from "@/src/components/ui/badge"
 import { toast } from "sonner"
@@ -21,6 +22,34 @@ import { SettingsView } from "@/src/components/dashboard/SettingsView"
 import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthView"
 
 export default function Dashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("ira_user")
+    if (!saved) {
+      router.push("/login")
+    } else {
+      try {
+        setUser(JSON.parse(saved))
+      } catch {
+        router.push("/login")
+      }
+    }
+  }, [router])
+
+  const handleLogout = async () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+    try {
+      await fetch(`${apiBase}/auth/logout`, { method: "POST" })
+    } catch (e) {
+      console.warn("Backend logout call failed", e)
+    }
+    localStorage.removeItem("ira_user")
+    toast.success("Signed out successfully.")
+    router.push("/login")
+  }
+
   const {
     candidates,
     setCandidates,
@@ -183,12 +212,26 @@ export default function Dashboard() {
             Workspace Settings
           </button>
           
-          <div className="mt-3 p-2.5 bg-secondary/40 rounded-lg border border-border flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-foreground border border-border shadow-xs">YK</div>
-            <div className="min-w-0 flex-1">
-              <span className="block text-[10px] font-bold text-foreground truncate leading-tight">Yogesh Wadhwa</span>
-              <span className="block text-[9px] text-muted-foreground truncate font-medium">Techsol Admin</span>
+          <div className="mt-3 p-2.5 bg-secondary/40 rounded-lg border border-border flex flex-col gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-foreground border border-border shadow-xs">
+                {user ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase() : "YK"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="block text-[10px] font-bold text-foreground truncate leading-tight">
+                  {user ? user.name : "Yogesh Wadhwa"}
+                </span>
+                <span className="block text-[9px] text-muted-foreground truncate font-medium">
+                  {user ? (user.role === "owner" ? "Workspace Owner" : user.role) : "Techsol Admin"}
+                </span>
+              </div>
             </div>
+            <button 
+              onClick={handleLogout} 
+              className="w-full text-center py-1.5 bg-destructive/10 hover:bg-destructive/20 text-destructive text-[10px] font-bold rounded transition-colors cursor-pointer"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </aside>
