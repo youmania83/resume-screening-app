@@ -23,26 +23,33 @@ export function useJobs(onJobSaved?: (jd: StructuredJD) => void) {
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.jobs)) {
-          const mapped: JobListItem[] = data.jobs.map((j: any) => ({
-            title: j.title,
-            dept: j.department || "Engineering",
-            loc: j.location || "Remote",
-            exp: j.experience || "Not Specified",
-            candidates: j.candidates_count || 0,
-            status: j.status || "Active",
-            jd: j.jd || {
-              title: j.title,
-              experience: j.experience,
-              department: j.department,
-              location: j.location,
-              requiredSkills: j.required_skills || [],
-              preferredSkills: j.preferred_skills || [],
-              education: j.education || "",
-              responsibilities: j.responsibilities || [],
-              keywords: j.keywords || [],
-              screeningCriteria: j.screening_criteria || []
+          const mapped: JobListItem[] = data.jobs.map((j: any) => {
+            let parsedJd = null;
+            if (j.jd) {
+              parsedJd = typeof j.jd === "string" ? JSON.parse(j.jd) : j.jd;
             }
-          }));
+            return {
+              id: j.id,
+              title: j.title,
+              dept: j.department || "Engineering",
+              loc: j.location || "Remote",
+              exp: j.experience_required || j.experience || "Not Specified",
+              candidates: j.candidates_count || 0,
+              status: j.status || "Active",
+              jd: parsedJd || {
+                title: j.title,
+                experience: j.experience_required || j.experience || "Not Specified",
+                department: j.department || "Engineering",
+                location: j.location || "Remote",
+                requiredSkills: j.skills || [],
+                preferredSkills: [],
+                education: "",
+                responsibilities: j.description ? [j.description] : [],
+                keywords: [],
+                screeningCriteria: []
+              }
+            };
+          });
           setJobs(mapped);
         }
       }
@@ -55,37 +62,53 @@ export function useJobs(onJobSaved?: (jd: StructuredJD) => void) {
     loadJobs();
   }, [loadJobs]);
 
-  const saveOrUpdateJob = (jd: StructuredJD) => {
-    setJobs(prev => {
-      const existsIndex = prev.findIndex(j => j.title.toLowerCase() === jd.title.toLowerCase());
-      if (existsIndex >= 0) {
-        const updated = [...prev];
-        updated[existsIndex] = {
-          ...updated[existsIndex],
-          title: jd.title,
-          dept: jd.department || "Operations",
-          loc: jd.location || "Remote",
-          exp: jd.experience || "Not Specified",
-          jd: jd
-        };
-        return updated;
+  const saveOrUpdateJob = async (jd: StructuredJD) => {
+    const existingJob = jobs.find(j => j.title.toLowerCase() === jd.title.toLowerCase());
+    const descText = jd.responsibilities?.join("\n") || jd.title || "No description provided";
+    
+    const body = {
+      title: jd.title,
+      description: descText,
+      department: jd.department || "Engineering",
+      location: jd.location || "Remote",
+      experienceRequired: jd.experience || "Not Specified",
+      skills: jd.requiredSkills || [],
+      jd: jd
+    };
+
+    try {
+      if (existingJob && existingJob.id) {
+        const res = await fetch(`${apiBase}/jobs/${existingJob.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          toast.success(`Job "${jd.title}" updated successfully.`);
+        } else {
+          toast.error("Failed to update job in database.");
+        }
       } else {
-        return [
-          ...prev,
-          {
-            title: jd.title,
-            dept: jd.department || "Operations",
-            loc: jd.location || "Remote",
-            exp: jd.experience || "Not Specified",
-            candidates: 0,
-            status: "Active",
-            jd: jd
-          }
-        ];
+        const res = await fetch(`${apiBase}/jobs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          toast.success(`Job "${jd.title}" saved to database.`);
+        } else {
+          toast.error("Failed to save job to database.");
+        }
       }
-    });
-    if (onJobSaved) {
-      onJobSaved(jd);
+      
+      await loadJobs();
+      
+      if (onJobSaved) {
+        onJobSaved(jd);
+      }
+    } catch (err) {
+      console.error("Failed to save job to database:", err);
+      toast.error("Network error while saving job.");
     }
   };
 

@@ -617,6 +617,10 @@ async function init() {
       ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS html_body TEXT;
     `);
 
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS jd JSONB;
+    `);
+
     console.log("Adding tenant_id column and indices to business tables...");
     const scopedTables = [
       "email_templates",

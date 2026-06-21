@@ -25,7 +25,7 @@ router.get("/", async (req, res, next) => {
 // POST /api/jobs – Generates a job description record under tenant
 router.post("/", creditCheck("job_create"), async (req, res, next) => {
   try {
-    const { title, description, department, location, experienceRequired } = req.body;
+    const { title, description, department, location, experienceRequired, jd } = req.body;
     
     if (!title || !description) {
        res.status(400).json({ success: false, error: "Title and Description are required" });
@@ -35,9 +35,18 @@ router.post("/", creditCheck("job_create"), async (req, res, next) => {
     const jobId = crypto.randomUUID();
 
     await queryTenant(
-      `INSERT INTO jobs (id, title, description, department, location, experience_required, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, :tenant_id);`,
-      [jobId, title, description, department || "Engineering", location || "Remote", experienceRequired || "Not Specified"]
+      `INSERT INTO jobs (id, title, description, department, location, experience_required, jd, skills, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, :tenant_id);`,
+      [
+        jobId,
+        title,
+        description,
+        department || "Engineering",
+        location || "Remote",
+        experienceRequired || "Not Specified",
+        jd ? JSON.stringify(jd) : null,
+        jd?.requiredSkills || null
+      ]
     );
 
     const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
@@ -216,8 +225,8 @@ ${jdText}`;
     const aiResponse = await callDeepSeek(prompt);
     try {
       const parsed = JSON.parse(aiResponse);
-       res.json(parsed);
-       return;
+      res.json({ success: true, jd: parsed });
+      return;
     } catch {
       console.error("Failed to parse DeepSeek JD extraction response:", aiResponse);
       throw new Error("Invalid structured JSON returned from DeepSeek");
@@ -230,23 +239,26 @@ ${jdText}`;
     const expMatch = text.match(/(\d+\s*-\s*\d+\s*years|\d+\s*\+\s*years)/i);
     
     res.json({
-      title: titleMatch ? titleMatch[1].trim() : "SCM Executive",
-      experience: expMatch ? expMatch[0] : "2-5 Years",
-      requiredSkills: ["Strategic Procurement", "Vendor Management", "SAP / ERP Systems", "Logistics", "Cost Optimization"],
-      preferredSkills: ["GST Audits", "Advanced Excel Data Analysis"],
-      education: "Bachelor's Degree in Business or Engineering",
-      responsibilities: [
-        "Manage raw material procurement and vendor negotiations",
-        "Operate SAP ERP modules for purchase orders",
-        "Optimize inventory metrics and logistics TAT",
-        "Audit vendor performance quarterly"
-      ],
-      keywords: ["Procurement", "SAP ERP", "Vendor Sourcing", "Logistics", "Inventory Control"],
-      screeningCriteria: [
-        "Has 3+ years in industrial procurement",
-        "Familiar with SAP/Oracle ERP supply chain workflows",
-        "Demonstrated cost-saving vendor negotiations"
-      ]
+      success: true,
+      jd: {
+        title: titleMatch ? titleMatch[1].trim() : "SCM Executive",
+        experience: expMatch ? expMatch[0] : "2-5 Years",
+        requiredSkills: ["Strategic Procurement", "Vendor Management", "SAP / ERP Systems", "Logistics", "Cost Optimization"],
+        preferredSkills: ["GST Audits", "Advanced Excel Data Analysis"],
+        education: "Bachelor's Degree in Business or Engineering",
+        responsibilities: [
+          "Manage raw material procurement and vendor negotiations",
+          "Operate SAP ERP modules for purchase orders",
+          "Optimize inventory metrics and logistics TAT",
+          "Audit vendor performance quarterly"
+        ],
+        keywords: ["Procurement", "SAP ERP", "Vendor Sourcing", "Logistics", "Inventory Control"],
+        screeningCriteria: [
+          "Has 3+ years in industrial procurement",
+          "Familiar with SAP/Oracle ERP supply chain workflows",
+          "Demonstrated cost-saving vendor negotiations"
+        ]
+      }
     });
   }
 });
@@ -255,7 +267,7 @@ ${jdText}`;
 router.put("/:id", async (req: any, res: any, next: any) => {
   try {
     const { id } = req.params;
-    const { title, description, department, location, experienceRequired, skills, workMode } = req.body;
+    const { title, description, department, location, experienceRequired, skills, workMode, jd } = req.body;
 
     const existingRes = await queryTenant(
       "SELECT * FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
@@ -285,8 +297,9 @@ router.put("/:id", async (req: any, res: any, next: any) => {
            location = COALESCE($4, location), 
            experience_required = COALESCE($5, experience_required),
            skills = COALESCE($6, skills),
-           work_mode = COALESCE($7, work_mode)
-       WHERE id = $8 AND tenant_id = :tenant_id;`,
+           work_mode = COALESCE($7, work_mode),
+           jd = COALESCE($8, jd)
+       WHERE id = $9 AND tenant_id = :tenant_id;`,
       [
         title || null,
         description || null,
@@ -295,6 +308,7 @@ router.put("/:id", async (req: any, res: any, next: any) => {
         experienceRequired || null,
         skills || null,
         workMode || null,
+        jd ? JSON.stringify(jd) : null,
         id
       ]
     );

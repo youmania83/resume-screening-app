@@ -52,6 +52,7 @@ export interface StructuredJD {
 }
 
 export interface JobListItem {
+  id?: string;
   title: string;
   dept: string;
   loc: string;
