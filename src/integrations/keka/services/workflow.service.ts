@@ -1,7 +1,6 @@
 // src/integrations/keka/services/workflow.service.ts
 
 import { query } from "../../../lib/db";
-import { kekaCandidatesService } from "./candidates.service";
 import { kekaApplicationsService } from "./applications.service";
 import { kekaInterviewsService } from "./interviews.service";
 import { kekaOffersService } from "./offers.service";
@@ -124,7 +123,7 @@ export class KekaWorkflowService {
         cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
       }
       parsedResult = JSON.parse(cleanedJson);
-    } catch (e) {
+    } catch {
       console.error("Failed to parse DeepSeek response JSON:", responseText);
       throw new Error("Invalid response formatting from AI model during automated screening");
     }

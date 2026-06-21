@@ -1,7 +1,5 @@
-// src/lib/assessmentService.ts
-import { callDeepSeek } from "./deepseek";
-import { query } from "./db";
-import crypto from "crypto";
+import { callDeepSeek } from "./deepseek.js";
+import { query } from "./db.js";
 
 export interface Question {
   questionText: string;
@@ -501,6 +499,11 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
     if (firstBrace !== -1 && lastBrace !== -1) {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
+
+    // Strip trailing commas before closing braces/brackets to prevent JSON parse errors
+    cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
+    // Strip comments if any
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
 
     const parsed = JSON.parse(cleaned) as { questions: Question[] };
     if (parsed && Array.isArray(parsed.questions) && parsed.questions.length === 10) {

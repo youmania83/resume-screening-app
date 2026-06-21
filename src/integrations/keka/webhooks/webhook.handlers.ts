@@ -3,10 +3,7 @@
 import crypto from "crypto";
 import { kekaConfig } from "../config/keka.config";
 import { kekaWebhooksService } from "../services/webhooks.service";
-import { kekaCandidatesService } from "../services/candidates.service";
 import { kekaApplicationsService } from "../services/applications.service";
-import { kekaInterviewsService } from "../services/interviews.service";
-import { kekaOffersService } from "../services/offers.service";
 import { kekaWorkflowService } from "../services/workflow.service";
 import { query } from "../../../lib/db";
 

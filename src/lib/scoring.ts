@@ -70,7 +70,7 @@ export async function computeScore(batchId: string, jobDescription: string): Pro
   try {
     const parsed = JSON.parse(response) as ScoreResult;
     return parsed;
-  } catch (e) {
+  } catch {
     console.error("Failed to parse DeepSeek response as JSON:", response);
     throw new Error("Invalid scoring response from DeepSeek");
   }

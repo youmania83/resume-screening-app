@@ -1,33 +1,29 @@
 // src/api/routes/rankingRouter.ts
 import { Router } from "express";
-import { pool } from "../../lib/db";
+import { queryTenant } from "../../lib/tenantDb.js";
 
 const router = Router();
 
-// GET /api/ranking/:batchId – returns stored candidate score (if any)
-router.get("/:batchId", async (req, res) => {
+// GET /api/ranking/:batchId – returns stored candidate score scoped by tenant
+router.get("/:batchId", async (req: any, res: any, next: any) => {
   const { batchId } = req.params;
   if (!batchId) {
-    return res.status(400).json({ error: "batchId required" });
+     res.status(400).json({ error: "batchId required" });
+     return;
   }
   try {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `SELECT overall, criteria FROM candidate_scores WHERE batch_id = $1 ORDER BY scored_at DESC LIMIT 1`,
-        [batchId]
-      );
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: "Score not found" });
-      }
-      const row = result.rows[0];
-      res.json({ batchId, score: { overall: row.overall, criteria: row.criteria } });
-    } finally {
-      client.release();
+    const result = await queryTenant(
+      `SELECT overall, criteria FROM candidate_scores WHERE batch_id = $1 AND tenant_id = :tenant_id LIMIT 1`,
+      [batchId]
+    );
+    if (result.rowCount === 0) {
+       res.status(404).json({ error: "Score not found" });
+       return;
     }
+    const row = result.rows[0];
+    res.json({ batchId, score: { overall: row.overall, criteria: row.criteria } });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch ranking" });
+    next(err);
   }
 });
 

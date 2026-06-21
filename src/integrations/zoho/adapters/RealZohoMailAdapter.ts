@@ -1,7 +1,7 @@
 // src/integrations/zoho/adapters/RealZohoMailAdapter.ts
 
 import { ZohoMailAdapter, ZohoEmailMessage } from "./ZohoMailAdapter";
-import { zohoConfig, isZohoConfigured } from "../config/zoho.config";
+import { isZohoConfigured } from "../config/zoho.config";
 
 export class RealZohoMailAdapter implements ZohoMailAdapter {
   private checkConfig() {
@@ -12,7 +12,7 @@ export class RealZohoMailAdapter implements ZohoMailAdapter {
     }
   }
 
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
+  async sendEmail(to: string, _subject: string, _html: string): Promise<void> {
     this.checkConfig();
     // TODO: Connect to Zoho Mail API POST /api/v1/co/mail/send or SMTP client using Nodemailer
     console.log(`🔌 [RealZohoMailAdapter] Sending email via Zoho Mail API/SMTP to: ${to}`);

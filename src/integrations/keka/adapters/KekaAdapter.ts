@@ -4,7 +4,6 @@ import { KekaJob } from "../interfaces/Job";
 import { KekaCandidate } from "../interfaces/Candidate";
 import { KekaApplication } from "../interfaces/Application";
 import { KekaInterview } from "../interfaces/Interview";
-import { KekaStage } from "../interfaces/Stage";
 import { KekaOffer } from "../interfaces/Offer";
 import { KekaDocument } from "../interfaces/Document";
 

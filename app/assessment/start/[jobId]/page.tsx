@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/src/components/ui/badge";
 import { toast, Toaster } from "sonner";
-import { motion } from "framer-motion";
 
 export default function PublicAssessmentRegistrationPage() {
   const params = useParams();

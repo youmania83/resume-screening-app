@@ -1,253 +1,265 @@
 // src/api/routes/candidateRouter.ts
 import { Router } from "express";
-import { query } from "../../lib/db";
+import { queryTenant } from "../../lib/tenantDb.js";
+import { parseBooleanQuery, compileASTToSQL } from "../../lib/search/booleanParser.js";
+import { logTimelineEvent } from "../../lib/timeline.js";
+import { TenantUsageService } from "../../services/TenantUsageService.js";
+import { getTenantContext } from "../../lib/tenantContext.js";
+
+import candidateNotesRouter from "./candidateNotesRouter.js";
+import candidateTagsRouter from "./candidateTagsRouter.js";
+import candidateDocumentsRouter from "./candidateDocumentsRouter.js";
+import candidateTimelineRouter from "./candidateTimelineRouter.js";
+import candidateAssignmentsRouter from "./candidateAssignmentsRouter.js";
+import clientSubmissionsRouter from "./clientSubmissionsRouter.js";
 
 const router = Router();
 
-// GET /api/candidates
-router.get("/", async (req, res) => {
+// Mount candidate detail sub-routers
+router.use("/:id/notes", candidateNotesRouter);
+router.use("/:id/tags", candidateTagsRouter);
+router.use("/:id/documents", candidateDocumentsRouter);
+router.use("/:id/timeline", candidateTimelineRouter);
+router.use("/:id/assignments", candidateAssignmentsRouter);
+router.use("/:id/submissions", clientSubmissionsRouter);
+
+// GET /api/candidates/recruiters/list - Fetch recruiters under the same tenant
+router.get("/recruiters/list", async (req, res, next) => {
   try {
-    const candidatesRes = await query("SELECT * FROM candidates ORDER BY created_at DESC;");
-    console.log('🔎 Fetched candidates rows:', candidatesRes.rowCount);
-    const logsRes = await query("SELECT * FROM candidate_activity_logs ORDER BY logged_at ASC;");
-    console.log('🔎 Fetched activity logs rows:', logsRes.rowCount);
-    
-    const logsMap = logsRes.rows.reduce((acc: any, log: any) => {
-      if (!acc[log.candidate_id]) {
-        acc[log.candidate_id] = [];
-      }
-      acc[log.candidate_id].push({
-        date: log.logged_at,
-        message: log.message
-      });
-      return acc;
-    }, {});
-    
-    const candidates = candidatesRes.rows.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      phone: row.phone,
-      role: row.role,
-      score: row.score,
-      matchPercent: row.match_percent,
-      experienceYears: row.experience_years,
-      experienceMatch: row.experience_match,
-      recommendation: row.recommendation,
-      confidence: row.confidence,
-      riskLevel: row.risk_level,
-      strengths: row.strengths || [],
-      weaknesses: row.weaknesses || [],
-      missingSkills: row.missing_skills || [],
-      matchedSkills: row.matched_skills || [],
-      skills: row.skills || [],
-      certifications: row.certifications || [],
-      projects: row.projects || [],
-      keywords: row.keywords || [],
-      status: row.status,
-      applicationSource: row.application_source,
-      assessmentScore: row.assessment_score,
-      assessmentStatus: row.assessment_status,
-      interviewScheduledDate: row.interview_scheduled_date,
-      interviewFeedback: row.interview_feedback,
-      kekaStatus: row.keka_status,
-      appliedDate: row.applied_date,
-      finalScore: row.final_score,
-      violationCount: row.violation_count,
-      assessmentCompletedAt: row.assessment_completed_at,
-      assessmentToken: row.assessment_token,
-      activityLogs: logsMap[row.id] || []
-    }));
-    
-    res.json({ success: true, candidates });
-  } catch (err: any) {
-    console.error("Failed to fetch candidates:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch candidates" });
+    const result = await queryTenant(
+      "SELECT id, name, role, email FROM users WHERE tenant_id = :tenant_id AND role IN ('owner', 'recruiter') ORDER BY name ASC;"
+    );
+    res.json({ success: true, recruiters: result.rows });
+  } catch (err) {
+    next(err);
   }
 });
 
-// POST /api/candidates
-router.post("/", async (req, res) => {
+// GET /api/candidates - Fetch candidates with search, filtering, and pagination
+router.get("/", async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+
+    const sortBy = ["created_at", "score", "name", "applied_date", "final_score"].includes(req.query.sortBy as string)
+      ? (req.query.sortBy as string)
+      : "created_at";
+    const sortOrder = (req.query.sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    let whereClause = "candidates.tenant_id = :tenant_id";
+    const queryParams: any[] = [];
+    let paramIndex = 1;
+
+    // Filter by dynamic ATS Stage
+    const stageId = req.query.stageId as string;
+    if (stageId) {
+      whereClause += ` AND candidates.status = $${paramIndex++}`;
+      queryParams.push(stageId);
+    }
+
+    // Filter by Recruiter Owner
+    const recruiterId = req.query.recruiterId as string;
+    if (recruiterId) {
+      whereClause += ` AND candidates.recruiter_owner_id = $${paramIndex++}`;
+      queryParams.push(recruiterId);
+    }
+
+    // Boolean Search compilation
+    const booleanSearch = req.query.booleanSearch as string;
+    if (booleanSearch) {
+      const ast = parseBooleanQuery(booleanSearch);
+      if (ast) {
+        const { sql, params } = compileASTToSQL(ast, paramIndex);
+        whereClause += ` AND ${sql}`;
+        queryParams.push(...params);
+        paramIndex += params.length;
+      }
+    }
+
+    // Fetch paginated candidate rows
+    const candidatesRes = await queryTenant(
+      `SELECT candidates.*, j.title as job_title, j.location as job_location
+       FROM candidates
+       LEFT JOIN jobs j ON candidates.job_id = j.id
+       WHERE ${whereClause}
+       ORDER BY candidates.${sortBy} ${sortOrder}
+       LIMIT ${limit} OFFSET ${offset};`,
+      queryParams
+    );
+
+    // Fetch total candidate count for meta
+    const countRes = await queryTenant(
+      `SELECT COUNT(*) as total
+       FROM candidates
+       LEFT JOIN jobs j ON candidates.job_id = j.id
+       WHERE ${whereClause};`,
+      queryParams
+    );
+    const total = parseInt(countRes.rows[0].total) || 0;
+
+    res.json({
+      success: true,
+      candidates: candidatesRes.rows,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/candidates/:id - Get a specific candidate detailed profile
+router.get("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await queryTenant(
+      `SELECT c.*, j.title as job_title, j.description as job_description, j.location as job_location, u.name as recruiter_owner_name
+       FROM candidates c
+       LEFT JOIN jobs j ON c.job_id = j.id
+       LEFT JOIN users u ON c.recruiter_owner_id = u.id
+       WHERE c.id = $1 AND c.tenant_id = :tenant_id LIMIT 1;`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+       res.status(404).json({ success: false, error: "Candidate not found" });
+       return;
+    }
+
+    res.json({ success: true, candidate: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/candidates - Add a candidate manually
+router.post("/", async (req: any, res, next) => {
   try {
     const c = req.body;
     const appliedDate = c.appliedDate || new Date().toISOString().split("T")[0];
-    
-    await query(
+
+    await queryTenant(
       `INSERT INTO candidates (
         id, name, email, phone, role, score, match_percent, experience_years, 
         experience_match, recommendation, confidence, risk_level, strengths, 
         weaknesses, missing_skills, matched_skills, skills, certifications, 
-        projects, keywords, status, application_source, keka_status, applied_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);`,
+        projects, keywords, status, application_source, keka_status, applied_date, 
+        source, source_details, linkedin_url, github_url, visa_status, work_authorization,
+        expected_salary, current_salary, availability_date, recruiter_owner_id, ai_match_score, tenant_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $6, :tenant_id);`,
       [
-        c.id,
-        c.name,
-        c.email || "",
-        c.phone || "",
-        c.role,
-        c.score,
-        c.score,
-        c.experienceYears || 0,
-        c.experienceMatch || "",
-        c.recommendation || "",
-        c.confidence || "",
-        c.riskLevel || "Low",
-        c.strengths || [],
-        c.weaknesses || [],
-        c.missingSkills || [],
-        c.matchedSkills || [],
-        c.skills || [],
-        c.certifications || [],
-        c.projects || [],
-        c.keywords || [],
-        c.status || "applied",
-        c.applicationSource || "Careers Page",
-        c.kekaStatus || "active",
-        appliedDate
+        c.id, c.name, c.email || "", c.phone || "", c.role, c.score || 0,
+        c.experienceYears || 0, c.experienceMatch || "", c.recommendation || "",
+        c.confidence || "", c.riskLevel || "Low", c.strengths || [], c.weaknesses || [],
+        c.missingSkills || [], c.matchedSkills || [], c.skills || [], c.certifications || [],
+        c.projects || [], c.keywords || [], c.status || "Applied", c.applicationSource || "Manual",
+        c.kekaStatus || "active", appliedDate, c.source || "Manual", c.sourceDetails || null,
+        c.linkedinUrl || null, c.githubUrl || null, c.visaStatus || null, c.workAuthorization || null,
+        c.expectedSalary || null, c.currentSalary || null, c.availabilityDate || null, c.recruiterOwnerId || null
       ]
     );
 
-    // Initial logs
-    await query(
-      "INSERT INTO candidate_activity_logs (candidate_id, event_type, message) VALUES ($1, $2, $3);",
-      [c.id, "application_received", `Application received through ${c.applicationSource || "Careers Page"}`]
-    );
-    await query(
-      "INSERT INTO candidate_activity_logs (candidate_id, event_type, message) VALUES ($1, $2, $3);",
-      [c.id, "ai_screened", `AI resume parsing complete. Score: ${c.score}/100.`]
-    );
+    const authorId = req.user?.userId || null;
+    await logTimelineEvent(c.id, "created", "Candidate Created", `Created candidate record: ${c.name}.`, authorId);
+    if (c.score) {
+      await logTimelineEvent(c.id, "ai_screened", "AI Screening Completed", `Resume evaluation complete. Match score: ${c.score}/100.`, null);
+    }
 
-    res.status(201).json({ success: true });
-  } catch (err: any) {
-    console.error("Failed to create candidate:", err);
-    res.status(500).json({ error: err.message || "Failed to create candidate" });
+    const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
+    await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
+
+    res.status(201).json({ success: true, message: "Candidate created successfully" });
+  } catch (err) {
+    next(err);
   }
 });
 
-// DELETE /api/candidates/:id
-router.delete("/:id", async (req, res) => {
+// PUT /api/candidates/:id - Update candidate profile info
+router.put("/:id", async (req: any, res, next) => {
   try {
     const { id } = req.params;
-    await query("DELETE FROM candidate_activity_logs WHERE candidate_id = $1;", [id]);
-    await query("DELETE FROM candidates WHERE id = $1;", [id]);
+    const c = req.body;
+
+    const existing = await queryTenant(
+      "SELECT status, recruiter_owner_id FROM candidates WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
+      [id]
+    );
+
+    if (existing.rowCount === 0) {
+       res.status(404).json({ success: false, error: "Candidate not found" });
+       return;
+    }
+
+    const oldStatus = existing.rows[0].status;
+    const oldRecruiter = existing.rows[0].recruiter_owner_id;
+
+    await queryTenant(
+      `UPDATE candidates
+       SET name = COALESCE($1, name),
+           email = COALESCE($2, email),
+           phone = COALESCE($3, phone),
+           role = COALESCE($4, role),
+           status = COALESCE($5, status),
+           source = COALESCE($6, source),
+           linkedin_url = COALESCE($7, linkedin_url),
+           github_url = COALESCE($8, github_url),
+           visa_status = COALESCE($9, visa_status),
+           work_authorization = COALESCE($10, work_authorization),
+           expected_salary = COALESCE($11, expected_salary),
+           current_salary = COALESCE($12, current_salary),
+           availability_date = COALESCE($13, availability_date),
+           recruiter_owner_id = COALESCE($14, recruiter_owner_id)
+       WHERE id = $15 AND tenant_id = :tenant_id;`,
+      [
+        c.name, c.email, c.phone, c.role, c.status, c.source,
+        c.linkedinUrl, c.githubUrl, c.visaStatus, c.workAuthorization,
+        c.expectedSalary, c.currentSalary, c.availabilityDate,
+        c.recruiterOwnerId, id
+      ]
+    );
+
+    const updaterId = req.user?.userId || null;
+
+    if (c.status && c.status !== oldStatus) {
+      await logTimelineEvent(id, "stage_changed", "Candidate Moved Stage", `Stage updated from "${oldStatus}" to "${c.status}".`, updaterId);
+      if (c.status.toLowerCase() === "hired") {
+        await logTimelineEvent(id, "hired", "Candidate Hired", "Candidate officially hired for the role.", updaterId);
+      } else if (c.status.toLowerCase() === "rejected") {
+        await logTimelineEvent(id, "rejected", "Candidate Rejected", "Candidate marked as rejected.", updaterId);
+      }
+    }
+
+    if (c.recruiterOwnerId && c.recruiterOwnerId !== oldRecruiter) {
+      const recCheck = await queryTenant("SELECT name FROM users WHERE id = $1 LIMIT 1;", [c.recruiterOwnerId]);
+      if (recCheck.rowCount! > 0) {
+        await logTimelineEvent(id, "candidate_assigned", "Candidate Assigned", `Assigned to recruiter: ${recCheck.rows[0].name}.`, updaterId);
+      }
+    }
+
+    res.json({ success: true, message: "Candidate updated successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/candidates/:id - Delete a candidate
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const check = await queryTenant("SELECT id FROM candidates WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;", [id]);
+    if (check.rowCount === 0) {
+      res.status(404).json({ success: false, error: "Candidate not found" });
+      return;
+    }
+
+    await queryTenant("DELETE FROM candidates WHERE id = $1 AND tenant_id = :tenant_id;", [id]);
+
+    const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
+    await TenantUsageService.decrementMetric(tenantId, "active_candidates", 1);
+
     res.json({ success: true, message: `Candidate ${id} deleted successfully.` });
-  } catch (err: any) {
-    console.error("Failed to delete candidate:", err);
-    res.status(500).json({ error: err.message || "Failed to delete candidate" });
-  }
-});
-
-// POST /api/candidates/:id/submit-assessment
-router.post("/:id/submit-assessment", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { score } = req.body as { score: number };
-    
-    let status = "rejected";
-    let kekaStatus = "rejected_pool";
-    let assessmentStatus = "failed";
-    let logMessage = `Candidate failed assessment with score ${score}/100. Moved to Rejected Pool in Keka HRMS.`;
-    let interviewScheduledDate = null;
-    
-    if (score >= 70) {
-      status = "interviewing";
-      kekaStatus = "active";
-      assessmentStatus = "passed";
-      // Schedule interview for 2 days from now at 10 AM
-      const date = new Date();
-      date.setDate(date.getDate() + 2);
-      date.setHours(10, 0, 0, 0);
-      interviewScheduledDate = date;
-      logMessage = `Candidate passed assessment with score ${score}/100. HR Interview scheduled for ${date.toLocaleDateString()} at 10:00 AM with HR Manager.`;
-    }
-    
-    await query(
-      `UPDATE candidates 
-       SET status = $1, keka_status = $2, assessment_status = $3, assessment_score = $4, interview_scheduled_date = $5
-       WHERE id = $6;`,
-      [status, kekaStatus, assessmentStatus, score, interviewScheduledDate, id]
-    );
-    
-    await query(
-      "INSERT INTO candidate_activity_logs (candidate_id, event_type, message) VALUES ($1, $2, $3);",
-      [id, "assessment_completed", logMessage]
-    );
-    
-    res.json({ 
-      success: true, 
-      status, 
-      kekaStatus, 
-      assessmentStatus, 
-      assessmentScore: score, 
-      interviewScheduledDate,
-      logMessage 
-    });
-  } catch (err: any) {
-    console.error("Failed to submit assessment:", err);
-    res.status(500).json({ error: err.message || "Failed to submit assessment" });
-  }
-});
-
-// POST /api/candidates/:id/submit-interview
-router.post("/:id/submit-interview", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { decision, feedback } = req.body as { decision: "pass" | "fail"; feedback: string };
-    
-    let status = "rejected";
-    let kekaStatus = "rejected_pool";
-    let logMessage = `Candidate rejected in HR Interview. Feedback: "${feedback}". Moved to Rejected Pool in Keka HRMS.`;
-    
-    if (decision === "pass") {
-      status = "shortlisted"; // shortlisted maps to 'selected' visually or we can keep it as 'shortlisted' / update to a selected status
-      status = "selected";
-      kekaStatus = "active";
-      logMessage = `HR Interview passed. Feedback: "${feedback}". Moved to Final Selection stage.`;
-    }
-    
-    await query(
-      `UPDATE candidates 
-       SET status = $1, keka_status = $2, interview_feedback = $3
-       WHERE id = $4;`,
-      [status, kekaStatus, feedback, id]
-    );
-    
-    await query(
-      "INSERT INTO candidate_activity_logs (candidate_id, event_type, message) VALUES ($1, $2, $3);",
-      [id, "interview_evaluated", logMessage]
-    );
-    
-    res.json({ success: true, status, kekaStatus, logMessage });
-  } catch (err: any) {
-    console.error("Failed to submit interview feedback:", err);
-    res.status(500).json({ error: err.message || "Failed to submit interview feedback" });
-  }
-});
-
-// POST /api/candidates/:id/onboard
-router.post("/:id/onboard", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const status = "onboarded";
-    const kekaStatus = "onboarding";
-    const logMessage = "Initiated Keka HRMS onboarding workflow. Candidate record migrated successfully.";
-    
-    await query(
-      `UPDATE candidates 
-       SET status = $1, keka_status = $2
-       WHERE id = $3;`,
-      [status, kekaStatus, id]
-    );
-    
-    await query(
-      "INSERT INTO candidate_activity_logs (candidate_id, event_type, message) VALUES ($1, $2, $3);",
-      [id, "onboarded", logMessage]
-    );
-    
-    res.json({ success: true, status, kekaStatus, logMessage });
-  } catch (err: any) {
-    console.error("Failed to trigger onboarding:", err);
-    res.status(500).json({ error: err.message || "Failed to trigger onboarding" });
+  } catch (err) {
+    next(err);
   }
 });
 
