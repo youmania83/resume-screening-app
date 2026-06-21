@@ -1,16 +1,82 @@
 // src/components/dashboard/OverviewView.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Candidate } from "../../types/index";
+import { 
+  CheckCircle2, 
+  Circle, 
+  ArrowRight, 
+  Briefcase, 
+  Mail, 
+  FileUp, 
+  Sparkles, 
+  CalendarDays,
+  HelpCircle
+} from "lucide-react";
 
 interface OverviewViewProps {
   candidates: Candidate[];
 }
 
 export function OverviewView({ candidates }: OverviewViewProps) {
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+
+  // Derived onboarding progress metrics
+  const hasCandidates = candidates.length > 0;
+  const hasScores = candidates.some((c) => (c.score || 0) > 0);
+  const hasInterviews = candidates.some((c) => 
+    ["interviewing", "selected", "onboarded"].includes(c.status || "") || 
+    c.interviewScheduledDate
+  );
+
+  const steps = useMemo(() => [
+    {
+      title: "1. Create Job Profile",
+      summary: "Define required skills & matching target.",
+      details: "Go to the 'Resume Screening' or 'Active Jobs' tab to paste or import a job description profile. This sets the threshold rules for AI screening.",
+      icon: Briefcase,
+      done: hasCandidates, // Step 1 is done if candidates exist
+      area: "Resume Screening",
+    },
+    {
+      title: "2. SMTP & Branding",
+      summary: "Configure custom SMTP & portal styles.",
+      details: "Go to 'Workspace Settings' -> 'SMTP & Branding' to connect Gmail, Outlook, or Zoho SMTP credentials and upload your logo and hex brand color.",
+      icon: Mail,
+      done: hasInterviews, // Step 2 is checked if interviews are scheduled (meaning invites sent via SMTP)
+      area: "Workspace Settings",
+    },
+    {
+      title: "3. Ingest Resumes",
+      summary: "Upload files or link Zoho email sync.",
+      details: "Drop PDF/DOCX resumes (single or bulk ZIPs) into the 'Resume Screening' dropzone, or rely on active integrations to fetch files.",
+      icon: FileUp,
+      done: hasCandidates, // Step 3 check
+      area: "Resume Screening",
+    },
+    {
+      title: "4. Review AI Matches",
+      summary: "Check parsed scores and duplicate logs.",
+      details: "Watch parsing and matching complete in the live queue. Check candidates on the leaderboard ranking and evaluate missing skills.",
+      icon: Sparkles,
+      done: hasScores,
+      area: "Candidates DB",
+    },
+    {
+      title: "5. Invites & Pipeline",
+      summary: "Portal schedules candidate slots.",
+      details: "Top candidates receive SMTP invite emails containing secure, passwordless links. They confirm slots on the portal. Review status changes in the pipeline.",
+      icon: CalendarDays,
+      done: hasInterviews,
+      area: "ATS Pipeline",
+    }
+  ], [hasCandidates, hasScores, hasInterviews]);
+
+  const completedCount = useMemo(() => steps.filter(s => s.done).length, [steps]);
+
   const metrics = useMemo(() => {
     const total = candidates.length;
     const screened = candidates.filter((c) => (c.score || 0) > 0).length;
@@ -37,6 +103,77 @@ export function OverviewView({ candidates }: OverviewViewProps) {
       transition={{ duration: 0.15 }}
       className="space-y-6"
     >
+      {/* Onboarding Step-by-Step Quick Start Guide */}
+      <Card className="shadow-sm border-border bg-card overflow-hidden">
+        <CardHeader className="pb-3 border-b border-border bg-secondary/30">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-xs uppercase tracking-wider font-extrabold text-foreground flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-indigo-500" />
+                IRA AI SaaS Quick-Start Guide
+              </CardTitle>
+              <CardDescription className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                Follow these 5 steps to successfully configure your workspace and begin screening candidates automatically.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Progress:</span>
+              <div className="h-2 w-28 bg-secondary rounded-full overflow-hidden border border-border">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500" 
+                  style={{ width: `${(completedCount / 5) * 100}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-extrabold text-emerald-500">{completedCount}/5 Complete</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3.5">
+          {steps.map((step, idx) => {
+            const Icon = step.icon;
+            const isSelected = activeStep === idx;
+            return (
+              <div 
+                key={idx} 
+                onClick={() => setActiveStep(isSelected ? null : idx)}
+                className={`p-3 rounded-lg border transition-all cursor-pointer relative ${
+                  isSelected 
+                    ? "bg-secondary border-slate-400 dark:border-slate-600 shadow-xs" 
+                    : "border-border bg-secondary/20 hover:bg-secondary/40 hover:border-border/80"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2 select-none">
+                  <div className="h-6.5 w-6.5 rounded bg-secondary flex items-center justify-center border border-border">
+                    <Icon className="h-3.5 w-3.5 text-slate-400" />
+                  </div>
+                  {step.done ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 fill-emerald-500/10" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-muted-foreground/40" />
+                  )}
+                </div>
+                <h4 className="text-[11px] font-extrabold text-foreground leading-snug">{step.title}</h4>
+                <p className="text-[9px] text-muted-foreground font-semibold mt-1 leading-normal">
+                  {step.summary}
+                </p>
+                {isSelected && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="pt-2 mt-2 border-t border-border/85 text-[9px] text-slate-400 leading-normal space-y-1.5"
+                  >
+                    <p className="font-medium">{step.details}</p>
+                    <div className="text-[8px] font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-0.5 mt-1.5">
+                      Target Area: {step.area} <ArrowRight className="h-2 w-2" />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       {/* 6 Core Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {metrics.map((stat, i) => (
@@ -46,7 +183,7 @@ export function OverviewView({ candidates }: OverviewViewProps) {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 block">
                   {stat.title}
                 </span>
-                <span className="block text-3xl font-extrabold text-foreground dark:text-slate-50 tracking-tight mt-1">
+                <span className="block text-3xl font-extrabold text-foreground dark:text-slate-55 tracking-tight mt-1">
                   {stat.value}
                 </span>
               </div>
