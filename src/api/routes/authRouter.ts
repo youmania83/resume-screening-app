@@ -70,17 +70,19 @@ router.post(
         [crypto.randomUUID(), userId, hashedRefreshToken, expiresAt]
       );
 
-      res.cookie("accessToken", accessToken, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+      };
+
+      res.cookie("accessToken", accessToken, {
+        ...cookieOptions,
         maxAge: 15 * 60 * 1000
       });
 
       res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        ...cookieOptions,
         maxAge: 8 * 60 * 60 * 1000
       });
 
@@ -150,17 +152,19 @@ router.post(
         );
       `, [userId]);
 
-      res.cookie("accessToken", accessToken, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+      };
+
+      res.cookie("accessToken", accessToken, {
+        ...cookieOptions,
         maxAge: 15 * 60 * 1000
       });
 
       res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        ...cookieOptions,
         maxAge: expiryDuration
       });
 
@@ -184,8 +188,13 @@ router.post("/logout", authMiddleware, async (req, res, next) => {
       await queryGlobal("DELETE FROM refresh_tokens WHERE token = $1;", [hashedToken]);
     }
 
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+    };
+    res.clearCookie("accessToken", cookieOptions);
+    res.clearCookie("refreshToken", cookieOptions);
     res.json({ success: true, message: "Logged out successfully" });
   } catch (err) {
     next(err);

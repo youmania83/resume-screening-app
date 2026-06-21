@@ -85,8 +85,13 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
       if (tokenRes.rowCount === 0) {
         // Invalid or expired refresh token
-        res.clearCookie("accessToken");
-        res.clearCookie("refreshToken");
+        const cookieOptions = {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+        };
+        res.clearCookie("accessToken", cookieOptions);
+        res.clearCookie("refreshToken", cookieOptions);
         res.status(401).json({ success: false, error: "Session expired, please login again" });
         return;
       }
@@ -118,18 +123,20 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
       const newAccessToken = jwt.sign(newPayload, JWT_SECRET, { expiresIn: "15m" });
 
-      // Set new cookies
-      res.cookie("accessToken", newAccessToken, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+      };
+
+      // Set new cookies
+      res.cookie("accessToken", newAccessToken, {
+        ...cookieOptions,
         maxAge: 15 * 60 * 1000 // 15 mins
       });
 
       res.cookie("refreshToken", newRefreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        ...cookieOptions,
         maxAge: expiryDuration
       });
 

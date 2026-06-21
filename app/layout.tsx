@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
 import { Toaster } from "sonner";
+import { ClientInitializer } from "@/src/components/providers/ClientInitializer";
 
 import type { Viewport } from "next";
 
@@ -23,10 +24,12 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light">
       <body className="antialiased">
+        <ClientInitializer />
         {children}
         <Toaster position="top-right" richColors />
       </body>
     </html>
   );
 }
+
 
