@@ -1,4 +1,5 @@
 // src/integrations/keka/services/workflow.service.ts
+import crypto from "crypto";
 
 import { query } from "../../../lib/db";
 import { kekaApplicationsService } from "./applications.service";
@@ -264,45 +265,40 @@ export class KekaWorkflowService {
     }
     const { name, email, job_id: jobId, title: jobTitle, description: jobDesc } = candRes.rows[0];
 
-    if (aiScore < STAGE_ROUTING_THRESHOLDS.REJECT_THRESHOLD) {
+    if (aiScore < 70) {
       targetStage = "Rejected";
       status = "rejected";
-      activityLog = `Candidate automatically rejected (Score ${aiScore} < ${STAGE_ROUTING_THRESHOLDS.REJECT_THRESHOLD}). Moved to Rejected Pool in Keka.`;
+      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 70). Moved to Rejected Pool in Keka.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Rejected");
     } 
-    else if (aiScore >= STAGE_ROUTING_THRESHOLDS.REJECT_THRESHOLD && aiScore < STAGE_ROUTING_THRESHOLDS.HR_REVIEW_THRESHOLD) {
-      targetStage = "HR Review";
-      status = "shortlisted";
-      activityLog = `Candidate moved to HR Review (Score ${aiScore} matches threshold ${STAGE_ROUTING_THRESHOLDS.REJECT_THRESHOLD}-${STAGE_ROUTING_THRESHOLDS.HR_REVIEW_THRESHOLD}).`;
-      
-      await kekaApplicationsService.moveCandidateStage(candidateId, "HR Review");
-    } 
-    else if (aiScore >= STAGE_ROUTING_THRESHOLDS.HR_REVIEW_THRESHOLD && aiScore < STAGE_ROUTING_THRESHOLDS.ASSESSMENT_THRESHOLD) {
+    else {
       targetStage = "Assessment";
       status = "shortlisted";
-      activityLog = `Candidate qualified for Assessment (Score ${aiScore} >= ${STAGE_ROUTING_THRESHOLDS.HR_REVIEW_THRESHOLD}). Generating MCQ link.`;
+      activityLog = `Candidate qualified for Assessment (Score ${aiScore}/100 >= 70). Generating MCQ link and sending invite email.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Assessment");
+
+      // Generate assessment token and set pending assessment state in candidates table
+      const token = crypto.randomBytes(24).toString("hex");
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 7);
+
+      await query(
+        `UPDATE candidates 
+         SET status = 'shortlisted',
+             assessment_token = $1,
+             assessment_token_expiry = $2,
+             assessment_status = 'pending'
+         WHERE id = $3;`,
+        [token, expiry, candidateId]
+      );
       
       // Generate Assessment and trigger email dispatch
       if (jobId && jobTitle) {
-        const token = await kekaAssessmentService.generateAssessment(candidateId, jobId, jobTitle, jobDesc || "");
+        await kekaAssessmentService.generateAssessment(candidateId, jobId, jobTitle, jobDesc || "");
         await kekaAssessmentService.sendAssessmentEmail(candidateId, name, email, jobTitle, token);
       }
-    } 
-    else {
-      // aiScore >= 85
-      targetStage = "Interview";
-      status = "shortlisted";
-      activityLog = `Candidate fast-tracked to Interview (Score ${aiScore} >= ${STAGE_ROUTING_THRESHOLDS.ASSESSMENT_THRESHOLD}). Scheduling interview.`;
-      
-      await kekaApplicationsService.moveCandidateStage(candidateId, "Interview");
-      
-      // Trigger dynamic scheduling
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 3);
-      await this.scheduleInterview(candidateId, "Engineering Panel Team", nextWeek);
     }
 
     // Log the action to activity logs
@@ -322,7 +318,7 @@ export class KekaWorkflowService {
 
   /**
    * Automatically executes stage changes on assessment completion.
-   * If they pass (Integrated Score >= 80), routes them to the Keka "Interview" stage.
+   * If they pass (Integrated Score >= 80), routes them to the Keka "Interview" stage and schedules HR interview.
    */
   async handleAssessmentCompletion(candidateId: string, finalScore: number): Promise<any> {
     console.log(`Processing assessment completion hook for candidate: ${candidateId} (Integrated Score: ${finalScore})`);
@@ -330,19 +326,25 @@ export class KekaWorkflowService {
     let targetStage = "HR Review";
     let status = "shortlisted";
     let logMessage = "";
+    let interviewDate: Date | null = null;
 
     if (finalScore >= 80) {
       targetStage = "Interview";
-      status = "shortlisted";
-      logMessage = `Candidate passed online assessment (Integrated Score: ${finalScore} >= 80). Automatically moved to Keka Interview Stage.`;
+      status = "interviewing";
+      logMessage = `Candidate passed online assessment (Integrated Score: ${finalScore} >= 80). Automatically moved to Keka Interview Stage and scheduled HR interview.`;
       
       // Move candidate stage in Keka to Interview
       await kekaApplicationsService.moveCandidateStage(candidateId, "Interview");
+
+      // Update status in local candidates DB overriding applications service stage change default 'applied'
+      await query(`UPDATE candidates SET status = 'interviewing' WHERE id = $1;`, [candidateId]);
       
-      // Schedule dynamic interview
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 3);
-      await this.scheduleInterview(candidateId, "Engineering Lead Interview", nextWeek);
+      // Schedule dynamic interview 2 days from now at 10:00 AM
+      interviewDate = new Date();
+      interviewDate.setDate(interviewDate.getDate() + 2);
+      interviewDate.setHours(10, 0, 0, 0);
+
+      await this.scheduleInterview(candidateId, "HR Recruiter", interviewDate);
     } 
     else if (finalScore >= 60) {
       targetStage = "HR Review";
@@ -350,6 +352,7 @@ export class KekaWorkflowService {
       logMessage = `Candidate completed assessment in borderline range (Integrated Score: ${finalScore}/100). Moved to Keka HR Review Stage.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "HR Review");
+      await query(`UPDATE candidates SET status = 'shortlisted' WHERE id = $1;`, [candidateId]);
     } 
     else {
       targetStage = "Rejected";
@@ -370,7 +373,8 @@ export class KekaWorkflowService {
       finalScore,
       targetStage,
       status,
-      log: logMessage
+      log: logMessage,
+      interviewDate
     };
   }
 

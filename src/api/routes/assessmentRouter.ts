@@ -533,11 +533,35 @@ router.post("/submit", async (req: any, res: any) => {
       [assessmentScore, assessmentStatus, finalScore, nextStatus, kekaStatus, candidate.id]
     );
 
-    // Sync assessment completion stage with Keka ATS Integration Foundation
+    // Sync assessment completion stage and schedule interview
+    let interviewDate: Date | null = null;
     try {
-      await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
+      const kekaResult = await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
+      if (kekaResult?.interviewDate) {
+        interviewDate = new Date(kekaResult.interviewDate);
+      }
     } catch (kekaErr) {
       console.error("⚠️ Failed to sync assessment completion to Keka:", kekaErr);
+    }
+
+    // Fallback: If candidate passed but interview wasn't scheduled via Keka service, schedule locally
+    if (finalScore >= 80 && !interviewDate) {
+      interviewDate = new Date();
+      interviewDate.setDate(interviewDate.getDate() + 2);
+      interviewDate.setHours(10, 0, 0, 0);
+
+      const interviewId = `interview-fallback-${Date.now()}`;
+      await query(
+        `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status)
+         VALUES ($1, $2, $3, $4, 'scheduled')
+         ON CONFLICT (id) DO NOTHING;`,
+        [interviewId, candidate.id, candidate.job_id, interviewDate]
+      );
+
+      await query(
+        `UPDATE candidates SET status = 'interviewing' WHERE id = $1;`,
+        [candidate.id]
+      );
     }
 
     // Log Activity
@@ -551,28 +575,14 @@ router.post("/submit", async (req: any, res: any) => {
       ]
     );
 
-    // Automation: If candidate rank is Qualified, schedule HR interview automatically!
     let interviewDetails = null;
-    if (nextStatus === "Qualified") {
-      // Schedule interview 2 days from now at 10:00 AM
-      const interviewDate = new Date();
-      interviewDate.setDate(interviewDate.getDate() + 2);
-      interviewDate.setHours(10, 0, 0, 0);
-
-      const interviewId = `interview-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-      await query(
-        `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [interviewId, candidate.id, candidate.job_id, interviewDate, "scheduled"]
-      );
-
+    if (interviewDate) {
       // Log interview scheduling
       await query(
         `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
-         VALUES ($1, $2, $3);`,
+         VALUES ($1, 'interview_scheduled', $2);`,
         [
           candidate.id,
-          "interview_scheduled",
           `HR Interview automatically scheduled for ${interviewDate.toLocaleDateString()} at 10:00 AM.`
         ]
       );

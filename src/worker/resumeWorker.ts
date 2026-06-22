@@ -9,6 +9,8 @@ import { tenantStorage } from "../lib/tenantContext.js";
 import { ResumeParserManager, ParsedResumeData } from "../lib/parser/ResumeParserProvider.js";
 import { connection } from "../api/queue.js";
 import { TenantUsageService } from "../services/TenantUsageService.js";
+import { ensureJobAssessment } from "../lib/assessmentService.js";
+import { sendAssessmentInviteEmail } from "../lib/email.js";
 
 dotenv.config();
 
@@ -364,6 +366,11 @@ export async function parseAndEvalResume(
         jobsToMatch = tenantJobs.rows;
       }
 
+      let highestMatchScore = 0;
+      let matchedJobId: string | null = null;
+      let matchedJobTitle = "";
+      let matchedJobDesc = "";
+
       for (const job of jobsToMatch) {
         const match = calculateHeuristicMatch(parsedData, job, weights);
         
@@ -389,6 +396,108 @@ export async function parseAndEvalResume(
            VALUES ($1, $2, $3, $4, 0, $5, 'Initial Matching Engine Recalculation');`,
           [crypto.randomUUID(), tenantId, candidateId, job.id, match.score]
         );
+
+        // Track highest matching job, or target job specifically
+        if (targetJobId && job.id === targetJobId) {
+          highestMatchScore = match.score;
+          matchedJobId = job.id;
+          matchedJobTitle = job.title;
+          matchedJobDesc = job.description;
+        } else if (!targetJobId && match.score > highestMatchScore) {
+          highestMatchScore = match.score;
+          matchedJobId = job.id;
+          matchedJobTitle = job.title;
+          matchedJobDesc = job.description;
+        }
+      }
+
+      // Default to first job if no match was targeted or found, and we have jobs
+      if (!matchedJobId && jobsToMatch.length > 0) {
+        matchedJobId = jobsToMatch[0].id;
+        matchedJobTitle = jobsToMatch[0].title;
+        matchedJobDesc = jobsToMatch[0].description;
+        const match = calculateHeuristicMatch(parsedData, jobsToMatch[0], weights);
+        highestMatchScore = match.score;
+      }
+
+      // Automated AI screening pipeline trigger
+      if (candidateStatus === "applied" && matchedJobId) {
+        if (highestMatchScore >= 70) {
+          const assessmentToken = crypto.randomBytes(24).toString("hex");
+          const expiry = new Date();
+          expiry.setDate(expiry.getDate() + 7);
+
+          // Update candidate status to shortlisted and link the assessment token
+          await queryGlobal(
+            `UPDATE candidates 
+             SET status = 'shortlisted', 
+                 job_id = $1, 
+                 score = $2, 
+                 match_percent = $2,
+                 assessment_token = $3, 
+                 assessment_token_expiry = $4, 
+                 assessment_status = 'pending'
+             WHERE id = $5;`,
+            [matchedJobId, highestMatchScore, assessmentToken, expiry, candidateId]
+          );
+
+          // Log activity and timeline
+          await queryGlobal(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+             VALUES ($1, 'email_sent', $2, $3);`,
+            [candidateId, `Candidate details logged (Score ${highestMatchScore}/100 >= 70). Assessment invitation automatically sent via email.`, tenantId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+             VALUES ($1, $2, $3, 'Stage Changed', 'Shortlisted', 'Candidate qualified for assessment stage with match score: ' || $4 || '/100.');`,
+            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
+          );
+
+          // Ensure job assessment and send invitation
+          try {
+            await ensureJobAssessment(matchedJobId, matchedJobTitle, matchedJobDesc);
+            
+            await sendAssessmentInviteEmail({
+              candidateName,
+              candidateEmail: parsedData.email || "",
+              jobTitle: matchedJobTitle,
+              token: assessmentToken,
+              expiryDate: expiry
+            });
+
+            await queryGlobal(
+              `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+               VALUES ($1, 'assessment_invited', $2, $3);`,
+              [candidateId, `Assessment invitation email sent to candidate. Token: ${assessmentToken}`, tenantId]
+            );
+          } catch (err: any) {
+            console.error(`[Worker] Failed to generate/send assessment for candidate ${candidateId}:`, err);
+          }
+        } else {
+          // Reject candidate
+          await queryGlobal(
+            `UPDATE candidates 
+             SET status = 'rejected', 
+                 job_id = $1, 
+                 score = $2, 
+                 match_percent = $2
+             WHERE id = $3;`,
+            [matchedJobId, highestMatchScore, candidateId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+             VALUES ($1, 'keka_rejected', $2, $3);`,
+            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 70).`, tenantId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+             VALUES ($1, $2, $3, 'Stage Changed', 'Rejected', 'Candidate auto-rejected with match score: ' || $4 || '/100.');`,
+            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
+          );
+        }
       }
 
       const matchDuration = Date.now() - matchStart;
