@@ -40,6 +40,7 @@ export default function CandidateAssessmentPage() {
     handleSelectOption,
     toggleFlag,
     dismissFullscreenError,
+    isResuming,
   } = useAssessmentSession(token);
 
   if (loading) {
@@ -80,6 +81,7 @@ export default function CandidateAssessmentPage() {
         isMobile={isMobile}
         token={token}
         requestFullscreen={requestFullscreen}
+        isResuming={isResuming}
       />
     );
   }

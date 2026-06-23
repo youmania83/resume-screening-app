@@ -60,7 +60,8 @@ export function useAssessmentSession(token: string) {
     const checkMobile = () => {
       setIsMobile(
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768
+        window.innerWidth < 768 ||
+        (typeof navigator !== "undefined" && navigator.maxTouchPoints !== undefined && navigator.maxTouchPoints > 1)
       );
     };
     checkMobile();
@@ -134,6 +135,30 @@ export function useAssessmentSession(token: string) {
           if (res.data.sessionId) {
             setSessionId(res.data.sessionId);
             sessionStorage.setItem("assessment_session_id", res.data.sessionId);
+          }
+
+          // Restore progress from server with local storage fallback
+          const serverAnswers = res.data.currentAnswers || {};
+          const serverIdx = res.data.currentQuestionIndex || 0;
+
+          const localAnswersStr = localStorage.getItem(`answers_${token}`);
+          if (localAnswersStr && Object.keys(serverAnswers).length === 0) {
+            try {
+              setAnswers(JSON.parse(localAnswersStr));
+            } catch {}
+          } else {
+            setAnswers(serverAnswers);
+          }
+
+          const localIdxStr = localStorage.getItem(`currentIdx_${token}`);
+          if (localIdxStr && serverIdx === 0) {
+            const localIdx = parseInt(localIdxStr, 10);
+            if (!isNaN(localIdx) && localIdx >= 0 && localIdx < res.data.questions.length) {
+              setCurrentIdx(localIdx);
+            }
+          } else {
+            const finalIdx = typeof serverIdx === "number" && serverIdx < res.data.questions.length ? serverIdx : 0;
+            setCurrentIdx(finalIdx);
           }
         }
         setLoading(false);
@@ -250,8 +275,35 @@ export function useAssessmentSession(token: string) {
     }
   };
 
+  const saveProgress = useCallback(
+    async (newAnswers: Record<string, string>, newIdx: number) => {
+      // 1. Save locally
+      localStorage.setItem(`answers_${token}`, JSON.stringify(newAnswers));
+      localStorage.setItem(`currentIdx_${token}`, newIdx.toString());
+
+      // 2. Save to backend (fire-and-forget, non-blocking)
+      if (navigator.onLine) {
+        try {
+          await api.saveAssessmentProgress(token, newAnswers, newIdx);
+        } catch (err) {
+          console.warn("Non-blocking save progress failed:", err);
+        }
+      }
+    },
+    [token]
+  );
+
   const handleSelectOption = (qId: string, option: string) => {
-    setAnswers((prev) => ({ ...prev, [qId]: option }));
+    setAnswers((prev) => {
+      const updated = { ...prev, [qId]: option };
+      saveProgress(updated, currentIdx);
+      return updated;
+    });
+  };
+
+  const handleSetCurrentIdx = (newIdx: number) => {
+    setCurrentIdx(newIdx);
+    saveProgress(answers, newIdx);
   };
 
   const toggleFlag = (idx: number) => {
@@ -266,6 +318,8 @@ export function useAssessmentSession(token: string) {
     setFullscreenError(false);
   };
 
+  const isResuming = Object.keys(answers).length > 0 || currentIdx > 0;
+
   return {
     sessionId,
     loading,
@@ -279,7 +333,7 @@ export function useAssessmentSession(token: string) {
     submitting,
     remainingSeconds,
     currentIdx,
-    setCurrentIdx,
+    setCurrentIdx: handleSetCurrentIdx,
     answers,
     flaggedQuestions,
     violationCount,
@@ -294,5 +348,6 @@ export function useAssessmentSession(token: string) {
     handleSelectOption,
     toggleFlag,
     dismissFullscreenError,
+    isResuming,
   };
 }

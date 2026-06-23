@@ -288,6 +288,8 @@ router.get("/:token", async (req: any, res: any) => {
         remainingSeconds: TOTAL_TEST_TIME_SEC,
         questions,
         sessionId: sessionDbId,
+        currentAnswers: {},
+        currentQuestionIndex: 0,
       });
     } else {
       attempt = attemptRes.rows[0];
@@ -356,6 +358,11 @@ router.get("/:token", async (req: any, res: any) => {
         });
       }
 
+      const currentAnswers = typeof attempt.current_answers === "string"
+        ? JSON.parse(attempt.current_answers)
+        : (attempt.current_answers || {});
+      const currentQuestionIndex = attempt.current_question_index || 0;
+
       return res.json({
         success: true,
         candidateName: candidate.name,
@@ -363,11 +370,65 @@ router.get("/:token", async (req: any, res: any) => {
         jobTitle: candidate.role,
         remainingSeconds,
         questions,
+        currentAnswers,
+        currentQuestionIndex,
       });
     }
   } catch (err: any) {
     console.error("Failed to load assessment portal details:", err);
     res.status(500).json({ error: err.message || "Failed to load assessment details" });
+  }
+});
+
+// POST /api/assessment/:token/save-progress - saves in-progress answers and question index
+router.post("/:token/save-progress", async (req: any, res: any) => {
+  try {
+    const { token } = req.params;
+    const { answers, currentQuestionIndex } = req.body as {
+      answers: Record<string, string>;
+      currentQuestionIndex: number;
+    };
+
+    if (!token) {
+      return res.status(400).json({ error: "token is required" });
+    }
+
+    // Fetch candidate
+    const candidateRes = await query(
+      `SELECT id, job_id FROM candidates WHERE assessment_token = $1 LIMIT 1;`,
+      [token]
+    );
+
+    if (!candidateRes.rowCount || candidateRes.rowCount === 0) {
+      return res.status(404).json({ error: "Invalid token" });
+    }
+
+    const candidate = candidateRes.rows[0];
+
+    // Find assessment
+    const assessmentRes = await query(
+      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      [candidate.job_id]
+    );
+
+    if (!assessmentRes.rowCount || assessmentRes.rowCount === 0) {
+      return res.status(404).json({ error: "Assessment not found" });
+    }
+
+    const assessmentId = assessmentRes.rows[0].id;
+
+    // Update in-progress attempt progress
+    await query(
+      `UPDATE assessment_attempts
+       SET current_answers = $1, current_question_index = $2
+       WHERE candidate_id = $3 AND assessment_id = $4 AND status = 'started';`,
+      [JSON.stringify(answers), currentQuestionIndex, candidate.id, assessmentId]
+    );
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Failed to save assessment progress:", err);
+    res.status(500).json({ error: err.message || "Failed to save progress" });
   }
 });
 

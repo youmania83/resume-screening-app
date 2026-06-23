@@ -69,3 +69,18 @@ export async function sendHeartbeat(token: string, sessionId: string) {
     console.error("Failed to send heartbeat:", err);
   }
 }
+
+export async function saveAssessmentProgress(
+  token: string,
+  answers: Record<string, string>,
+  currentQuestionIndex: number
+) {
+  const resp = await fetch(`${apiBase}/assessment/${token}/save-progress`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers, currentQuestionIndex }),
+  });
+  if (!resp.ok) throw new Error("Failed to save assessment progress.");
+  return resp.json();
+}
+

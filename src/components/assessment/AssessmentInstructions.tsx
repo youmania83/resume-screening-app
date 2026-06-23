@@ -8,6 +8,7 @@ interface AssessmentInstructionsProps {
   isMobile: boolean;
   token: string;
   requestFullscreen: () => Promise<void>;
+  isResuming?: boolean;
 }
 
 export default function AssessmentInstructions({
@@ -16,6 +17,7 @@ export default function AssessmentInstructions({
   isMobile,
   token,
   requestFullscreen,
+  isResuming = false,
 }: AssessmentInstructionsProps) {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between py-12 px-4 select-none">
@@ -76,10 +78,10 @@ export default function AssessmentInstructions({
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
           >
             {isMobile ? (
-              "Start Assessment"
+              isResuming ? "Resume Assessment" : "Start Assessment"
             ) : (
               <>
-                <Maximize2 className="h-4 w-4" /> Enter Fullscreen & Start Test
+                <Maximize2 className="h-4 w-4" /> {isResuming ? "Enter Fullscreen & Resume Test" : "Enter Fullscreen & Start Test"}
               </>
             )}
           </button>

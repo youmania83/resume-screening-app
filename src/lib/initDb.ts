@@ -173,6 +173,10 @@ async function init() {
       );
     `);
     await client.query(`
+      ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS current_answers JSONB DEFAULT '{}'::jsonb;
+      ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS current_question_index INT DEFAULT 0;
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS assessment_violations (
         id SERIAL PRIMARY KEY,
         candidate_id VARCHAR REFERENCES candidates(id) ON DELETE CASCADE,

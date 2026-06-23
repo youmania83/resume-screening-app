@@ -48,6 +48,29 @@ export default function ExamInterface({
   const selectedAnswer = answers[currentQuestion?.id];
   const isFlagged = flaggedQuestions[currentIdx];
 
+  const [isOnline, setIsOnline] = React.useState(true);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  const handleSubmitClick = () => {
+    if (!isOnline) {
+      alert("⚠️ You are currently offline. Please restore your internet connection before submitting your assessment so your answers can be graded.");
+      return;
+    }
+    submitAssessment(false);
+  };
+
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -59,6 +82,13 @@ export default function ExamInterface({
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between select-none">
       <Toaster position="top-right" theme="light" closeButton />
+
+      {/* OFFLINE RESILIENCE BANNER */}
+      {!isOnline && (
+        <div className="bg-amber-600 text-white text-xs font-bold py-2 px-6 text-center animate-pulse flex items-center justify-center gap-2 sticky top-0 z-20 shadow-md">
+          <span>📶 Working Offline. Answers are saved locally in browser cache and will sync automatically when your connection returns.</span>
+        </div>
+      )}
 
       {/* A. HEADER */}
       <header className="bg-white/95 border-b border-border px-6 py-4 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
@@ -72,6 +102,18 @@ export default function ExamInterface({
 
           {/* TIMER */}
           <div className="flex items-center gap-4">
+            {/* Connection Status Badge */}
+            <div
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${
+                isOnline
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                  : "bg-amber-50 border-amber-200 text-amber-600 animate-pulse"
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-amber-500 animate-ping"}`} />
+              {isOnline ? "Cloud Synced" : "Offline Mode"}
+            </div>
+
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs font-bold ${
                 remainingSeconds < 120
@@ -85,7 +127,7 @@ export default function ExamInterface({
 
             {/* Submit */}
             <button
-              onClick={() => submitAssessment(false)}
+              onClick={handleSubmitClick}
               className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold px-4 py-2 rounded-md transition-colors cursor-pointer shadow-md"
             >
               Submit Test
@@ -268,7 +310,7 @@ export default function ExamInterface({
                 </button>
               ) : (
                 <button
-                  onClick={() => submitAssessment(false)}
+                  onClick={handleSubmitClick}
                   className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold px-6 py-2.5 rounded transition-all cursor-pointer shadow-lg"
                 >
                   Submit Assessment
