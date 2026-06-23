@@ -152,7 +152,7 @@ async function runVerification() {
 
     console.log("Submitting assessment responses...");
     // Let's call handleAssessmentCompletion directly to verify the workflow service
-    const completionResult = await kekaWorkflowService.handleAssessmentCompletion(candidateId, 90);
+    const completionResult = await kekaWorkflowService.handleAssessmentCompletion(candidateId!, 90);
     console.log("Completion Result:", completionResult);
 
     if (completionResult?.interviewDate) {

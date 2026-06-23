@@ -57,3 +57,15 @@ export async function forceResumeSession(token: string, sessionId: string) {
   }
   return resp.json();
 }
+
+export async function sendHeartbeat(token: string, sessionId: string) {
+  try {
+    await fetch(`${apiBase}/assessment/${token}/heartbeat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+  } catch (err) {
+    console.error("Failed to send heartbeat:", err);
+  }
+}

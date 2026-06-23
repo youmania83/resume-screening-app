@@ -446,10 +446,11 @@ const FALLBACK_GENERIC_QUESTIONS: Question[] = [
  * AI Questions Generation Service
  */
 export async function generateAssessmentQuestions(jobTitle: string, jobDescription: string): Promise<Question[]> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const provider = (process.env.AI_PROVIDER || "").toLowerCase().trim();
+  const hasAPIKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    console.warn("⚠️ DEEPSEEK_API_KEY is not configured. Falling back to high-quality default questions.");
+  if (provider === "mock" || (!provider && !hasAPIKey)) {
+    console.warn("⚠️ No active AI provider API key configured or AI_PROVIDER is mock. Falling back to default questions.");
     return selectFallbackQuestions(jobTitle);
   }
 

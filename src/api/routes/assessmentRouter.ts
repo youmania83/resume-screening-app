@@ -21,7 +21,7 @@ async function resolveTenantContext(req: any, res: any, next: any) {
     let tenantId: string | null = null;
 
     // 1. Resolve by assessment token
-    const token = req.params.token || req.body.token || req.query.token;
+    const token = req.params?.token || req.body?.token || req.query?.token;
     if (token && typeof token === "string" && token.length > 20) {
       const result = await queryGlobal("SELECT tenant_id FROM candidates WHERE assessment_token = $1 LIMIT 1;", [token]);
       if (result.rowCount && result.rowCount > 0) {
@@ -30,7 +30,7 @@ async function resolveTenantContext(req: any, res: any, next: any) {
     }
 
     // 2. Resolve by candidateId
-    const candidateId = req.body.candidateId || req.query.candidateId;
+    const candidateId = req.body?.candidateId || req.query?.candidateId;
     if (!tenantId && candidateId && typeof candidateId === "string") {
       const result = await queryGlobal("SELECT tenant_id FROM candidates WHERE id = $1 LIMIT 1;", [candidateId]);
       if (result.rowCount && result.rowCount > 0) {
@@ -39,7 +39,7 @@ async function resolveTenantContext(req: any, res: any, next: any) {
     }
 
     // 3. Resolve by jobId
-    const jobId = req.body.jobId || req.params.jobId || req.query.jobId;
+    const jobId = req.body?.jobId || req.params?.jobId || req.query?.jobId;
     if (!tenantId && jobId && typeof jobId === "string") {
       const result = await queryGlobal("SELECT tenant_id FROM jobs WHERE id = $1 LIMIT 1;", [jobId]);
       if (result.rowCount && result.rowCount > 0) {
@@ -209,17 +209,18 @@ router.get("/:token", async (req: any, res: any) => {
       return res.status(400).json({ error: "This assessment link has expired (7 days deadline passed)" });
     }
 
-    // Find assessment for the job
+    // Find or generate assessment for the job on demand
+    let assessmentId = "";
     const assessmentRes = await query(
       `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
       [candidate.job_id]
     );
-
-    if (!assessmentRes.rowCount || assessmentRes.rowCount === 0) {
-      return res.status(404).json({ error: "Assessment not found for this job opening" });
+    if (assessmentRes.rowCount && assessmentRes.rowCount > 0) {
+      assessmentId = assessmentRes.rows[0].id;
+    } else {
+      // Auto-generate assessment on the fly!
+      assessmentId = await ensureJobAssessment(candidate.job_id, candidate.role, candidate.job_description || `Job opening for ${candidate.role}`);
     }
-
-    const assessmentId = assessmentRes.rows[0].id;
 
     // Check if there is an existing attempt
     const attemptRes = await query(
@@ -299,9 +300,47 @@ router.get("/:token", async (req: any, res: any) => {
       // Rejoining session checks:
       // Check session ID
       if (attempt.session_id !== sessionId) {
-        return res.status(403).json({
-          error: "Only one active session allowed. You cannot open this assessment in multiple windows/tabs."
-        });
+        // Retrieve the session to check its last heartbeat
+        const sessionRes = await query(
+          `SELECT last_heartbeat FROM assessment_sessions WHERE id = $1 LIMIT 1;`,
+          [attempt.session_id]
+        );
+        
+        const now = new Date();
+        const activeTimeoutMs = 30 * 1000; // 30 seconds timeout
+        let isSessionActive = false;
+        
+        if (sessionRes.rowCount && sessionRes.rowCount > 0) {
+          const lastHeartbeat = new Date(sessionRes.rows[0].last_heartbeat);
+          if (now.getTime() - lastHeartbeat.getTime() < activeTimeoutMs) {
+            isSessionActive = true;
+          }
+        }
+        
+        if (isSessionActive) {
+          return res.status(403).json({
+            error: "Only one active session allowed. You cannot open this assessment in multiple windows/tabs."
+          });
+        } else {
+          // The old session is dead/inactive. Auto-recover by taking over!
+          console.log(`[Session Recovery] Auto-recovering session for candidate ${candidate.id}. Swapping old session ${attempt.session_id} to new session ${sessionId}`);
+          
+          // Update the attempt with the new session ID in the database
+          await query(
+            `UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`,
+            [sessionId, attempt.id]
+          );
+          
+          // Create a new session record for the audit trail
+          const browserFingerprint = req.headers['user-agent'] || null;
+          const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
+          await query(
+            `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
+             VALUES ($1, $2, $3, $4, 'active', $5, $6)
+             ON CONFLICT (id) DO NOTHING;`,
+            [sessionId, candidate.id, assessmentId, attempt.id, browserFingerprint, ipAddress]
+          );
+        }
       }
 
       // Check remaining time
@@ -824,10 +863,10 @@ router.post("/public-register", async (req: any, res: any) => {
     }
     const job = jobRes.rows[0];
 
-    // 2. Fetch assessment to make sure it exists
+    // 2. Fetch assessment to make sure it exists (auto-generate if missing)
     const assessmentRes = await query(`SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`, [jobId]);
     if (!assessmentRes.rowCount || assessmentRes.rowCount === 0) {
-      return res.status(404).json({ error: "Assessment not configured for this job opening." });
+      await ensureJobAssessment(jobId, job.title, job.description || `Autogenerated job description for ${job.title}`);
     }
 
     // 3. Check if candidate is already registered for this job

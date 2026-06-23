@@ -39,6 +39,7 @@ export default function CandidateAssessmentPage() {
     submitAssessment,
     handleSelectOption,
     toggleFlag,
+    dismissFullscreenError,
   } = useAssessmentSession(token);
 
   if (loading) {
@@ -109,6 +110,7 @@ export default function CandidateAssessmentPage() {
         videoRef={proctoring.videoRef}
         faceViolation={proctoring.faceViolation}
         modelLoaded={proctoring.modelLoaded}
+        dismissFullscreenError={dismissFullscreenError}
       />
     </>
   );

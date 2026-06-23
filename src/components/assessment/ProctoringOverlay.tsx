@@ -10,6 +10,7 @@ interface ProctoringOverlayProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   faceViolation: "none" | "no_face" | "multiple_faces";
   modelLoaded: boolean;
+  dismissFullscreenError?: () => void;
 }
 
 export default function ProctoringOverlay({
@@ -20,6 +21,7 @@ export default function ProctoringOverlay({
   videoRef,
   faceViolation,
   modelLoaded,
+  dismissFullscreenError,
 }: ProctoringOverlayProps) {
   return (
     <>
@@ -43,12 +45,22 @@ export default function ProctoringOverlay({
                   this technical assessment.
                 </p>
               </div>
-              <button
-                onClick={requestFullscreen}
-                className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-md text-xs transition-colors cursor-pointer"
-              >
-                Re-enter Fullscreen & Continue
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={requestFullscreen}
+                  className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-md text-xs transition-colors cursor-pointer"
+                >
+                  Re-enter Fullscreen & Continue
+                </button>
+                {dismissFullscreenError && (
+                  <button
+                    onClick={dismissFullscreenError}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-md text-xs transition-colors cursor-pointer border border-slate-200 animate-fade-in"
+                  >
+                    Continue in Windowed Mode (Flagged)
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}

@@ -145,6 +145,19 @@ export function useAssessmentSession(token: string) {
     loadAssessment();
   }, [token, sessionId]);
 
+  useEffect(() => {
+    if (!testStarted || testSubmitted || !token || !sessionId) return;
+    
+    // Send initial heartbeat
+    api.sendHeartbeat(token, sessionId);
+    
+    const interval = setInterval(() => {
+      api.sendHeartbeat(token, sessionId);
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, [testStarted, testSubmitted, token, sessionId]);
+
   const submitAssessment = useCallback(
     async (isAuto = false) => {
       if (submitting || testSubmitted) return;
@@ -249,6 +262,10 @@ export function useAssessmentSession(token: string) {
     ? Math.round((Object.keys(answers).length / questions.length) * 100)
     : 0;
 
+  const dismissFullscreenError = () => {
+    setFullscreenError(false);
+  };
+
   return {
     sessionId,
     loading,
@@ -276,5 +293,6 @@ export function useAssessmentSession(token: string) {
     submitAssessment,
     handleSelectOption,
     toggleFlag,
+    dismissFullscreenError,
   };
 }
