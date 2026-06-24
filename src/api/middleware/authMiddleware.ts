@@ -26,6 +26,7 @@ declare global {
 }
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  console.log("🔑 [Auth Middleware] Request Path:", req.path);
   // Public routes that bypass auth entirely
   const publicPaths = [
     "/api/auth/login",

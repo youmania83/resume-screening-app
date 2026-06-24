@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, User, Mail, Lock, Loader2, Sparkles } from "lucide-react";
+import { Building2, User, Mail, Lock, Key, Loader2, Sparkles } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [licenseKey, setLicenseKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = async (token: string) => {
@@ -21,7 +22,7 @@ export default function RegisterPage() {
       const res = await fetch(`${apiBase}/auth/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, licenseKey }),
       });
 
       const data = await res.json();
@@ -77,8 +78,8 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName || !userName || !email || !password) {
-      toast.error("Please fill in all fields");
+    if (!companyName || !userName || !email || !password || !licenseKey) {
+      toast.error("Please fill in all fields including the License Key");
       return;
     }
 
@@ -89,7 +90,7 @@ export default function RegisterPage() {
       const res = await fetch(`${apiBase}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, userName, email, password }),
+        body: JSON.stringify({ companyName, userName, email, password, licenseKey }),
       });
 
       const data = await res.json();
@@ -199,6 +200,25 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm bg-secondary/35 border border-border/75 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* License Key */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="licenseKey" className="text-xs font-bold text-foreground">
+                License Key
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  id="licenseKey"
+                  type="text"
+                  placeholder="TEST-PREMIUM-KEY"
+                  value={licenseKey}
+                  onChange={(e) => setLicenseKey(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 text-sm bg-secondary/35 border border-border/75 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
                   required
                 />

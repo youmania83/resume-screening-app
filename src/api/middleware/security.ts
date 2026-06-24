@@ -61,10 +61,13 @@ export function rateLimiter(windowMs: number, maxRequests: number) {
     const ip = (req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
     const path = req.path;
 
+    console.log(`⏱️ [Rate Limiter] Request path: ${req.path}, IP: ${ip}`);
     // 1. Try Redis
     if (isRedisConnected && redisClient) {
       try {
+        console.log(`⏱️ [Rate Limiter] Querying Redis for ${ip}:${path}`);
         const allowed = await redisRateLimit(ip, path, windowMs, maxRequests);
+        console.log(`⏱️ [Rate Limiter] Redis allowed? ${allowed}`);
         if (!allowed) {
           res.status(429).json({
             success: false,
@@ -124,6 +127,7 @@ export function rateLimiter(windowMs: number, maxRequests: number) {
  * Basic CSRF Protection via strict Origin and Referer header checking on state-changing operations
  */
 export function csrfGuard(req: Request, res: Response, next: NextFunction) {
+  console.log("🔒 [CSRF Guard] Request Method:", req.method, "Path:", req.path, "Origin:", req.headers.origin || req.headers.referer);
   const safeMethods = ["GET", "HEAD", "OPTIONS"];
   if (safeMethods.includes(req.method)) {
     return next();

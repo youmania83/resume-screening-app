@@ -11,6 +11,8 @@ import { sendAssessmentInviteEmail } from "../../lib/email.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
+import { detectPromptInjection } from "../../lib/guardrails.js";
+import { rateLimiter } from "../middleware/security.js";
 
 const upload = multer({ dest: "uploads/" });
 const router = Router();
@@ -49,14 +51,19 @@ Analyze the resume and return ONLY a JSON object:
 Do not include markdown code block formatting or explanations outside the JSON.`;
 }
 
-router.post("/", creditCheck("ai_screen"), upload.single("file"), async (req: any, res: any, next: any) => {
+router.post("/", rateLimiter(1 * 60 * 1000, 10), creditCheck("ai_screen"), upload.single("file"), async (req: any, res: any, next: any) => {
   try {
+    const { jobDescription } = req.body as { jobDescription: string };
+    if (jobDescription && detectPromptInjection(jobDescription)) {
+       res.status(400).json({ error: "Security Alert: Potential prompt injection detected in Job Description." });
+       return;
+    }
+
     if (!req.file) {
        res.status(400).json({ error: "Resume file is required" });
        return;
     }
-    const { jobDescription } = req.body as { jobDescription: string };
-    if (!jobDescription) {
+     if (!jobDescription) {
        res.status(400).json({ error: "jobDescription is required" });
        return;
     }
@@ -90,6 +97,11 @@ router.post("/", creditCheck("ai_screen"), upload.single("file"), async (req: an
 
     if (!rawText || !rawText.trim()) {
        res.status(400).json({ error: "Could not extract text from the resume file." });
+       return;
+    }
+
+    if (detectPromptInjection(rawText)) {
+       res.status(400).json({ error: "Security Alert: Potential prompt injection detected in Resume content." });
        return;
     }
 

@@ -7,6 +7,8 @@ import { queryTenant } from "../../lib/tenantDb.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
+import { detectPromptInjection } from "../../lib/guardrails.js";
+import { rateLimiter } from "../middleware/security.js";
 
 const router = Router();
 
@@ -23,12 +25,17 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST /api/jobs – Generates a job description record under tenant
-router.post("/", creditCheck("job_create"), async (req, res, next) => {
+router.post("/", rateLimiter(1 * 60 * 1000, 15), creditCheck("job_create"), async (req, res, next) => {
   try {
     const { title, description, department, location, experienceRequired, jd } = req.body;
     
     if (!title || !description) {
        res.status(400).json({ success: false, error: "Title and Description are required" });
+       return;
+    }
+
+    if (detectPromptInjection(title) || detectPromptInjection(description)) {
+       res.status(400).json({ success: false, error: "Security Alert: Potential prompt injection detected in Job Title or Description." });
        return;
     }
 
@@ -102,10 +109,16 @@ router.delete("/:id", async (req, res, next) => {
 
 // POST /api/jobs/extract – extracts structured data from job descriptions via DeepSeek
 // POST /api/jobs/extract – extracts structured data from job descriptions via DeepSeek
-router.post("/extract", async (req, res, _next) => {
+router.post("/extract", rateLimiter(1 * 60 * 1000, 5), async (req, res, _next) => {
   let jdText = "";
   try {
     const { text, url } = req.body as { text?: string; url?: string };
+    
+    if (text && detectPromptInjection(text)) {
+      res.status(400).json({ error: "Security Alert: Potential prompt injection detected in Job Description text." });
+      return;
+    }
+
     jdText = text || "";
     
     if (url) {

@@ -673,6 +673,28 @@ async function init() {
       `);
     }
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS license_keys (
+        key VARCHAR PRIMARY KEY,
+        plan_tier VARCHAR NOT NULL DEFAULT 'premium' CHECK (plan_tier IN ('free', 'premium', 'enterprise')),
+        credits INT NOT NULL DEFAULT 100,
+        expires_at TIMESTAMPTZ,
+        is_used BOOLEAN DEFAULT FALSE,
+        used_by_tenant_id VARCHAR REFERENCES tenants(id) ON DELETE SET NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      INSERT INTO license_keys (key, plan_tier, credits, expires_at)
+      VALUES 
+        ('TEST-FREE-KEY', 'free', 100, NOW() + INTERVAL '30 days'),
+        ('TEST-PREMIUM-KEY', 'premium', 1000, NOW() + INTERVAL '365 days'),
+        ('TEST-ENTERPRISE-KEY', 'enterprise', 10000, NOW() + INTERVAL '365 days')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();

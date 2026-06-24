@@ -10,6 +10,7 @@ import { IngestQueue } from "../../lib/queue/ingestQueue.js";
 import { queryGlobal } from "../../lib/tenantDb.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
+import { rateLimiter } from "../middleware/security.js";
 
 const upload = multer({ dest: "uploads/" });
 const router = Router();
@@ -66,7 +67,7 @@ async function processAndEnqueue(
 }
 
 // POST /api/resumes/upload - Supports single, bulk, and ZIP resume ingestion
-router.post("/upload", creditCheck("upload"), upload.array("files", 50), async (req: any, res: any, next: any) => {
+router.post("/upload", rateLimiter(1 * 60 * 1000, 20), creditCheck("upload"), upload.array("files", 50), async (req: any, res: any, next: any) => {
   try {
     const files = req.files as Express.Multer.File[];
     const jobId = req.body.jobId;

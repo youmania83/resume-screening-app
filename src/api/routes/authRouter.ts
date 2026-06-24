@@ -20,26 +20,57 @@ router.post(
   rateLimiter(60 * 60 * 1000, 5), // Max 5 signups per hour per IP
   async (req, res, next) => {
     try {
-      const { companyName, userName, email, password } = req.body;
+      console.log("📥 [Register API] Request body:", JSON.stringify(req.body));
+      const { companyName, userName, email, password, licenseKey } = req.body;
 
       if (!companyName || !userName || !email || !password) {
+         console.log("❌ [Register API] Missing basic fields");
          res.status(400).json({ success: false, error: "All fields are required" });
          return;
       }
 
+      if (!licenseKey) {
+        console.log("❌ [Register API] Missing licenseKey");
+        res.status(400).json({ success: false, error: "License key is required to register." });
+        return;
+      }
+
+      console.log("🔍 [Register API] Checking user existence for email:", email);
       // Check if user already exists
       const checkUser = await queryGlobal("SELECT id FROM users WHERE email = $1 LIMIT 1;", [email]);
       if (checkUser.rowCount! > 0) {
+         console.log("❌ [Register API] Email already registered");
          res.status(400).json({ success: false, error: "A user with this email already exists" });
          return;
       }
+
+      console.log("🔍 [Register API] Checking license key validity:", licenseKey);
+      // Verify license key
+      const licenseRes = await queryGlobal(
+        "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1;",
+        [licenseKey]
+      );
+      if (licenseRes.rowCount === 0) {
+         res.status(400).json({ success: false, error: "Invalid, expired, or already used license key" });
+         return;
+      }
+      const license = licenseRes.rows[0];
 
       const tenantId = crypto.randomUUID();
       const userId = crypto.randomUUID();
       const pwdHash = await hashPassword(password);
 
-      // Create Tenant
-      await queryGlobal("INSERT INTO tenants (id, name) VALUES ($1, $2);", [tenantId, companyName]);
+      // Create Tenant with license parameters
+      await queryGlobal(
+        "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
+        [tenantId, companyName, license.plan_tier, license.credits, license.expires_at]
+      );
+
+      // Mark license key as used
+      await queryGlobal(
+        "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
+        [tenantId, licenseKey]
+      );
 
       // Create Owner User
       await queryGlobal(
@@ -106,7 +137,7 @@ router.post(
   rateLimiter(15 * 60 * 1000, 20), // Max 20 logins/registrations per 15 minutes per IP
   async (req, res, next) => {
     try {
-      const { token } = req.body;
+      const { token, licenseKey } = req.body;
       if (!token) {
         res.status(400).json({ success: false, error: "Google ID token is required" });
         return;
@@ -164,15 +195,40 @@ router.post(
       let userName: string;
 
       if (userRes.rowCount === 0) {
-        // User does not exist, auto-onboard
+        // User does not exist, auto-onboard. Require license key!
+        if (!licenseKey) {
+          res.status(400).json({ success: false, error: "License key is required for new registration." });
+          return;
+        }
+
+        // Verify license key
+        const licenseRes = await queryGlobal(
+          "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1;",
+          [licenseKey]
+        );
+        if (licenseRes.rowCount === 0) {
+          res.status(400).json({ success: false, error: "Invalid, expired, or already used license key" });
+          return;
+        }
+        const license = licenseRes.rows[0];
+
         tenantId = crypto.randomUUID();
         userId = crypto.randomUUID();
         role = "owner";
         userName = name;
 
-        // Create Tenant
+        // Create Tenant with license parameters
         const companyName = `${userName}'s Workspace`;
-        await queryGlobal("INSERT INTO tenants (id, name) VALUES ($1, $2);", [tenantId, companyName]);
+        await queryGlobal(
+          "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
+          [tenantId, companyName, license.plan_tier, license.credits, license.expires_at]
+        );
+
+        // Mark license key as used
+        await queryGlobal(
+          "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
+          [tenantId, licenseKey]
+        );
 
         // Create Owner User with a secure randomized password
         const randomPassword = crypto.randomBytes(32).toString("hex");
@@ -480,6 +536,64 @@ router.post(
       await queryGlobal("DELETE FROM user_invitations WHERE id = $1;", [invite.id]);
 
       res.json({ success: true, message: "Invitation accepted. Account created successfully!" });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/auth/activate-license - Top up or change subscription for an active tenant (Rate limited, Owner only)
+router.post(
+  "/activate-license",
+  authMiddleware,
+  requireRole(["owner"]),
+  rateLimiter(15 * 60 * 1000, 5), // Max 5 license activations per 15 minutes per IP
+  async (req, res, next) => {
+    try {
+      const { licenseKey } = req.body;
+      const tenantId = req.user?.tenantId;
+
+      if (!licenseKey) {
+        res.status(400).json({ success: false, error: "License key is required." });
+        return;
+      }
+
+      if (!tenantId) {
+        res.status(401).json({ success: false, error: "Authentication / Tenant context required." });
+        return;
+      }
+
+      // Verify license key
+      const licenseRes = await queryGlobal(
+        "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1;",
+        [licenseKey]
+      );
+      if (licenseRes.rowCount === 0) {
+        res.status(400).json({ success: false, error: "Invalid, expired, or already used license key." });
+        return;
+      }
+      const license = licenseRes.rows[0];
+
+      // Update tenant subscription and credits
+      await queryGlobal(
+        `UPDATE tenants 
+         SET plan_tier = $1, 
+             credit_balance = credit_balance + $2, 
+             plan_expires_at = COALESCE($3, plan_expires_at)
+         WHERE id = $4;`,
+        [license.plan_tier, license.credits, license.expires_at, tenantId]
+      );
+
+      // Mark license key as used
+      await queryGlobal(
+        "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
+        [tenantId, licenseKey]
+      );
+
+      res.json({
+        success: true,
+        message: `License key activated successfully! Applied plan: ${license.plan_tier}, Credits added: ${license.credits}.`
+      });
     } catch (err) {
       next(err);
     }
