@@ -7,7 +7,10 @@ import { hashToken } from "../../lib/auth.js";
 import { tenantStorage } from "../../lib/tenantContext.js";
 import { queryGlobal } from "../../lib/tenantDb.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is required. Refusing to start with an insecure default.");
+}
 
 interface TokenPayload {
   userId: string;
@@ -60,7 +63,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     // 1. Verify access token if present
     if (accessToken) {
       try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET) as TokenPayload;
+        const decoded = jwt.verify(accessToken, JWT_SECRET) as unknown as TokenPayload;
         req.user = decoded;
         
         // Execute the rest of request inside tenant storage context

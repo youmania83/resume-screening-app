@@ -62,6 +62,19 @@ ${divider}
 };
 
 /**
+ * Escapes characters in a string to prevent XSS/HTML Injection
+ */
+function escapeHtml(text: string): string {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
  * Send candidate assessment invite email
  */
 export async function sendAssessmentInviteEmail(params: {
@@ -71,6 +84,9 @@ export async function sendAssessmentInviteEmail(params: {
   token: string;
   expiryDate: Date;
 }) {
+  const safeCandidateName = escapeHtml(params.candidateName);
+  const safeJobTitle = escapeHtml(params.jobTitle);
+
   const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const assessmentLink = `${portalUrl}/assessment/${params.token}`;
   const formattedExpiry = params.expiryDate.toLocaleDateString("en-US", {
@@ -82,7 +98,7 @@ export async function sendAssessmentInviteEmail(params: {
     minute: "2-digit",
   });
 
-  const subject = `Assessment Invitation: ${params.jobTitle} Role - Rison AI Tech`;
+  const subject = `Assessment Invitation: ${safeJobTitle} Role - Rison AI Tech`;
   
   const html = `
     <!DOCTYPE html>
@@ -118,13 +134,13 @@ export async function sendAssessmentInviteEmail(params: {
           <p>Candidate Assessment Portal</p>
         </div>
         <div class="content">
-          <p class="greeting">Hello ${params.candidateName},</p>
-          <p class="message">Thank you for your interest in the <strong>${params.jobTitle}</strong> position. Your resume matching evaluation has passed our initial screening filters. We are pleased to invite you to the next stage of our recruitment process: a short technical assessment.</p>
+          <p class="greeting">Hello ${safeCandidateName},</p>
+          <p class="message">Thank you for your interest in the <strong>${safeJobTitle}</strong> position. Your resume matching evaluation has passed our initial screening filters. We are pleased to invite you to the next stage of our recruitment process: a short technical assessment.</p>
           
           <div class="details-box">
             <div class="detail-row">
               <span class="detail-label">Role:</span>
-              <span class="detail-val">${params.jobTitle}</span>
+              <span class="detail-val">${safeJobTitle}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Time Limit:</span>
@@ -188,6 +204,9 @@ export async function sendInterviewScheduleEmail(params: {
   scheduledDate: Date;
   hrEmail: string;
 }) {
+  const safeCandidateName = escapeHtml(params.candidateName);
+  const safeJobTitle = escapeHtml(params.jobTitle);
+
   const formattedDate = params.scheduledDate.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -200,8 +219,8 @@ export async function sendInterviewScheduleEmail(params: {
     timeZoneName: "short",
   });
 
-  const candidateSubject = `HR Interview Scheduled: ${params.jobTitle} Role - Rison AI Tech`;
-  const hrSubject = `[ALERT] Qualified Candidate: HR Interview Scheduled for ${params.candidateName}`;
+  const candidateSubject = `HR Interview Scheduled: ${safeJobTitle} Role - Rison AI Tech`;
+  const hrSubject = `[ALERT] Qualified Candidate: HR Interview Scheduled for ${safeCandidateName}`;
 
   // 1. HTML Email for Candidate
   const candidateHtml = `
@@ -236,7 +255,7 @@ export async function sendInterviewScheduleEmail(params: {
           <p>Interview Scheduling Automation</p>
         </div>
         <div class="content">
-          <p class="greeting">Congratulations, ${params.candidateName}!</p>
+          <p class="greeting">Congratulations, ${safeCandidateName}!</p>
           <p class="message">We are thrilled to inform you that you have passed our technical assessment stage. Your final integrated matching score has exceeded our benchmark. An interview has been automatically scheduled for you with our HR Manager.</p>
           
           <div class="details-box">
@@ -250,7 +269,7 @@ export async function sendInterviewScheduleEmail(params: {
             </div>
             <div class="detail-row">
               <span class="detail-label-dark">Role:</span>
-              <span class="detail-val">${params.jobTitle}</span>
+              <span class="detail-val">${safeJobTitle}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label-dark">Format:</span>
@@ -305,11 +324,11 @@ export async function sendInterviewScheduleEmail(params: {
           <div class="score-box">
             <div class="score-row">
               <span class="score-label">Candidate Name:</span>
-              <span class="score-val">${params.candidateName}</span>
+              <span class="score-val">${safeCandidateName}</span>
             </div>
             <div class="score-row">
               <span class="score-label">Job Role:</span>
-              <span class="score-val">${params.jobTitle}</span>
+              <span class="score-val">${safeJobTitle}</span>
             </div>
             <div class="score-row">
               <span class="score-label">Resume Match Score:</span>

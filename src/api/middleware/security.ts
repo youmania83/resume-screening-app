@@ -5,8 +5,8 @@ import { connection } from "../queue.js";
 
 const rateLimits = new Map<string, { count: number; resetTime: number }>();
 
-let redisClient: Redis | null = null;
-let isRedisConnected = false;
+export let redisClient: Redis | null = null;
+export let isRedisConnected = false;
 
 try {
   // Establish Redis Connection for rate limiting
@@ -136,8 +136,13 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin || req.headers.referer;
   const expectedDomain = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  // Bypass CSRF for Zoho and Keka webhook endpoints
-  if (req.path.startsWith("/api/webhooks") || req.path.startsWith("/api/assessment/submit")) {
+  // Bypass CSRF for Zoho and Keka webhook endpoints (machine-to-machine calls)
+  if (req.path.startsWith("/api/webhooks")) {
+    return next();
+  }
+
+  // Bypass CSRF for candidate-facing assessment endpoints (accessed via token, not session cookies)
+  if (req.path.startsWith("/api/assessment/") && !req.path.startsWith("/api/assessment/generate") && !req.path.startsWith("/api/assessment/send")) {
     return next();
   }
 

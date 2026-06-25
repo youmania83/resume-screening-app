@@ -21,8 +21,8 @@
  *   }
  * }
  */
-import { callDeepSeek } from "./deepseek";
-import { pool } from "./db";
+import { callDeepSeek } from "./deepseek.js";
+import { pool } from "./db.js";
 
 type ScoreResult = {
   overall: number;

@@ -1,4 +1,3 @@
-// src/api/routes/authRouter.ts
 import { Router } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
@@ -7,9 +6,33 @@ import { hashPassword, comparePassword, hashToken } from "../../lib/auth.js";
 import { queryGlobal } from "../../lib/tenantDb.js";
 import { authMiddleware, requireRole } from "../middleware/authMiddleware.js";
 import { rateLimiter } from "../middleware/security.js";
+import { registerTenant } from "../../services/tenantRegistrationService.js";
+import { z } from "zod";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+
+const registerSchema = z.object({
+  companyName: z.string().trim().min(1, "Company name is required"),
+  userName: z.string().trim().min(1, "User name is required"),
+  email: z.string().trim().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  licenseKey: z.string().trim().min(1, "License key is required"),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean().optional(),
+});
+
+const googleLoginSchema = z.object({
+  token: z.string().trim().min(1, "Google token is required"),
+  licenseKey: z.string().trim().optional(),
+});
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is required.");
+}
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const oauthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
@@ -20,20 +43,16 @@ router.post(
   rateLimiter(60 * 60 * 1000, 5), // Max 5 signups per hour per IP
   async (req, res, next) => {
     try {
-      console.log("📥 [Register API] Request body:", JSON.stringify(req.body));
-      const { companyName, userName, email, password, licenseKey } = req.body;
-
-      if (!companyName || !userName || !email || !password) {
-         console.log("❌ [Register API] Missing basic fields");
-         res.status(400).json({ success: false, error: "All fields are required" });
-         return;
-      }
-
-      if (!licenseKey) {
-        console.log("❌ [Register API] Missing licenseKey");
-        res.status(400).json({ success: false, error: "License key is required to register." });
+      console.log("📥 [Register API] New registration attempt for:", req.body?.email || "unknown");
+      const result = registerSchema.safeParse(req.body);
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error.issues.map((e: any) => e.message).join(", "),
+        });
         return;
       }
+      const { companyName, userName, email, password, licenseKey } = result.data;
 
       console.log("🔍 [Register API] Checking user existence for email:", email);
       // Check if user already exists
@@ -44,55 +63,14 @@ router.post(
          return;
       }
 
-      console.log("🔍 [Register API] Checking license key validity:", licenseKey);
-      // Verify license key
-      const licenseRes = await queryGlobal(
-        "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1;",
-        [licenseKey]
-      );
-      if (licenseRes.rowCount === 0) {
-         res.status(400).json({ success: false, error: "Invalid, expired, or already used license key" });
-         return;
-      }
-      const license = licenseRes.rows[0];
-
-      const tenantId = crypto.randomUUID();
-      const userId = crypto.randomUUID();
       const pwdHash = await hashPassword(password);
-
-      // Create Tenant with license parameters
-      await queryGlobal(
-        "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
-        [tenantId, companyName, license.plan_tier, license.credits, license.expires_at]
-      );
-
-      // Mark license key as used
-      await queryGlobal(
-        "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
-        [tenantId, licenseKey]
-      );
-
-      // Create Owner User
-      await queryGlobal(
-        "INSERT INTO users (id, tenant_id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5, 'owner');",
-        [userId, tenantId, userName, email, pwdHash]
-      );
-
-      // Seed Default ATS Pipeline Stages for the Tenant
-      const defaultStages = [
-        "Applied", "Resume Received", "AI Screened", "Shortlisted", "Recruiter Review",
-        "Phone Screen", "Interview 1", "Interview 2", "Client Submission", "Offer Sent",
-        "Hired", "Rejected"
-      ];
-      for (let i = 0; i < defaultStages.length; i++) {
-        const stageId = crypto.randomUUID();
-        const stageName = defaultStages[i];
-        const isSystem = ["Applied", "AI Screened", "Hired", "Rejected"].includes(stageName);
-        await queryGlobal(
-          "INSERT INTO stages (id, tenant_id, name, order_index, is_system) VALUES ($1, $2, $3, $4, $5);",
-          [stageId, tenantId, stageName, i, isSystem]
-        );
-      }
+      const { tenantId, userId } = await registerTenant({
+        companyName,
+        userName,
+        email,
+        passwordHash: pwdHash,
+        licenseKey,
+      });
 
       // Generate tokens
       const accessToken = jwt.sign({ userId, tenantId, role: "owner", email }, JWT_SECRET, { expiresIn: "15m" });
@@ -137,11 +115,15 @@ router.post(
   rateLimiter(15 * 60 * 1000, 20), // Max 20 logins/registrations per 15 minutes per IP
   async (req, res, next) => {
     try {
-      const { token, licenseKey } = req.body;
-      if (!token) {
-        res.status(400).json({ success: false, error: "Google ID token is required" });
+      const result = googleLoginSchema.safeParse(req.body);
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error.issues.map((e: any) => e.message).join(", "),
+        });
         return;
       }
+      const { token, licenseKey } = result.data;
 
       let email = "";
       let name = "";
@@ -201,58 +183,22 @@ router.post(
           return;
         }
 
-        // Verify license key
-        const licenseRes = await queryGlobal(
-          "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1;",
-          [licenseKey]
-        );
-        if (licenseRes.rowCount === 0) {
-          res.status(400).json({ success: false, error: "Invalid, expired, or already used license key" });
-          return;
-        }
-        const license = licenseRes.rows[0];
-
-        tenantId = crypto.randomUUID();
-        userId = crypto.randomUUID();
-        role = "owner";
-        userName = name;
-
-        // Create Tenant with license parameters
-        const companyName = `${userName}'s Workspace`;
-        await queryGlobal(
-          "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
-          [tenantId, companyName, license.plan_tier, license.credits, license.expires_at]
-        );
-
-        // Mark license key as used
-        await queryGlobal(
-          "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
-          [tenantId, licenseKey]
-        );
-
-        // Create Owner User with a secure randomized password
+        const companyName = `${name}'s Workspace`;
         const randomPassword = crypto.randomBytes(32).toString("hex");
         const pwdHash = await hashPassword(randomPassword);
-        await queryGlobal(
-          "INSERT INTO users (id, tenant_id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5, $6);",
-          [userId, tenantId, userName, email, pwdHash, role]
-        );
 
-        // Seed Default ATS Pipeline Stages for the Tenant
-        const defaultStages = [
-          "Applied", "Resume Received", "AI Screened", "Shortlisted", "Recruiter Review",
-          "Phone Screen", "Interview 1", "Interview 2", "Client Submission", "Offer Sent",
-          "Hired", "Rejected"
-        ];
-        for (let i = 0; i < defaultStages.length; i++) {
-          const stageId = crypto.randomUUID();
-          const stageName = defaultStages[i];
-          const isSystem = ["Applied", "AI Screened", "Hired", "Rejected"].includes(stageName);
-          await queryGlobal(
-            "INSERT INTO stages (id, tenant_id, name, order_index, is_system) VALUES ($1, $2, $3, $4, $5);",
-            [stageId, tenantId, stageName, i, isSystem]
-          );
-        }
+        const result = await registerTenant({
+          companyName,
+          userName: name,
+          email,
+          passwordHash: pwdHash,
+          licenseKey,
+        });
+
+        userId = result.userId;
+        tenantId = result.tenantId;
+        role = "owner";
+        userName = name;
       } else {
         const user = userRes.rows[0];
         userId = user.id;
@@ -315,12 +261,15 @@ router.post(
   rateLimiter(15 * 60 * 1000, 10), // Max 10 login attempts per 15 minutes per IP
   async (req, res, next) => {
     try {
-      const { email, password, rememberMe } = req.body;
-
-      if (!email || !password) {
-         res.status(400).json({ success: false, error: "Email and password are required" });
-         return;
+      const result = loginSchema.safeParse(req.body);
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error.issues.map((e: any) => e.message).join(", "),
+        });
+        return;
       }
+      const { email, password, rememberMe } = result.data;
 
       const userRes = await queryGlobal("SELECT * FROM users WHERE email = $1 LIMIT 1;", [email]);
       if (userRes.rowCount === 0) {

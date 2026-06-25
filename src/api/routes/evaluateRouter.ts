@@ -14,7 +14,22 @@ import { getTenantContext } from "../../lib/tenantContext.js";
 import { detectPromptInjection } from "../../lib/guardrails.js";
 import { rateLimiter } from "../middleware/security.js";
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({
+  dest: "uploads/",
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (_req, file, cb) => {
+    const allowedMimes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+      "text/plain",
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF, DOCX, and TXT files are allowed"));
+    }
+  },
+});
 const router = Router();
 
 function buildEvaluatePrompt(jobDescription: string, resumeText: string): string {

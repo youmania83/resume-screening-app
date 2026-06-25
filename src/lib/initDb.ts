@@ -695,6 +695,19 @@ async function init() {
       ON CONFLICT (key) DO NOTHING;
     `);
 
+    // Ensure critical indexes are created for performance and security
+    console.log("Adding missing database performance indexes...");
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_candidates_email ON candidates(tenant_id, LOWER(email));
+      CREATE INDEX IF NOT EXISTS idx_candidates_job_id ON candidates(job_id);
+      CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(tenant_id, status);
+      CREATE INDEX IF NOT EXISTS idx_candidate_job_matches_job_id ON candidate_job_matches(job_id);
+      CREATE INDEX IF NOT EXISTS idx_resume_inbox_file_hash ON resume_inbox(file_hash, tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_assessment_attempts_candidate ON assessment_attempts(candidate_id, assessment_id);
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_interviews_candidate ON interviews(candidate_id);
+    `);
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();
