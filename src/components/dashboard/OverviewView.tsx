@@ -14,7 +14,11 @@ import {
   FileUp, 
   Sparkles, 
   CalendarDays,
-  HelpCircle
+  HelpCircle,
+  FileText,
+  UserCheck,
+  UserX,
+  Award
 } from "lucide-react";
 
 interface OverviewViewProps {
@@ -86,12 +90,12 @@ export function OverviewView({ candidates }: OverviewViewProps) {
     const selected = candidates.filter((c) => ["selected", "onboarded"].includes(c.status || "")).length;
 
     return [
-      { title: "Total Resumes Received", value: total, desc: "Cumulative uploaded resumes", color: "from-blue-500 to-indigo-600" },
-      { title: "AI Screened", value: screened, desc: "Evaluated by AI parsing engine", color: "from-purple-500 to-pink-600" },
-      { title: "Shortlisted", value: shortlisted, desc: "Qualified match score candidates", color: "from-emerald-500 to-teal-600" },
-      { title: "Rejected", value: rejected, desc: "Did not meet required thresholds", color: "from-rose-500 to-red-600" },
-      { title: "Interviews Scheduled", value: interviews, desc: "Scheduled or currently interviewing", color: "from-amber-500 to-orange-600" },
-      { title: "Candidates Selected", value: selected, desc: "Passed all stages and selected", color: "from-cyan-500 to-blue-600" },
+      { title: "Total Resumes Received", value: total, desc: "Cumulative uploaded resumes", color: "from-blue-500 via-blue-600 to-indigo-600", textAccent: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30", icon: FileText },
+      { title: "AI Screened", value: screened, desc: "Evaluated by AI parsing engine", color: "from-purple-500 via-violet-600 to-pink-600", textAccent: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30", icon: Sparkles },
+      { title: "Shortlisted", value: shortlisted, desc: "Qualified match score candidates", color: "from-emerald-500 via-teal-600 to-emerald-600", textAccent: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30", icon: UserCheck },
+      { title: "Rejected", value: rejected, desc: "Did not meet required thresholds", color: "from-rose-500 via-red-600 to-pink-600", textAccent: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30", icon: UserX },
+      { title: "Interviews Scheduled", value: interviews, desc: "Scheduled or currently interviewing", color: "from-amber-500 via-orange-600 to-yellow-500", textAccent: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30", icon: CalendarDays },
+      { title: "Candidates Selected", value: selected, desc: "Passed all stages and selected", color: "from-cyan-500 via-cyan-600 to-blue-600", textAccent: "text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/20 border-cyan-100 dark:border-cyan-900/30", icon: Award },
     ];
   }, [candidates]);
 
@@ -176,23 +180,37 @@ export function OverviewView({ candidates }: OverviewViewProps) {
 
       {/* 6 Core Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {metrics.map((stat, i) => (
-          <Card key={i} className="shadow-sm border-border bg-card hover:border-slate-400 dark:hover:border-slate-600 transition-all">
-            <CardContent className="p-5 flex flex-col justify-between h-full space-y-2">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 block">
-                  {stat.title}
+        {metrics.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <Card 
+              key={i} 
+              className="shadow-sm border-border bg-card hover:border-primary/35 hover:-translate-y-1 hover:shadow-md transition-all duration-300 relative overflow-hidden group"
+            >
+              {/* Top border colored stripe */}
+              <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${stat.color}`} />
+              
+              <CardContent className="p-5 flex flex-col justify-between h-full space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/85 block">
+                      {stat.title}
+                    </span>
+                    <span className={`block text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${stat.color}`}>
+                      {stat.value}
+                    </span>
+                  </div>
+                  <div className={`h-8 w-8 rounded-lg border flex items-center justify-center shadow-xs transition-colors group-hover:scale-105 duration-300 ${stat.textAccent}`}>
+                    <Icon className="h-4.5 w-4.5" />
+                  </div>
+                </div>
+                <span className="block text-[10px] text-muted-foreground font-semibold leading-tight">
+                  {stat.desc}
                 </span>
-                <span className="block text-3xl font-extrabold text-foreground dark:text-slate-55 tracking-tight mt-1">
-                  {stat.value}
-                </span>
-              </div>
-              <span className="block text-[10px] text-muted-foreground font-semibold">
-                {stat.desc}
-              </span>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -206,41 +224,45 @@ export function OverviewView({ candidates }: OverviewViewProps) {
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px] pl-4">Rank</TableHead>
-                    <TableHead>Candidate Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Experience</TableHead>
-                    <TableHead>Match %</TableHead>
-                    <TableHead>AI Score</TableHead>
-                    <TableHead className="pr-4">Status</TableHead>
+                  <TableRow className="border-b border-border bg-secondary/35 text-[9.5px] uppercase font-bold text-muted-foreground tracking-wider">
+                    <TableHead className="w-[50px] pl-6 py-2.5">Rank</TableHead>
+                    <TableHead className="py-2.5">Candidate Name</TableHead>
+                    <TableHead className="py-2.5">Role</TableHead>
+                    <TableHead className="py-2.5">Experience</TableHead>
+                    <TableHead className="py-2.5 text-center">Match %</TableHead>
+                    <TableHead className="py-2.5 text-center">AI Score</TableHead>
+                    <TableHead className="pr-6 py-2.5 text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {candidates.slice(0, 10).map((c, idx) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="pl-4 text-xs font-semibold text-muted-foreground/80">#{idx + 1}</TableCell>
+                    <TableRow key={c.id} className="border-b border-border/40 hover:bg-secondary/30 transition-colors">
+                      <TableCell className="pl-6 text-xs font-semibold text-muted-foreground/80">#{idx + 1}</TableCell>
                       <TableCell className="font-bold text-xs text-foreground dark:text-slate-100">{c.name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground font-semibold">{c.role}</TableCell>
                       <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears || 0} Years</TableCell>
-                      <TableCell className="text-xs font-bold text-muted-foreground">{c.matchPercent || 0}%</TableCell>
-                      <TableCell>
-                        <span className={`text-xs font-bold ${c.score >= 85 ? "text-emerald-600" : c.score >= 70 ? "text-amber-600" : "text-red-500"}`}>
-                          {c.score || 0}/100
-                        </span>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="text-[10px] font-mono font-bold bg-secondary/35 text-foreground/90 border-border/70">
+                          {c.matchPercent || 0}%
+                        </Badge>
                       </TableCell>
-                      <TableCell className="pr-4">
-                        <Badge
-                          variant={
-                            c.status === "shortlisted"
-                              ? "success"
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className={`text-[10px] font-mono font-bold ${c.score >= 80 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border-emerald-500/20" : c.score >= 60 ? "bg-amber-500/10 text-amber-600 dark:text-amber-450 border-amber-500/20" : "bg-rose-500/10 text-rose-600 dark:text-rose-450 border-rose-500/20"}`}>
+                          {c.score || 0}/100
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="pr-6 text-center">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[9.5px] font-bold uppercase tracking-wider px-2 py-0 border ${
+                            c.status === "shortlisted" || c.status === "selected" || c.status === "onboarded"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-950/30 dark:bg-emerald-950/20 dark:text-emerald-400"
                               : c.status === "interviewing"
-                              ? "purple"
+                              ? "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-950/30 dark:bg-purple-950/20 dark:text-purple-400"
                               : c.status === "rejected" || c.status === "keka_rejected"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className="text-[9px] uppercase tracking-wider py-0"
+                              ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-950/30 dark:bg-rose-950/20 dark:text-rose-400"
+                              : "border-border bg-secondary/40 text-muted-foreground"
+                          }`}
                         >
                           {c.status}
                         </Badge>

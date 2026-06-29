@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { JobListItem, StructuredJD } from "../types/index";
 import { INITIAL_JOBS, INITIAL_SCM_JD } from "../lib/mockData";
 
-export function useJobs(onJobSaved?: (jd: StructuredJD) => void) {
+export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) => void) {
   const [jobs, setJobs] = useState<JobListItem[]>(INITIAL_JOBS);
   const [activeJD, setActiveJD] = useState<StructuredJD | null>(INITIAL_SCM_JD);
   const [importTab, setImportTab] = useState<"url" | "file" | "text">("url");
@@ -59,8 +59,10 @@ export function useJobs(onJobSaved?: (jd: StructuredJD) => void) {
   }, [apiBase]);
 
   useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+    if (isLoggedIn) {
+      loadJobs();
+    }
+  }, [loadJobs, isLoggedIn]);
 
   const saveOrUpdateJob = async (jd: StructuredJD) => {
     const existingJob = jobs.find(j => j.title.toLowerCase() === jd.title.toLowerCase());

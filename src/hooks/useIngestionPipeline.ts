@@ -1,5 +1,5 @@
 // src/hooks/useIngestionPipeline.ts
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Candidate, StructuredJD } from "../types/index";
 
@@ -22,6 +22,43 @@ export function useIngestionPipeline({
   const [isIngesting, setIsIngesting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (folderInputRef.current) {
+      folderInputRef.current.setAttribute("webkitdirectory", "");
+      folderInputRef.current.setAttribute("directory", "");
+    }
+  }, []);
+
+  const traverseFileTree = (entry: any): Promise<File[]> => {
+    return new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file((file: File) => {
+          resolve([file]);
+        });
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        let allFiles: File[] = [];
+
+        const readEntries = () => {
+          dirReader.readEntries(async (entries: any[]) => {
+            if (entries.length === 0) {
+              resolve(allFiles);
+            } else {
+              const filePromises = entries.map(e => traverseFileTree(e));
+              const nestedFiles = await Promise.all(filePromises);
+              allFiles.push(...nestedFiles.flat());
+              readEntries();
+            }
+          });
+        };
+        readEntries();
+      } else {
+        resolve([]);
+      }
+    });
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -33,11 +70,26 @@ export function useIngestionPipeline({
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      const items = Array.from(e.dataTransfer.items);
+      const entryPromises = items.map(item => {
+        const entry = item.webkitGetAsEntry();
+        if (entry) {
+          return traverseFileTree(entry);
+        }
+        return Promise.resolve([]);
+      });
+      const filesLists = await Promise.all(entryPromises);
+      const allFiles = filesLists.flat();
+      if (allFiles.length > 0) {
+        processUploadedFiles(allFiles);
+      }
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processUploadedFiles(Array.from(e.dataTransfer.files));
     }
   };
@@ -48,8 +100,18 @@ export function useIngestionPipeline({
     }
   };
 
+  const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processUploadedFiles(Array.from(e.target.files));
+    }
+  };
+
   const triggerFileSelect = () => {
     fileInputRef.current?.click();
+  };
+
+  const triggerFolderSelect = () => {
+    folderInputRef.current?.click();
   };
 
   const runEvaluationPipelineWithSource = async (queueItem: any, file: File, source: string) => {
@@ -158,17 +220,65 @@ export function useIngestionPipeline({
     toast.success(`Screening complete: ${candidateData.name} (${candidateData.score}%)`);
   };
 
-  const processUploadedFiles = (files: File[]) => {
+  const processUploadedFiles = async (files: File[]) => {
     if (!activeJD) {
       toast.error("Please import or save a Job Description profile before screening candidates.");
       return;
     }
 
-    files.forEach(file => {
+    let JSZipModule: any = null;
+    try {
+      JSZipModule = (await import("jszip")).default;
+    } catch (e) {
+      console.error("Failed to load JSZip:", e);
+    }
+
+    for (const file of files) {
       const ext = file.name.split(".").pop()?.toLowerCase();
+
+      if (ext === "zip") {
+        if (!JSZipModule) {
+          toast.error("ZIP support is not loaded yet. Please try again in a moment.");
+          continue;
+        }
+
+        toast.info(`Extracting resumes from ZIP: ${file.name}...`);
+        try {
+          const zip = new JSZipModule();
+          const contents = await zip.loadAsync(file);
+          const extractedFiles: File[] = [];
+
+          for (const [filename, rawEntry] of Object.entries(contents.files)) {
+            const fileEntry = rawEntry as any;
+            if (!fileEntry.dir) {
+              const fileExt = filename.split(".").pop()?.toLowerCase();
+              if (fileExt === "pdf" || fileExt === "docx") {
+                const fileData = await fileEntry.async("blob");
+                const baseName = filename.split("/").pop() || filename;
+                const extractedFile = new File([fileData], baseName, {
+                  type: fileExt === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                });
+                extractedFiles.push(extractedFile);
+              }
+            }
+          }
+
+          if (extractedFiles.length === 0) {
+            toast.error(`No PDF or DOCX resumes found inside ZIP: ${file.name}`);
+          } else {
+            toast.success(`Extracted ${extractedFiles.length} resumes from ${file.name}. Starting screening...`);
+            processUploadedFiles(extractedFiles);
+          }
+        } catch (err) {
+          console.error("Failed to unzip file:", err);
+          toast.error(`Failed to extract ZIP archive: ${file.name}`);
+        }
+        continue;
+      }
+
       if (ext !== "pdf" && ext !== "docx") {
-        toast.error(`"${file.name}" ignored. Only PDF/DOCX are supported.`);
-        return;
+        toast.error(`"${file.name}" ignored. Only PDF, DOCX, and ZIP archives are supported.`);
+        continue;
       }
 
       const fileId = `${file.name}-${Date.now()}`;
@@ -199,7 +309,7 @@ export function useIngestionPipeline({
           runEvaluationPipelineWithSource(newQueueItem, file, "Careers Page");
         }
       }, 100);
-    });
+    }
   };
 
   const handleSimulatedIngestion = async (source: string) => {
@@ -250,10 +360,13 @@ export function useIngestionPipeline({
     screeningQueue,
     isIngesting,
     fileInputRef,
+    folderInputRef,
     handleDrag,
     handleDrop,
     handleFileChange,
+    handleFolderChange,
     triggerFileSelect,
+    triggerFolderSelect,
     handleSimulatedIngestion
   };
 }

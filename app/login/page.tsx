@@ -14,6 +14,24 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
+    const checkSilentLogin = async () => {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      try {
+        const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            localStorage.setItem("ira_user", JSON.stringify(data.user));
+            router.push("/");
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Silent login failed:", err);
+      }
+    };
+    checkSilentLogin();
+
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get("expired") === "true") {
       const t = setTimeout(() => {
@@ -21,7 +39,7 @@ export default function LoginPage() {
       }, 150);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [router]);
 
   const handleGoogleLogin = async (token: string) => {
     setIsLoading(true);
@@ -234,7 +252,7 @@ export default function LoginPage() {
                   onClick={() => {
                     const confirmMock = window.confirm(
                       "Google Client ID is not configured on this environment.\n\n" +
-                      "To test the Google Sign-In & Workspace Auto-Onboarding flow, we can simulate a successful Google authentication. Would you like to proceed?"
+                      "To test the Google Sign-In flow, we can simulate a successful Google authentication. Note that only pre-registered workspace users are permitted access. Would you like to proceed?"
                     );
                     if (confirmMock) {
                       handleGoogleLogin("mock-google-token");
@@ -267,14 +285,7 @@ export default function LoginPage() {
         </section>
 
         <footer className="text-center text-xs text-muted-foreground font-semibold">
-          Don&apos;t have an account?{" "}
-          <button
-            type="button"
-            onClick={() => router.push("/register")}
-            className="text-foreground font-bold hover:underline"
-          >
-            Register your company
-          </button>
+          Contact your administrator to request access.
         </footer>
       </div>
     </main>

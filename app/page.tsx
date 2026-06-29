@@ -28,7 +28,24 @@ export default function Dashboard() {
   useEffect(() => {
     const saved = localStorage.getItem("ira_user")
     if (!saved) {
-      router.push("/login")
+      const trySilentLogin = async () => {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+        try {
+          const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.user) {
+              localStorage.setItem("ira_user", JSON.stringify(data.user));
+              setUser(data.user);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Silent login failed:", e);
+        }
+        router.push("/login");
+      };
+      trySilentLogin();
     } else {
       try {
         setUser(JSON.parse(saved))
@@ -80,7 +97,7 @@ export default function Dashboard() {
     handleDeleteCandidate,
     filteredCandidates,
     loadCandidates
-  } = useCandidates()
+  } = useCandidates(!!user)
 
   const {
     jobs,
@@ -99,7 +116,7 @@ export default function Dashboard() {
     setIsEditingJD,
     handleJdExtract,
     saveOrUpdateJob
-  } = useJobs()
+  } = useJobs(!!user)
 
   const {
     activeTab,
@@ -117,10 +134,13 @@ export default function Dashboard() {
   const {
     dragActive,
     fileInputRef,
+    folderInputRef,
     handleDrag,
     handleDrop,
     handleFileChange,
+    handleFolderChange,
     triggerFileSelect,
+    triggerFolderSelect,
     handleSimulatedIngestion,
     isIngesting,
     uploadProgress,
@@ -149,7 +169,7 @@ export default function Dashboard() {
     }
   }
 
-  if (!mounted) {
+  if (!mounted || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-3">
@@ -166,11 +186,11 @@ export default function Dashboard() {
       <aside className="w-[220px] flex-shrink-0 bg-card border-r border-border flex flex-col justify-between z-20 select-none">
         <div>
           <div className="h-14 flex items-center px-4.5 border-b border-border gap-2.5">
-            <div className="h-6.5 w-6.5 bg-foreground text-background rounded flex items-center justify-center shadow-xs">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="h-7 w-7 bg-gradient-to-tr from-indigo-500 via-indigo-600 to-violet-600 text-white rounded-lg flex items-center justify-center shadow-md">
+              <Sparkles className="h-4 w-4 animate-pulse" />
             </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-foreground">Rison AI Tech</span>
+              <span className="font-bold text-sm tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground via-indigo-900 to-indigo-700 dark:from-foreground dark:to-indigo-300">Rison AI Tech</span>
               <span className="block text-[9px] text-muted-foreground font-bold tracking-wider leading-none">RECRUIT SUITE</span>
             </div>
           </div>
@@ -194,11 +214,11 @@ export default function Dashboard() {
                   onClick={() => setActiveTab(item.id as any)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
                     isActive 
-                      ? "bg-secondary text-foreground shadow-xs border border-border/50" 
+                      ? "bg-primary/10 text-primary shadow-xs border border-primary/20" 
                       : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground border border-transparent"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-foreground" : "text-muted-foreground/80"}`} />
+                  <Icon className={`h-4 w-4 ${isActive ? "text-primary" : "text-muted-foreground/80"}`} />
                   {item.label}
                 </button>
               )
@@ -294,6 +314,9 @@ export default function Dashboard() {
               triggerFileSelect={triggerFileSelect}
               fileInputRef={fileInputRef}
               handleFileChange={handleFileChange}
+              triggerFolderSelect={triggerFolderSelect}
+              folderInputRef={folderInputRef}
+              handleFolderChange={handleFolderChange}
               uploadProgress={uploadProgress}
               screeningQueue={screeningQueue}
               candidates={candidates}

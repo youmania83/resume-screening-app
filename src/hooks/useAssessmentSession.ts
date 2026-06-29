@@ -170,6 +170,16 @@ export function useAssessmentSession(token: string) {
     loadAssessment();
   }, [token, sessionId]);
 
+  // Request camera permission early on welcome screen mount so user is ready when they click start
+  useEffect(() => {
+    if (!loading && !testStarted && !testSubmitted && !isMobile) {
+      console.log("Welcome screen ready - requesting camera permission early...");
+      proctoring.startWebcam().catch((err) => {
+        console.warn("Early camera check failed:", err);
+      });
+    }
+  }, [loading, testStarted, testSubmitted, isMobile]);
+
   useEffect(() => {
     if (!testStarted || testSubmitted || !token || !sessionId) return;
     
@@ -240,8 +250,14 @@ export function useAssessmentSession(token: string) {
   const requestFullscreen = async () => {
     if (!isMobile) {
       try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
+        const docEl = document.documentElement as any;
+        const requestFS = docEl.requestFullscreen ||
+                          docEl.webkitRequestFullscreen ||
+                          docEl.mozRequestFullScreen ||
+                          docEl.msRequestFullscreen;
+        
+        if (requestFS) {
+          await requestFS.call(docEl);
         }
         setFullscreenError(false);
       } catch (err) {
@@ -255,7 +271,9 @@ export function useAssessmentSession(token: string) {
       proctorGraceActive.current = false;
     }, 4000);
     if (!isMobile) {
-      await proctoring.startWebcam();
+      proctoring.startWebcam().catch((err) => {
+        console.warn("Non-blocking startWebcam failed:", err);
+      });
     }
     setTestStarted(true);
   };

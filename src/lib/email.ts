@@ -3,6 +3,9 @@ import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { query } from "./db.js";
+import { decrypt } from "./crypto.js";
+import { getTenantContext } from "./tenantContext.js";
 import { zohoConfig } from "../integrations/zoho/config/zoho.config";
 import { zohoMailService } from "../integrations/zoho/services/zohoMail.service";
 
@@ -74,6 +77,44 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
+async function resolveTransporter(tenantId?: string): Promise<{ transporter: any; fromEmail: string }> {
+  const resolvedTenantId = tenantId || getTenantContext()?.tenantId;
+  const FROM_EMAIL = process.env.SMTP_FROM || '"Rison AI Recruitment" <recruiting@risonai.tech>';
+
+  if (resolvedTenantId) {
+    try {
+      const res = await query("SELECT email_config FROM tenants WHERE id = $1 LIMIT 1", [resolvedTenantId]);
+      if (res.rowCount && res.rows[0]?.email_config) {
+        const config = typeof res.rows[0].email_config === "string" 
+          ? JSON.parse(res.rows[0].email_config)
+          : res.rows[0].email_config;
+
+        if (config && config.host && config.username) {
+          const decryptedPass = decrypt(config.password || config.pass || "");
+          const transporter = nodemailer.createTransport({
+            host: config.host,
+            port: Number(config.port) || 587,
+            secure: Number(config.port) === 465,
+            auth: {
+              user: config.username,
+              pass: decryptedPass
+            }
+          });
+          const fromName = config.fromName || "Rison AI Recruitment";
+          const fromEmail = `"${fromName}" <${config.username}>`;
+          return { transporter, fromEmail };
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load tenant custom email config, falling back to system defaults:", err);
+    }
+  }
+
+  // Fallback to env config
+  const transporter = getTransporter();
+  return { transporter, fromEmail: FROM_EMAIL };
+}
+
 /**
  * Send candidate assessment invite email
  */
@@ -83,6 +124,7 @@ export async function sendAssessmentInviteEmail(params: {
   jobTitle: string;
   token: string;
   expiryDate: Date;
+  tenantId?: string;
 }) {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
@@ -174,14 +216,14 @@ export async function sendAssessmentInviteEmail(params: {
     return { success: true, mock: false };
   }
 
-  const transporter = getTransporter();
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   if (!transporter) {
     logEmailFallback(params.candidateEmail, subject, html);
     return { success: true, mock: true };
   }
 
   await transporter.sendMail({
-    from: FROM_EMAIL,
+    from: fromEmail,
     to: params.candidateEmail,
     subject,
     html,
@@ -203,6 +245,7 @@ export async function sendInterviewScheduleEmail(params: {
   finalScore: number;
   scheduledDate: Date;
   hrEmail: string;
+  tenantId?: string;
 }) {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
@@ -364,7 +407,7 @@ export async function sendInterviewScheduleEmail(params: {
     return { success: true, mock: false };
   }
 
-  const transporter = getTransporter();
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   if (!transporter) {
     logEmailFallback(params.candidateEmail, candidateSubject, candidateHtml);
     logEmailFallback(params.hrEmail, hrSubject, hrHtml);
@@ -373,7 +416,7 @@ export async function sendInterviewScheduleEmail(params: {
 
   // Send to candidate
   await transporter.sendMail({
-    from: FROM_EMAIL,
+    from: fromEmail,
     to: params.candidateEmail,
     subject: candidateSubject,
     html: candidateHtml,
@@ -381,7 +424,7 @@ export async function sendInterviewScheduleEmail(params: {
 
   // Send to HR
   await transporter.sendMail({
-    from: FROM_EMAIL,
+    from: fromEmail,
     to: params.hrEmail,
     subject: hrSubject,
     html: hrHtml,

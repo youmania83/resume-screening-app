@@ -9,6 +9,8 @@ interface AssessmentInstructionsProps {
   token: string;
   requestFullscreen: () => Promise<void>;
   isResuming?: boolean;
+  webcamStream?: MediaStream | null;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
 export default function AssessmentInstructions({
@@ -18,6 +20,8 @@ export default function AssessmentInstructions({
   token,
   requestFullscreen,
   isResuming = false,
+  webcamStream = null,
+  videoRef,
 }: AssessmentInstructionsProps) {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between py-12 px-4 select-none">
@@ -70,6 +74,38 @@ export default function AssessmentInstructions({
               </li>
             </ul>
           </div>
+
+          {!isMobile && (
+            <div className="bg-secondary/30 border border-border rounded-xl p-5 flex flex-col items-center gap-3 text-center">
+              <h3 className="text-xs uppercase font-extrabold text-muted-foreground tracking-wider">
+                🎥 Camera Setup Check
+              </h3>
+              {webcamStream ? (
+                <div className="relative rounded-lg overflow-hidden border border-emerald-300 bg-black aspect-video w-full max-w-[240px] shadow-lg">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-emerald-50 border border-emerald-250 px-1.5 py-0.5 rounded text-[8.5px] font-bold text-emerald-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Webcam Active
+                  </div>
+                </div>
+              ) : (
+                <div className="h-[135px] w-full max-w-[240px] rounded-lg border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center p-4">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider animate-pulse">
+                    Webcam Setup Pending
+                  </span>
+                  <p className="text-[9px] text-slate-400 mt-1 leading-tight">
+                    Please allow camera access in your browser when prompted to continue.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pt-4 border-t border-border flex flex-col gap-3">

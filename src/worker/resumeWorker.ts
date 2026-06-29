@@ -463,7 +463,8 @@ export async function parseAndEvalResume(
               candidateEmail: parsedData.email || "",
               jobTitle: matchedJobTitle,
               token: assessmentToken,
-              expiryDate: expiry
+              expiryDate: expiry,
+              tenantId
             });
 
             await queryGlobal(

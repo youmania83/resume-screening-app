@@ -92,9 +92,21 @@ router.post("/", rateLimiter(1 * 60 * 1000, 10), creditCheck("ai_screen"), uploa
 
     if (ext === ".pdf") {
       const pdfParse = await import("pdf-parse");
-      const parseFn = (pdfParse as any).default || pdfParse;
-      const data = await parseFn(fileBuffer);
-      rawText = data.text;
+      let parsedText = "";
+      if (typeof pdfParse === 'function') {
+        const data = await (pdfParse as any)(fileBuffer);
+        parsedText = data.text;
+      } else if (typeof (pdfParse as any).default === 'function') {
+        const data = await (pdfParse as any).default(fileBuffer);
+        parsedText = data.text;
+      } else if (typeof (pdfParse as any).PDFParse === 'function') {
+        const parser = new (pdfParse as any).PDFParse({ data: fileBuffer });
+        const data = await parser.getText();
+        parsedText = data.text;
+      } else {
+        throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+      }
+      rawText = parsedText;
     } else if (ext === ".docx") {
       const mammoth = await import("mammoth");
       const parseFn = (mammoth as any).default || mammoth;
@@ -294,7 +306,8 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
           candidateEmail: parsedResult.email || "",
           jobTitle: targetJobTitle,
           token: assessmentToken,
-          expiryDate: assessmentTokenExpiry
+          expiryDate: assessmentTokenExpiry,
+          tenantId
         });
 
         await queryTenant(

@@ -170,7 +170,7 @@ export function JobImportCard({
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Job Title</label>
                   <input
                     type="text"
-                    value={activeJD.title}
+                    value={activeJD.title || ""}
                     onChange={(e) => setActiveJD({ ...activeJD, title: e.target.value })}
                     className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none font-semibold text-foreground"
                   />
@@ -181,7 +181,7 @@ export function JobImportCard({
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Experience</label>
                     <input
                       type="text"
-                      value={activeJD.experience}
+                      value={activeJD.experience || ""}
                       onChange={(e) => setActiveJD({ ...activeJD, experience: e.target.value })}
                       className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
                     />
@@ -190,7 +190,7 @@ export function JobImportCard({
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Department</label>
                     <input
                       type="text"
-                      value={activeJD.department}
+                      value={activeJD.department || ""}
                       onChange={(e) => setActiveJD({ ...activeJD, department: e.target.value })}
                       className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
                     />
@@ -201,7 +201,7 @@ export function JobImportCard({
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Location</label>
                   <input
                     type="text"
-                    value={activeJD.location}
+                    value={activeJD.location || ""}
                     onChange={(e) => setActiveJD({ ...activeJD, location: e.target.value })}
                     className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
                   />
@@ -210,7 +210,7 @@ export function JobImportCard({
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Required Skills (Comma-separated)</label>
                   <textarea
-                    value={activeJD.requiredSkills.join(", ")}
+                    value={(activeJD.requiredSkills || []).join(", ")}
                     onChange={(e) => setActiveJD({ ...activeJD, requiredSkills: e.target.value.split(",").map(s => s.trim()) })}
                     rows={2}
                     className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground resize-none font-mono"
@@ -221,7 +221,7 @@ export function JobImportCard({
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Preferred Skills</label>
                   <input
                     type="text"
-                    value={activeJD.preferredSkills.join(", ")}
+                    value={(activeJD.preferredSkills || []).join(", ")}
                     onChange={(e) => setActiveJD({ ...activeJD, preferredSkills: e.target.value.split(",").map(s => s.trim()) })}
                     className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
                   />
@@ -231,7 +231,7 @@ export function JobImportCard({
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Education Required</label>
                   <input
                     type="text"
-                    value={activeJD.education}
+                    value={activeJD.education || ""}
                     onChange={(e) => setActiveJD({ ...activeJD, education: e.target.value })}
                     className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
                   />

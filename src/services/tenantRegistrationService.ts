@@ -12,34 +12,43 @@ export async function registerTenant(params: {
   userName: string;
   email: string;
   passwordHash: string;
-  licenseKey: string;
+  licenseKey?: string;
 }): Promise<RegistrationResult> {
   const { companyName, userName, email, passwordHash, licenseKey } = params;
 
   return transaction(async (client) => {
-    // 1. Verify license key (lock row for write)
-    const licenseRes = await client.query(
-      "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1 FOR UPDATE;",
-      [licenseKey]
-    );
-    if (licenseRes.rowCount === 0) {
-      throw new Error("Invalid, expired, or already used license key");
-    }
-    const license = licenseRes.rows[0];
-
     const tenantId = crypto.randomUUID();
     const userId = crypto.randomUUID();
+
+    let planTier = "premium";
+    let creditBalance = 1000;
+    let planExpiresAt: Date | null = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+
+    if (licenseKey && licenseKey.trim() !== "") {
+      // 1. Verify license key (lock row for write)
+      const licenseRes = await client.query(
+        "SELECT * FROM license_keys WHERE key = $1 AND is_used = FALSE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1 FOR UPDATE;",
+        [licenseKey.trim()]
+      );
+      if (licenseRes.rowCount === 0) {
+        throw new Error("Invalid, expired, or already used license key");
+      }
+      const license = licenseRes.rows[0];
+      planTier = license.plan_tier;
+      creditBalance = license.credits;
+      planExpiresAt = license.expires_at;
+
+      // 3. Mark license key as used
+      await client.query(
+        "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
+        [tenantId, licenseKey.trim()]
+      );
+    }
 
     // 2. Create Tenant with license parameters
     await client.query(
       "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
-      [tenantId, companyName, license.plan_tier, license.credits, license.expires_at]
-    );
-
-    // 3. Mark license key as used
-    await client.query(
-      "UPDATE license_keys SET is_used = TRUE, used_by_tenant_id = $1, used_at = CURRENT_TIMESTAMP WHERE key = $2;",
-      [tenantId, licenseKey]
+      [tenantId, companyName, planTier, creditBalance, planExpiresAt]
     );
 
     // 4. Create Owner User

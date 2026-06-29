@@ -25,7 +25,7 @@ export function useProctoring({
     if (webcamStream && videoRef.current) {
       videoRef.current.srcObject = webcamStream;
     }
-  }, [webcamStream]);
+  }, [webcamStream, testStarted]);
 
   // Cleanup webcam on unmount
   useEffect(() => {

@@ -32,6 +32,9 @@ interface ScreeningViewProps {
   triggerFileSelect: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  triggerFolderSelect: () => void;
+  folderInputRef: React.RefObject<HTMLInputElement | null>;
+  handleFolderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   uploadProgress: Record<string, number>;
   screeningQueue: any[];
   candidates: Candidate[];
@@ -91,6 +94,9 @@ export function ScreeningView(props: ScreeningViewProps) {
           triggerFileSelect={props.triggerFileSelect}
           fileInputRef={props.fileInputRef}
           handleFileChange={props.handleFileChange}
+          triggerFolderSelect={props.triggerFolderSelect}
+          folderInputRef={props.folderInputRef}
+          handleFolderChange={props.handleFolderChange}
           uploadProgress={props.uploadProgress}
           screeningQueue={props.screeningQueue}
           candidates={props.candidates}

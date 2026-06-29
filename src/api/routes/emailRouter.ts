@@ -80,9 +80,10 @@ async function seedDefaultTemplates() {
   ];
 
   for (const t of defaults) {
+    const plainBody = t.html_body.replace(/<br\/>/g, "\n").replace(/<[^>]+>/g, "");
     await queryTenant(
-      "INSERT INTO email_templates (id, tenant_id, name, subject, html_body) VALUES ($1, :tenant_id, $2, $3, $4) ON CONFLICT (tenant_id, name) DO NOTHING;",
-      [crypto.randomUUID(), t.name, t.subject, t.html_body]
+      "INSERT INTO email_templates (id, tenant_id, name, subject, body, html_body) VALUES ($1, :tenant_id, $2, $3, $4, $5) ON CONFLICT (tenant_id, name) DO NOTHING;",
+      [crypto.randomUUID(), t.name, t.subject, plainBody, t.html_body]
     );
   }
 }

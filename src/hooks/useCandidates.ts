@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Candidate } from "../types/index";
 import { INITIAL_CANDIDATES } from "../lib/mockData";
 
-export function useCandidates() {
+export function useCandidates(isLoggedIn?: boolean) {
   const [candidates, setCandidates] = useState<Candidate[]>(INITIAL_CANDIDATES);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(INITIAL_CANDIDATES[0]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,8 +79,10 @@ export function useCandidates() {
   }, [apiBase]);
 
   useEffect(() => {
-    loadCandidates();
-  }, [loadCandidates]);
+    if (isLoggedIn) {
+      loadCandidates();
+    }
+  }, [loadCandidates, isLoggedIn]);
 
   const handleAssessmentSubmit = async (id: string, score: number) => {
     setIsAssessmentSubmitting(true);

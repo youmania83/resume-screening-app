@@ -82,6 +82,8 @@ export default function CandidateAssessmentPage() {
         token={token}
         requestFullscreen={requestFullscreen}
         isResuming={isResuming}
+        webcamStream={proctoring.webcamStream}
+        videoRef={proctoring.videoRef}
       />
     );
   }

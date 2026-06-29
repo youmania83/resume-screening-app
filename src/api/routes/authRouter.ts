@@ -16,7 +16,7 @@ const registerSchema = z.object({
   userName: z.string().trim().min(1, "User name is required"),
   email: z.string().trim().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  licenseKey: z.string().trim().min(1, "License key is required"),
+  licenseKey: z.string().trim().optional(),
 });
 
 const loginSchema = z.object({
@@ -177,28 +177,31 @@ router.post(
       let userName: string;
 
       if (userRes.rowCount === 0) {
-        // User does not exist, auto-onboard. Require license key!
-        if (!licenseKey) {
-          res.status(400).json({ success: false, error: "License key is required for new registration." });
+        if (isMockToken && isDev) {
+          // Dev Mock Google Login is allowed to auto-onboard for testing
+          const companyName = `${name}'s Workspace`;
+          const randomPassword = crypto.randomBytes(32).toString("hex");
+          const pwdHash = await hashPassword(randomPassword);
+
+          const result = await registerTenant({
+            companyName,
+            userName: name,
+            email,
+            passwordHash: pwdHash,
+            licenseKey,
+          });
+
+          userId = result.userId;
+          tenantId = result.tenantId;
+          role = "owner";
+          userName = name;
+        } else {
+          res.status(401).json({
+            success: false,
+            error: "This Google account is not registered in the system. Please contact your workspace administrator to request access."
+          });
           return;
         }
-
-        const companyName = `${name}'s Workspace`;
-        const randomPassword = crypto.randomBytes(32).toString("hex");
-        const pwdHash = await hashPassword(randomPassword);
-
-        const result = await registerTenant({
-          companyName,
-          userName: name,
-          email,
-          passwordHash: pwdHash,
-          licenseKey,
-        });
-
-        userId = result.userId;
-        tenantId = result.tenantId;
-        role = "owner";
-        userName = name;
       } else {
         const user = userRes.rows[0];
         userId = user.id;
@@ -548,5 +551,57 @@ router.post(
     }
   }
 );
+
+// POST /api/auth/silent-login - Auto-login as default workspace owner (bypasses login wall)
+router.post("/silent-login", async (req, res, next) => {
+  try {
+    const email = "yogesh@isonscheduling.com";
+    const userRes = await queryGlobal("SELECT * FROM users WHERE email = $1 LIMIT 1;", [email]);
+    
+    if (userRes.rowCount === 0) {
+      res.status(404).json({ success: false, error: "Default admin user not found." });
+      return;
+    }
+    
+    const user = userRes.rows[0];
+    const tenantId = user.tenant_id;
+    const userId = user.id;
+    const role = user.role;
+
+    // Generate tokens
+    const accessToken = jwt.sign({ userId, tenantId, role, email }, JWT_SECRET, { expiresIn: "15m" });
+    const refreshToken = crypto.randomBytes(40).toString("hex");
+    const hashedRefreshToken = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours session
+
+    await queryGlobal(
+      "INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4);",
+      [crypto.randomUUID(), userId, hashedRefreshToken, expiresAt]
+    );
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+    };
+
+    res.cookie("accessToken", accessToken, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: 8 * 60 * 60 * 1000
+    });
+
+    res.json({
+      success: true,
+      user: { id: userId, tenantId, name: user.name, email, role }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

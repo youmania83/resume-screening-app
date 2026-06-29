@@ -473,7 +473,9 @@ Generate exactly 10 questions meeting these requirements:
   * Medium (4 questions)
   * Hard (3 questions)
 
-Return ONLY a valid JSON object matching the following structure. Do not include markdown code block formatting (such as \`\`\`json), and do not include any text outside of the JSON.
+CRITICAL RULES FOR JSON VALIDITY:
+1. Do NOT use double quotes inside your question texts or options (e.g., instead of "What does "SCM" mean?", write "What does 'SCM' mean?"). If you need quotes inside the text, use single quotes.
+2. Return ONLY a valid, parseable JSON object matching the structure below. Do not include markdown code block formatting (such as \`\`\`json), and do not include any text outside of the JSON.
 
 JSON Structure:
 {
@@ -543,25 +545,151 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
   }
 }
 
+// Fallback questions for Sales, Marketing, Business, Automobile, and non-tech roles
+const FALLBACK_SALES_BUSINESS_QUESTIONS: Question[] = [
+  // Easy
+  {
+    questionText: "What is the primary goal of a sales pipeline?",
+    options: [
+      "To track and manage potential customers at various stages of the buying process",
+      "To build the company website",
+      "To manage employee attendance records",
+      "To calculate monthly server costs"
+    ],
+    correctAnswer: "To track and manage potential customers at various stages of the buying process",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "Which of the following is a key element of a strong customer value proposition?",
+    options: [
+      "Clearly articulating how your product solves a specific customer pain point",
+      "Listing all company office addresses in the brochure",
+      "Providing the longest product warranty in the market",
+      "Offering the lowest price regardless of value delivered"
+    ],
+    correctAnswer: "Clearly articulating how your product solves a specific customer pain point",
+    difficulty: "easy",
+    topic: "role-specific"
+  },
+  {
+    questionText: "What does 'CRM' stand for in a business context?",
+    options: ["Customer Relationship Management", "Corporate Revenue Model", "Client Reporting Module", "Commercial Rate Monitor"],
+    correctAnswer: "Customer Relationship Management",
+    difficulty: "easy",
+    topic: "industry"
+  },
+  // Medium
+  {
+    questionText: "A customer objects to your product's price during a negotiation. What is the most effective response?",
+    options: [
+      "Immediately offer a discount to close the deal",
+      "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
+      "Ignore their objection and continue the product demonstration",
+      "Tell the customer that the price is non-negotiable and end the meeting"
+    ],
+    correctAnswer: "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
+    difficulty: "medium",
+    topic: "practical"
+  },
+  {
+    questionText: "Which metric best measures sales team efficiency in converting leads to paying customers?",
+    options: [
+      "Website traffic volume",
+      "Lead-to-Customer Conversion Rate",
+      "Number of emails sent per day",
+      "Social media follower count"
+    ],
+    correctAnswer: "Lead-to-Customer Conversion Rate",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "In the context of automobile sales, what is the significance of 'test drive experience' in the buying cycle?",
+    options: [
+      "It is irrelevant and only adds cost to the dealership",
+      "It is a critical touchpoint that builds emotional connection and reduces buyer hesitation",
+      "It is only important for commercial vehicle sales",
+      "It should be offered only after the customer has signed the purchase agreement"
+    ],
+    correctAnswer: "It is a critical touchpoint that builds emotional connection and reduces buyer hesitation",
+    difficulty: "medium",
+    topic: "industry"
+  },
+  {
+    questionText: "What is the 'SPIN Selling' methodology primarily focused on?",
+    options: [
+      "Asking Situation, Problem, Implication, and Need-Payoff questions to understand the buyer",
+      "Spinning the product features to sound more attractive",
+      "Rapidly closing deals by pressuring the buyer",
+      "Sending promotional emails to large contact lists"
+    ],
+    correctAnswer: "Asking Situation, Problem, Implication, and Need-Payoff questions to understand the buyer",
+    difficulty: "medium",
+    topic: "practical"
+  },
+  // Hard
+  {
+    questionText: "A key account representing 25% of your quarterly revenue is threatening to switch to a competitor. What is the most strategic approach?",
+    options: [
+      "Match the competitor's price immediately regardless of margin impact",
+      "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
+      "Let the account go because no single customer should hold that much leverage",
+      "Offer free products for 6 months to retain the account"
+    ],
+    correctAnswer: "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
+    difficulty: "hard",
+    topic: "practical"
+  },
+  {
+    questionText: "What is the primary difference between 'consultative selling' and 'transactional selling'?",
+    options: [
+      "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
+      "Transactional selling involves more paperwork than consultative selling",
+      "Consultative selling is only used in B2C markets",
+      "There is no difference; they are the same approach"
+    ],
+    correctAnswer: "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
+    difficulty: "hard",
+    topic: "role-specific"
+  },
+  {
+    questionText: "In market analysis, what does the term 'Total Addressable Market' (TAM) represent?",
+    options: [
+      "The total number of employees in a company",
+      "The total revenue opportunity available if a product achieves 100% market share in its target segment",
+      "The total advertising budget allocated for the fiscal year",
+      "The total number of retail stores in a geographic region"
+    ],
+    correctAnswer: "The total revenue opportunity available if a product achieves 100% market share in its target segment",
+    difficulty: "hard",
+    topic: "technical"
+  }
+];
+
 /**
  * Match a role and select fallback questions
  */
 function selectFallbackQuestions(jobTitle: string): Question[] {
   const title = jobTitle.toLowerCase();
-  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("operations")) {
+  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("operations") || title.includes("logistics") || title.includes("warehouse")) {
     console.log("Using SCM Executive fallback questions");
     return FALLBACK_SCM_QUESTIONS;
-  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("ui")) {
+  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("ui") || title.includes("angular") || title.includes("vue")) {
     console.log("Using Frontend Engineer fallback questions");
     return FALLBACK_FRONTEND_QUESTIONS;
-  } else if (title.includes("devops") || title.includes("cloud") || title.includes("aws") || title.includes("sre") || title.includes("infrastructure")) {
+  } else if (title.includes("devops") || title.includes("cloud") || title.includes("aws") || title.includes("sre") || title.includes("infrastructure") || title.includes("platform")) {
     console.log("Using DevOps Engineer fallback questions");
     return FALLBACK_DEVOPS_QUESTIONS;
+  } else if (title.includes("sales") || title.includes("marketing") || title.includes("business") || title.includes("account") || title.includes("automobile") || title.includes("automotive") || title.includes("bdm") || title.includes("bde") || title.includes("hr") || title.includes("recruiter") || title.includes("manager") || title.includes("executive") || title.includes("retail") || title.includes("customer")) {
+    console.log("Using Sales/Business fallback questions");
+    return FALLBACK_SALES_BUSINESS_QUESTIONS;
   } else {
     console.log("Using Generic fallback questions");
     return FALLBACK_GENERIC_QUESTIONS;
   }
 }
+
 
 /**
  * Creates an assessment for a job if it does not already exist, returning the assessment ID.
@@ -608,4 +736,28 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
 
   console.log(`✅ Assessment ${assessmentId} created for job ${jobId} (${jobTitle}) with 10 questions.`);
   return assessmentId;
+}
+
+/**
+ * Regenerates assessment questions for a job by deleting old ones and creating fresh ones.
+ * Use when existing questions were generated incorrectly or need to be refreshed.
+ */
+export async function regenerateJobAssessment(jobId: string, jobTitle: string, jobDescription: string): Promise<string> {
+  // Delete existing assessment questions and assessment record for this job
+  const existingAssessment = await query(
+    `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+    [jobId]
+  );
+
+  if (existingAssessment.rowCount && existingAssessment.rowCount > 0) {
+    const oldAssessmentId = existingAssessment.rows[0].id;
+    // Delete questions first (FK constraint)
+    await query(`DELETE FROM assessment_questions WHERE assessment_id = $1;`, [oldAssessmentId]);
+    // Delete assessment
+    await query(`DELETE FROM assessments WHERE id = $1;`, [oldAssessmentId]);
+    console.log(`🗑️ Deleted old assessment ${oldAssessmentId} for job ${jobId}`);
+  }
+
+  // Now create fresh assessment
+  return ensureJobAssessment(jobId, jobTitle, jobDescription);
 }

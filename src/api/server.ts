@@ -141,6 +141,44 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
   });
 });
 
+// Twice-daily background job to sync emails for all tenants (Lock TTL = 1 hour)
+cron.schedule("0 9,21 * * *", () => { // Run at 9 AM and 9 PM daily
+  runWithLock("cron:email-sync-all-tenants", 3600, async () => {
+    try {
+      const { queryGlobal } = await import("../lib/tenantDb.js");
+      const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
+      
+      console.log("✉️ [Email Sync Job] Starting twice-daily email sync for all tenants...");
+      
+      const tenantsRes = await queryGlobal(
+        "SELECT id, email_config FROM tenants WHERE email_config IS NOT NULL;"
+      );
+      
+      let totalIngested = 0;
+      
+      for (const tenant of tenantsRes.rows) {
+        const tenantId = tenant.id;
+        const config = tenant.email_config;
+        const provider = config?.provider;
+        
+        if (provider && provider !== "mock") {
+          try {
+            console.log(`✉️ [Email Sync Job] Syncing ${provider} for tenant ${tenantId}...`);
+            const count = await EmailSyncService.syncMailbox(tenantId, provider);
+            totalIngested += count;
+          } catch (err: any) {
+            console.error(`🚨 [Email Sync Job] Failed syncing for tenant ${tenantId}:`, err.message || err);
+          }
+        }
+      }
+      
+      console.log(`✉️ [Email Sync Job] Finished email sync. Total resumes ingested: ${totalIngested}`);
+    } catch (err) {
+      console.error("🚨 [Email Sync Job] Twice-daily email sync failed:", err);
+    }
+  });
+});
+
 const PORT = Number(process.env.PORT) || 4000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Backend server listening on http://0.0.0.0:${PORT}`);

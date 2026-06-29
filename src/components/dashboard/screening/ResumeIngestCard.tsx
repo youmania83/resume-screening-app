@@ -18,6 +18,9 @@ interface ResumeIngestCardProps {
   triggerFileSelect: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  triggerFolderSelect: () => void;
+  folderInputRef: React.RefObject<HTMLInputElement | null>;
+  handleFolderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   uploadProgress: Record<string, number>;
   screeningQueue: any[];
   candidates: Candidate[];
@@ -35,6 +38,9 @@ export function ResumeIngestCard({
   triggerFileSelect,
   fileInputRef,
   handleFileChange,
+  triggerFolderSelect,
+  folderInputRef,
+  handleFolderChange,
   uploadProgress,
   screeningQueue,
   candidates,
@@ -103,20 +109,50 @@ export function ResumeIngestCard({
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".pdf,.docx"
+              accept=".pdf,.docx,.zip"
+              className="hidden"
+              multiple
+            />
+            <input
+              type="file"
+              ref={folderInputRef}
+              onChange={handleFolderChange}
               className="hidden"
               multiple
             />
             <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-slate-400">
               <UploadCloud className="h-5 w-5" />
             </div>
-            <div>
+            <div className="w-full">
               <p className="text-xs font-bold text-foreground">
                 {Object.keys(uploadProgress).length > 0
                   ? `Uploading ${Object.keys(uploadProgress).length} file(s)...`
-                  : "Drop PDF / DOCX resumes here"}
+                  : "Drop resumes, folder, or ZIP here"}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-1">Supports multiple documents evaluated in parallel</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Supports PDF, DOCX, folders, and ZIP archives</p>
+              <div className="mt-2.5 text-xs flex justify-center gap-3 text-indigo-500 font-bold select-none">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerFileSelect();
+                  }}
+                  className="hover:underline cursor-pointer bg-transparent border-0 outline-none p-0 text-indigo-500 font-bold"
+                >
+                  Browse Files
+                </button>
+                <span className="text-muted-foreground/30">|</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerFolderSelect();
+                  }}
+                  className="hover:underline cursor-pointer bg-transparent border-0 outline-none p-0 text-indigo-500 font-bold"
+                >
+                  Upload Folder
+                </button>
+              </div>
             </div>
           </div>
 

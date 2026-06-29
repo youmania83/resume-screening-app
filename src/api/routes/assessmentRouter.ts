@@ -1,6 +1,6 @@
 // src/api/routes/assessmentRouter.ts
 import { Router } from "express";
-import { ensureJobAssessment } from "../../lib/assessmentService";
+import { ensureJobAssessment, regenerateJobAssessment } from "../../lib/assessmentService";
 import { sendAssessmentInviteEmail, sendInterviewScheduleEmail } from "../../lib/email";
 import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service";
 import crypto from "crypto";
@@ -632,103 +632,7 @@ router.post("/submit", async (req: any, res: any) => {
       [assessmentScore, assessmentStatus, finalScore, nextStatus, kekaStatus, candidate.id]
     );
 
-    // Sync assessment completion stage and schedule interview
-    let interviewDate: Date | null = null;
-    try {
-      const kekaResult = await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
-      if (kekaResult?.interviewDate) {
-        interviewDate = new Date(kekaResult.interviewDate);
-      }
-    } catch (kekaErr) {
-      console.error("⚠️ Failed to sync assessment completion to Keka:", kekaErr);
-    }
-
-    // Fallback: If candidate passed but interview wasn't scheduled via Keka service, schedule locally
-    if (finalScore >= 80 && !interviewDate) {
-      interviewDate = new Date();
-      interviewDate.setDate(interviewDate.getDate() + 2);
-      interviewDate.setHours(10, 0, 0, 0);
-
-      const interviewId = `interview-fallback-${Date.now()}`;
-      await queryGlobal(
-        `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status)
-         VALUES ($1, $2, $3, $4, 'scheduled')
-         ON CONFLICT (id) DO NOTHING;`,
-        [interviewId, candidate.id, candidate.job_id, interviewDate]
-      );
-
-      await queryGlobal(
-        `UPDATE candidates SET status = 'interviewing' WHERE id = $1;`,
-        [candidate.id]
-      );
-    }
-
-    // Log Activity
-    await queryGlobal(
-      `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
-       VALUES ($1, $2, $3);`,
-      [
-        candidate.id,
-        "assessment_submitted",
-        `Assessment completed. Score: ${assessmentScore}% (Correct: ${correctCount}/${totalQuestions}). Final score calculated: ${finalScore}% (Ranked: ${nextStatus}).`
-      ]
-    );
-
-    let interviewDetails = null;
-    if (interviewDate) {
-      // Log interview scheduling
-      await queryGlobal(
-        `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
-         VALUES ($1, 'interview_scheduled', $2);`,
-        [
-          candidate.id,
-          `HR Interview automatically scheduled for ${interviewDate.toLocaleDateString()} at 10:00 AM.`
-        ]
-      );
-
-      // Update candidate details for legacy screen support
-      await queryGlobal(
-        `UPDATE candidates 
-         SET status = 'interviewing', interview_scheduled_date = $1 
-         WHERE id = $2;`,
-        [interviewDate, candidate.id]
-      );
-
-      // Trigger automatic emails (Candidate and HR)
-      try {
-        let hrEmail = "yogeshkumarwadhwa@localhost.com";
-        try {
-          const ownerRes = await queryGlobal(
-            `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
-            [candidate.tenant_id]
-          );
-          if (ownerRes.rowCount && ownerRes.rowCount > 0) {
-            hrEmail = ownerRes.rows[0].email;
-          }
-        } catch (dbErr) {
-          console.error("Failed to lookup tenant owner email, falling back to default:", dbErr);
-        }
-
-        await sendInterviewScheduleEmail({
-          candidateName: candidate.name,
-          candidateEmail: candidate.email,
-          jobTitle: candidate.role,
-          resumeScore,
-          assessmentScore,
-          finalScore,
-          scheduledDate: interviewDate,
-          hrEmail,
-        });
-      } catch (mailErr) {
-        console.error("Failed to trigger automated interview emails:", mailErr);
-      }
-
-      interviewDetails = {
-        scheduledDate: interviewDate,
-        status: "scheduled"
-      };
-    }
-
+    // ── CRITICAL PATH COMPLETE ── Send response immediately so the candidate sees results
     res.json({
       success: true,
       assessmentScore,
@@ -736,11 +640,123 @@ router.post("/submit", async (req: any, res: any) => {
       status: nextStatus,
       correctAnswers: correctCount,
       totalQuestions,
-      interviewDetails
+      interviewDetails: null // will be updated asynchronously
     });
+
+    // ── NON-CRITICAL SIDE-EFFECTS (fire-and-forget) ──
+    // These run after the response is sent. Failures here are logged but won't affect the candidate.
+    (async () => {
+      try {
+        // Log assessment submission activity
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
+           VALUES ($1, $2, $3);`,
+          [
+            candidate.id,
+            "assessment_submitted",
+            `Assessment completed. Score: ${assessmentScore}% (Correct: ${correctCount}/${totalQuestions}). Final score calculated: ${finalScore}% (Ranked: ${nextStatus}).`
+          ]
+        );
+      } catch (logErr) {
+        console.error("⚠️ [Side-Effect] Failed to log assessment submission activity:", logErr);
+      }
+
+      // Sync assessment completion stage via Keka
+      let interviewDate: Date | null = null;
+      try {
+        const kekaResult = await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
+        if (kekaResult?.interviewDate) {
+          interviewDate = new Date(kekaResult.interviewDate);
+        }
+      } catch (kekaErr) {
+        console.error("⚠️ [Side-Effect] Failed to sync assessment completion to Keka:", kekaErr);
+      }
+
+      // Fallback: If candidate passed but interview wasn't scheduled via Keka, schedule locally
+      if (finalScore >= 80 && !interviewDate) {
+        interviewDate = new Date();
+        interviewDate.setDate(interviewDate.getDate() + 2);
+        interviewDate.setHours(10, 0, 0, 0);
+
+        try {
+          const interviewId = `interview-fallback-${Date.now()}`;
+          await queryGlobal(
+            `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status)
+             VALUES ($1, $2, $3, $4, 'scheduled')
+             ON CONFLICT (id) DO NOTHING;`,
+            [interviewId, candidate.id, candidate.job_id, interviewDate]
+          );
+
+          await queryGlobal(
+            `UPDATE candidates SET status = 'interviewing' WHERE id = $1;`,
+            [candidate.id]
+          );
+        } catch (intErr) {
+          console.error("⚠️ [Side-Effect] Failed to schedule fallback interview:", intErr);
+        }
+      }
+
+      if (interviewDate) {
+        // Log interview scheduling
+        try {
+          await queryGlobal(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
+             VALUES ($1, 'interview_scheduled', $2);`,
+            [
+              candidate.id,
+              `HR Interview automatically scheduled for ${interviewDate.toLocaleDateString()} at 10:00 AM.`
+            ]
+          );
+
+          // Update candidate details for legacy screen support
+          await queryGlobal(
+            `UPDATE candidates 
+             SET status = 'interviewing', interview_scheduled_date = $1 
+             WHERE id = $2;`,
+            [interviewDate, candidate.id]
+          );
+        } catch (schedErr) {
+          console.error("⚠️ [Side-Effect] Failed to log interview scheduling:", schedErr);
+        }
+
+        // Trigger automatic emails (Candidate and HR)
+        try {
+          let hrEmail = "yogeshkumarwadhwa@localhost.com";
+          try {
+            const ownerRes = await queryGlobal(
+              `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
+              [candidate.tenant_id]
+            );
+            if (ownerRes.rowCount && ownerRes.rowCount > 0) {
+              hrEmail = ownerRes.rows[0].email;
+            }
+          } catch (dbErr) {
+            console.error("Failed to lookup tenant owner email, falling back to default:", dbErr);
+          }
+
+          await sendInterviewScheduleEmail({
+            candidateName: candidate.name,
+            candidateEmail: candidate.email,
+            jobTitle: candidate.role,
+            resumeScore,
+            assessmentScore,
+            finalScore,
+            scheduledDate: interviewDate,
+            hrEmail,
+          });
+        } catch (mailErr) {
+          console.error("⚠️ [Side-Effect] Failed to trigger automated interview emails:", mailErr);
+        }
+      }
+    })().catch(sideEffectErr => {
+      console.error("⚠️ Unhandled side-effect error after assessment submission:", sideEffectErr);
+    });
+
   } catch (err: any) {
     console.error("Failed to submit assessment responses:", err);
-    res.status(500).json({ error: err.message || "Failed to submit assessment" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to submit assessment" });
+    }
   }
 });
 
@@ -987,6 +1003,68 @@ router.post("/public-register", async (req: any, res: any) => {
   } catch (err: any) {
     console.error("Failed to register public candidate:", err);
     res.status(500).json({ error: err.message || "Failed to register candidate" });
+  }
+});
+
+/**
+ * POST /api/assessment/regenerate
+ * Admin/Recruiter endpoint to regenerate assessment questions for a job.
+ * Deletes old stale questions and creates new role-specific ones.
+ */
+router.post("/regenerate", async (req: any, res: any) => {
+  try {
+    const { jobId } = req.body as { jobId: string };
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId is required" });
+    }
+
+    // Look up job details
+    const jobRes = await queryGlobal(
+      `SELECT id, title, description FROM jobs WHERE id = $1 LIMIT 1;`,
+      [jobId]
+    );
+    if (!jobRes.rowCount || jobRes.rowCount === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const job = jobRes.rows[0];
+
+    // Also reset any existing candidate attempts for this job's assessment
+    // so candidates can re-take with fresh questions
+    const existingAssessment = await queryGlobal(
+      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      [jobId]
+    );
+    if (existingAssessment.rowCount && existingAssessment.rowCount > 0) {
+      const oldId = existingAssessment.rows[0].id;
+      await queryGlobal(`DELETE FROM assessment_attempts WHERE assessment_id = $1;`, [oldId]);
+    }
+
+    const newAssessmentId = await regenerateJobAssessment(
+      job.id,
+      job.title,
+      job.description || `Job opening for ${job.title}`
+    );
+
+    // Fetch new questions for confirmation
+    const questionsRes = await queryGlobal(
+      `SELECT id, question_text, difficulty, topic FROM assessment_questions WHERE assessment_id = $1 ORDER BY id ASC;`,
+      [newAssessmentId]
+    );
+
+    res.json({
+      success: true,
+      assessmentId: newAssessmentId,
+      questionsCount: questionsRes.rowCount,
+      questions: questionsRes.rows.map(q => ({
+        id: q.id,
+        questionText: q.question_text,
+        difficulty: q.difficulty,
+        topic: q.topic
+      }))
+    });
+  } catch (err: any) {
+    console.error("Failed to regenerate assessment:", err);
+    res.status(500).json({ error: err.message || "Failed to regenerate assessment" });
   }
 });
 
