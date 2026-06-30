@@ -163,8 +163,8 @@ export function useIngestionPipeline({
         appliedDate: evalData.candidate.appliedDate || new Date().toISOString().split("T")[0]
       };
 
-      if (candidateData.score < 70) {
-        toast.error(`Auto-Rejected: ${candidateData.name} scored ${candidateData.score}% (Threshold: 70%)`);
+      if (candidateData.score < 80) {
+        toast.error(`Auto-Rejected: ${candidateData.name} scored ${candidateData.score}% (Threshold: 80%)`);
       } else {
         toast.success(`Assessment Invitation Sent: ${candidateData.name} scored ${candidateData.score}%!`);
       }
@@ -192,11 +192,11 @@ export function useIngestionPipeline({
     const generatedName = queueItem.name;
     const appliedDate = new Date().toISOString().split("T")[0];
 
-    const status = score < 70 ? "rejected" : "shortlisted";
-    const kekaStatus = score < 70 ? "rejected_pool" : "active";
-    const logMessage = score < 70
-      ? `Candidate automatically rejected (Score ${score}/100 < 70). Moved to Rejected Pool.`
-      : `Candidate details logged (Score ${score}/100 >= 70). Assessment invitation automatically sent via email.`;
+    const status = score < 80 ? "rejected" : "shortlisted";
+    const kekaStatus = score < 80 ? "rejected_pool" : "active";
+    const logMessage = score < 80
+      ? `Candidate automatically rejected (Score ${score}/100 < 80). Moved to Rejected Pool.`
+      : `Candidate details logged (Score ${score}/100 >= 80). Assessment invitation automatically sent via email.`;
 
     candidateData = {
       id: `cand-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -206,7 +206,7 @@ export function useIngestionPipeline({
       matchPercent: score,
       experienceYears: Math.floor(Math.random() * 5) + 2,
       experienceMatch: "Candidate has solid background matching the active JD.",
-      recommendation: `Recommended for ${score >= 70 ? "assessment" : "review later"}.`,
+      recommendation: `Recommended for ${score >= 80 ? "assessment" : "review later"}.`,
       confidence: "88% (Medium)",
       riskLevel: score >= 85 ? "Low" : "Medium",
       strengths: ["Strong domain familiarity", "Clear communication skill"],

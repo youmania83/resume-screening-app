@@ -222,14 +222,14 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     let assessmentTokenExpiry = null;
     let assessmentStatusVal = null;
 
-    if (score < 70) {
+    if (score < 80) {
       status = "rejected";
       kekaStatus = "rejected_pool";
-      logMessage = `Candidate automatically rejected (Score ${score}/100 < 70). Moved to Rejected Pool in Keka HRMS.`;
+      logMessage = `Candidate automatically rejected (Score ${score}/100 < 80). Moved to Rejected Pool in Keka HRMS.`;
     } else {
       status = "shortlisted";
       kekaStatus = "active";
-      logMessage = `Candidate details logged (Score ${score}/100 >= 70). Assessment invitation automatically sent via email.`;
+      logMessage = `Candidate details logged (Score ${score}/100 >= 80). Assessment invitation automatically sent via email.`;
       
       assessmentToken = crypto.randomBytes(24).toString("hex");
       assessmentTokenExpiry = new Date();
@@ -295,10 +295,10 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       );
       await queryTenant(
         `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) VALUES ($1, $2, $3, :tenant_id);`,
-        [candidateId, score < 70 ? "keka_rejected" : "email_sent", logMessage]
+        [candidateId, score < 80 ? "keka_rejected" : "email_sent", logMessage]
       );
 
-      if (score >= 70 && assessmentToken && assessmentTokenExpiry) {
+      if (score >= 80 && assessmentToken && assessmentTokenExpiry) {
         await ensureJobAssessment(jobId, targetJobTitle, targetJobDesc);
         
         await sendAssessmentInviteEmail({

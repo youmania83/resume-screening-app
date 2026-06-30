@@ -422,7 +422,7 @@ export async function parseAndEvalResume(
 
       // Automated AI screening pipeline trigger
       if (candidateStatus === "applied" && matchedJobId) {
-        if (highestMatchScore >= 70) {
+        if (highestMatchScore >= 80) {
           const assessmentToken = crypto.randomBytes(24).toString("hex");
           const expiry = new Date();
           expiry.setDate(expiry.getDate() + 7);
@@ -443,9 +443,9 @@ export async function parseAndEvalResume(
 
           // Log activity and timeline
           await queryGlobal(
-            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-             VALUES ($1, 'email_sent', $2, $3);`,
-            [candidateId, `Candidate details logged (Score ${highestMatchScore}/100 >= 70). Assessment invitation automatically sent via email.`, tenantId]
+             `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+              VALUES ($1, 'email_sent', $2, $3);`,
+            [candidateId, `Candidate details logged (Score ${highestMatchScore}/100 >= 80). Assessment invitation automatically sent via email.`, tenantId]
           );
 
           await queryGlobal(
@@ -490,7 +490,7 @@ export async function parseAndEvalResume(
           await queryGlobal(
             `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
              VALUES ($1, 'keka_rejected', $2, $3);`,
-            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 70).`, tenantId]
+            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 80).`, tenantId]
           );
 
           await queryGlobal(

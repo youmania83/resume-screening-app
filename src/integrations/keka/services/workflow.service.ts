@@ -277,17 +277,17 @@ export class KekaWorkflowService {
     }
     const { name, email, job_id: jobId, title: jobTitle, description: jobDesc } = candRes.rows[0];
 
-    if (aiScore < 70) {
+    if (aiScore < 80) {
       targetStage = "Rejected";
       status = "rejected";
-      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 70). Moved to Rejected Pool in Keka.`;
+      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 80). Moved to Rejected Pool in Keka.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Rejected");
     } 
     else {
       targetStage = "Assessment";
       status = "shortlisted";
-      activityLog = `Candidate qualified for Assessment (Score ${aiScore}/100 >= 70). Generating MCQ link and sending invite email.`;
+      activityLog = `Candidate qualified for Assessment (Score ${aiScore}/100 >= 80). Generating MCQ link and sending invite email.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Assessment");
 

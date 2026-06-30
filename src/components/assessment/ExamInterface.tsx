@@ -267,24 +267,24 @@ export default function ExamInterface({
                     <button
                       key={oIdx}
                       onClick={() => handleSelectOption(currentQuestion.id, option)}
-                      className={`w-full text-left p-4 rounded-lg border text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                      className={`w-full text-left p-4 rounded-lg border text-xs font-medium flex items-start justify-between gap-4 transition-all cursor-pointer ${
                         isSel
                           ? "bg-slate-900 border-slate-900 text-white font-bold shadow-md"
                           : "bg-background/50 border-border text-foreground/90 hover:bg-secondary/50"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
                         <span
-                          className={`h-5 w-5 rounded-full flex items-center justify-center border text-[10px] font-extrabold ${
+                          className={`h-5 w-5 rounded-full flex items-center justify-center border text-[10px] font-extrabold shrink-0 mt-0.5 ${
                             isSel ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-border text-muted-foreground"
                           }`}
                         >
                           {String.fromCharCode(65 + oIdx)}
                         </span>
-                        {option}
+                        <span className="break-words flex-1 pr-2 mt-0.5">{option}</span>
                       </div>
 
-                      {isSel && <div className="h-2 w-2 rounded-full bg-white" />}
+                      {isSel && <div className="h-2 w-2 rounded-full bg-white shrink-0 self-center" />}
                     </button>
                   );
                 })}
