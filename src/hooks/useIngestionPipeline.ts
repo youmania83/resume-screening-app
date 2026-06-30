@@ -135,36 +135,56 @@ export function useIngestionPipeline({
       formData.append("jobDescription", JSON.stringify(activeJD));
       formData.append("applicationSource", source);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout to allow DeepSeek to finish
+
       const evalResp = await fetch(`${apiBase}/evaluate`, {
         method: "POST",
         headers: { "X-Client-ID": clientId },
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
-      if (evalResp.ok) {
-        const evalData = await evalResp.json();
-        if (evalData.success && evalData.candidate) {
-          candidateData = {
-            ...evalData.candidate,
-            status: evalData.candidate.status || "applied",
-            appliedDate: evalData.candidate.appliedDate || new Date().toISOString().split("T")[0]
-          };
-
-          if (candidateData.score < 70) {
-            toast.error(`Auto-Rejected: ${candidateData.name} scored ${candidateData.score}% (Threshold: 70%)`);
-          } else {
-            toast.success(`Assessment Invitation Sent: ${candidateData.name} scored ${candidateData.score}%!`);
-          }
-
-          setCandidates(prev => [candidateData, ...prev]);
-          setSelectedCandidate(candidateData);
-          setScreeningQueue(prev => prev.filter(item => item.id !== queueItem.id));
-          setCredits(prev => Math.max(0, prev - 3));
-          return;
-        }
+      if (!evalResp.ok) {
+        const errData = await evalResp.json().catch(() => ({ error: `Server returned status ${evalResp.status}` }));
+        const errMsg = errData.error || errData.message || `HTTP ${evalResp.status}`;
+        throw new Error(errMsg);
       }
-    } catch {
-      console.log("Offline Fallback: Scoring computed locally.");
+
+      const evalData = await evalResp.json();
+      if (!evalData.success || !evalData.candidate) {
+        throw new Error(evalData.error || "Invalid response structure from server");
+      }
+
+      candidateData = {
+        ...evalData.candidate,
+        status: evalData.candidate.status || "applied",
+        appliedDate: evalData.candidate.appliedDate || new Date().toISOString().split("T")[0]
+      };
+
+      if (candidateData.score < 70) {
+        toast.error(`Auto-Rejected: ${candidateData.name} scored ${candidateData.score}% (Threshold: 70%)`);
+      } else {
+        toast.success(`Assessment Invitation Sent: ${candidateData.name} scored ${candidateData.score}%!`);
+      }
+
+      setCandidates(prev => [candidateData, ...prev]);
+      setSelectedCandidate(candidateData);
+      setScreeningQueue(prev => prev.filter(item => item.id !== queueItem.id));
+      setCredits(prev => Math.max(0, prev - 3));
+      return;
+    } catch (err: any) {
+      console.error("Evaluation pipeline failed:", err);
+      const errorMessage = err.name === "AbortError" 
+        ? "Timeout: DeepSeek API took too long to respond." 
+        : (err.message || "Failed to parse resume");
+
+      setScreeningQueue(prev => prev.map(item =>
+        item.id === queueItem.id ? { ...item, progress: 100, status: "error", error: errorMessage } : item
+      ));
+      toast.error(`Ingestion failed: ${errorMessage}`);
+      return;
     }
 
     // Fallback Mock Ingestion logic if API is unreachable
@@ -191,8 +211,8 @@ export function useIngestionPipeline({
       riskLevel: score >= 85 ? "Low" : "Medium",
       strengths: ["Strong domain familiarity", "Clear communication skill"],
       weaknesses: ["Missing specific enterprise module certificates"],
-      missingSkills: [activeJD?.requiredSkills[3] || "Advanced Tool"],
-      matchedSkills: [activeJD?.requiredSkills[0] || "Basics", activeJD?.requiredSkills[1] || "Process"],
+      missingSkills: [activeJD?.requiredSkills?.[3] || "Advanced Tool"],
+      matchedSkills: [activeJD?.requiredSkills?.[0] || "Basics", activeJD?.requiredSkills?.[1] || "Process"],
       skills: activeJD?.requiredSkills || [],
       certifications: ["Standard Training Certificate"],
       projects: ["Enterprise Integration Project"],
@@ -354,6 +374,10 @@ export function useIngestionPipeline({
     runEvaluationPipelineWithSource(newQueueItem, file, source);
   };
 
+  const dismissQueueItem = (id: string) => {
+    setScreeningQueue(prev => prev.filter(item => item.id !== id));
+  };
+
   return {
     dragActive,
     uploadProgress,
@@ -367,6 +391,7 @@ export function useIngestionPipeline({
     handleFolderChange,
     triggerFileSelect,
     triggerFolderSelect,
-    handleSimulatedIngestion
+    handleSimulatedIngestion,
+    dismissQueueItem
   };
 }

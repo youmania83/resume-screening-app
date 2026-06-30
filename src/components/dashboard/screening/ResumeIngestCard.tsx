@@ -1,6 +1,6 @@
 // src/components/dashboard/screening/ResumeIngestCard.tsx
 import React from "react";
-import { Activity, Building2, FileText, Link2, UploadCloud, Clock, ChevronRight } from "lucide-react";
+import { Activity, Building2, FileText, Link2, UploadCloud, Clock, ChevronRight, X, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Badge } from "../../ui/badge";
@@ -26,6 +26,7 @@ interface ResumeIngestCardProps {
   candidates: Candidate[];
   selectedCandidate: Candidate | null;
   setSelectedCandidate: (candidate: Candidate | null) => void;
+  dismissQueueItem: (id: string) => void;
 }
 
 export function ResumeIngestCard({
@@ -45,7 +46,8 @@ export function ResumeIngestCard({
   screeningQueue,
   candidates,
   selectedCandidate,
-  setSelectedCandidate
+  setSelectedCandidate,
+  dismissQueueItem
 }: ResumeIngestCardProps) {
   return (
     <div className="lg:col-span-5 space-y-6">
@@ -196,23 +198,30 @@ export function ResumeIngestCard({
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-900">
               {screeningQueue.map((item) => (
-                <div key={item.id} className="p-3.5 flex items-center justify-between gap-4">
+                <div key={item.id} className={`p-3.5 flex items-center justify-between gap-4 transition-colors ${item.status === "error" ? "bg-rose-50/50 dark:bg-rose-950/20" : ""}`}>
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold truncate text-foreground">{item.name}</span>
-                      <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground font-mono select-none">
+                      <Badge variant="outline" className={`text-[8px] px-1.5 py-0 border-border font-mono select-none ${item.status === "error" ? "border-rose-200/50 text-rose-600 bg-rose-50/30" : "text-muted-foreground"}`}>
                         {item.fileName}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-slate-900 dark:bg-secondary transition-all duration-500"
-                          style={{ width: `${item.progress}%` }}
-                        />
+                    {item.status === "error" ? (
+                      <div className="flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-450 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{item.error || "Evaluation failed"}</span>
                       </div>
-                      <span className="text-[9px] font-bold text-muted-foreground w-8 text-right">{item.progress}%</span>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-slate-900 dark:bg-secondary transition-all duration-500"
+                            style={{ width: `${item.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] font-bold text-muted-foreground w-8 text-right">{item.progress}%</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -221,6 +230,19 @@ export function ResumeIngestCard({
                         <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
                         Parsing text
                       </Badge>
+                    ) : item.status === "error" ? (
+                      <div className="flex items-center gap-1">
+                        <Badge variant="destructive" className="text-[9px] px-2 py-0.5">
+                          Failed
+                        </Badge>
+                        <button
+                          onClick={() => dismissQueueItem(item.id)}
+                          className="p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-500 transition-colors"
+                          title="Dismiss item"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ) : (
                       <Badge variant="warning" className="text-[9px] px-2 py-0.5 flex items-center gap-1">
                         <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import { Key, Mail, Palette, FileText, Save, Info, AlertTriangle } from "lucide-react";
+import { Key, Mail, Palette, FileText, Save, Info, AlertTriangle, Inbox, Plus, Trash2, CheckCircle2 } from "lucide-react";
 
 interface SettingsViewProps {
   webhookUrl: string;
@@ -13,7 +13,7 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "smtp" | "templates">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "inbox-sync" | "smtp" | "templates">("general");
 
   // SMTP Settings State
   const [smtpProvider, setSmtpProvider] = useState("gmail");
@@ -23,6 +23,33 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFromName, setSmtpFromName] = useState("");
   const [smtpReplyTo, setSmtpReplyTo] = useState("");
+
+  // Incoming Email Sync State
+  const [incomingSyncEnabled, setIncomingSyncEnabled] = useState(false);
+  const [incomingProvider, setIncomingProvider] = useState("mock");
+  const [incomingFolder, setIncomingFolder] = useState("INBOX");
+  const [hrManagerEmail, setHrManagerEmail] = useState("");
+  const [rules, setRules] = useState<any[]>([
+    {
+      type: "resume",
+      name: "Default Resume Application",
+      subjectRegex: "(?i)applying\\s*for|job\\s*application|resume\\s*for|cv\\s*for",
+      titleRegex: "(?i)(?:applying\\s*for|job\\s*application|resume\\s*for|cv\\s*for)\\s*[:-]?\\s*(.+)"
+    },
+    {
+      type: "jd",
+      name: "Default Job Description Ingest",
+      subjectRegex: "(?i)job\\s*description|new\\s*jd|post\\s*job|hiring\\s*for",
+      titleRegex: "(?i)(?:job\\s*description|new\\s*jd|post\\s*job|hiring\\s*for)\\s*[:-]?\\s*(.+)"
+    }
+  ]);
+
+  // Sandbox / Testing State
+  const [testSubject, setTestSubject] = useState("");
+  const [testBody, setTestBody] = useState("");
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testingRoute, setTestingRoute] = useState(false);
+  const [syncingInbox, setSyncingInbox] = useState(false);
 
   // Branding State
   const [logoUrl, setLogoUrl] = useState("");
@@ -58,6 +85,15 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
           setSmtpPassword(cfg.password || cfg.pass || "");
           setSmtpFromName(cfg.fromName || "");
           setSmtpReplyTo(cfg.replyTo || "");
+
+          // Ingestion config fields
+          setIncomingSyncEnabled(cfg.incomingSyncEnabled ?? false);
+          setIncomingProvider(cfg.incomingProvider || "mock");
+          setIncomingFolder(cfg.incomingFolder || "INBOX");
+          setHrManagerEmail(cfg.hrManagerEmail || "");
+          if (Array.isArray(cfg.rules)) {
+            setRules(cfg.rules);
+          }
 
           const brand = data.branding || {};
           setLogoUrl(brand.logoUrl || "");
@@ -143,7 +179,13 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
           replyTo: smtpReplyTo,
           logoUrl,
           primaryColor,
-          emailFooter
+          emailFooter,
+          // Incoming configurations to persist in email_config JSONB
+          rules,
+          incomingSyncEnabled,
+          incomingProvider,
+          incomingFolder,
+          hrManagerEmail
         })
       });
       if (resp.ok) {
@@ -195,6 +237,83 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
     }
   };
 
+  // Rules Manipulation
+  const addRule = () => {
+    setRules(prev => [
+      ...prev,
+      {
+        type: "resume",
+        name: `Incoming Rule #${prev.length + 1}`,
+        subjectRegex: "",
+        titleRegex: ""
+      }
+    ]);
+  };
+
+  const updateRule = (index: number, field: string, value: string) => {
+    setRules(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
+  };
+
+  const removeRule = (index: number) => {
+    setRules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Sandbox route test trigger
+  const handleTestRoute = async () => {
+    if (!testSubject.trim()) {
+      toast.error("Please enter a subject line to test.");
+      return;
+    }
+    setTestingRoute(true);
+    setTestResult(null);
+    try {
+      const resp = await fetch(`${apiBase}/email/test-routing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: testSubject, body: testBody })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setTestResult(data);
+        toast.success("Routing test complete!");
+      } else {
+        toast.error("Routing test failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Connection error while testing email routing.");
+    } finally {
+      setTestingRoute(false);
+    }
+  };
+
+  // Manual Trigger email sync
+  const triggerManualSync = async () => {
+    setSyncingInbox(true);
+    toast.loading("Initiating mailbox sync pass...", { id: "sync-toast" });
+    try {
+      const resp = await fetch(`${apiBase}/inbox/email-sync`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-tenant-id": "default-tenant" 
+        },
+        body: JSON.stringify({ provider: incomingProvider })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        toast.success(data.message || "Email sync run complete!", { id: "sync-toast" });
+      } else {
+        toast.error("Failed to run email sync pass.", { id: "sync-toast" });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Connection error running email sync pass.", { id: "sync-toast" });
+    } finally {
+      setSyncingInbox(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[300px] items-center justify-center text-xs text-muted-foreground font-semibold">
@@ -223,6 +342,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
       <div className="flex border-b border-border gap-6 select-none">
         {[
           { id: "general", label: "Integrations & Sync", icon: Key },
+          { id: "inbox-sync", label: "Email Inbox Sync", icon: Inbox },
           { id: "smtp", label: "SMTP & Branding", icon: Mail },
           { id: "templates", label: "Email Templates", icon: FileText }
         ].map(t => {
@@ -310,6 +430,269 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
               ))}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Email Inbox Sync Tab */}
+      {activeTab === "inbox-sync" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          {/* Rules Editor */}
+          <div className="md:col-span-2 space-y-6">
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Email Sync Configuration</CardTitle>
+                  <CardDescription className="text-[10px] mt-0.5">Determine how the platform fetches and maps incoming recruitment emails.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 text-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="space-y-0.5">
+                    <strong className="text-foreground font-bold">Enable Inbox Ingestion Sync</strong>
+                    <span className="text-slate-400 text-[10px] block">Periodically sync mailbox, classify subject lines, and auto-parse contents.</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={incomingSyncEnabled}
+                    onChange={(e) => setIncomingSyncEnabled(e.target.checked)}
+                    className="h-4 w-4 accent-slate-800 cursor-pointer"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Incoming Mail Provider</span>
+                    <select
+                      value={incomingProvider}
+                      onChange={(e) => setIncomingProvider(e.target.value)}
+                      className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-semibold outline-none text-[11px] text-foreground"
+                    >
+                      <option value="mock">Mock Sync Provider (Testing feed)</option>
+                      <option value="gmail">Gmail API Sync (OAuth)</option>
+                      <option value="outlook">Outlook Microsoft Graph Sync</option>
+                      <option value="zoho">Zoho Mail API</option>
+                      <option value="imap">IMAP Protocol server</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Mailbox Sync Folder</span>
+                    <input
+                      type="text"
+                      value={incomingFolder}
+                      onChange={(e) => setIncomingFolder(e.target.value)}
+                      placeholder="e.g. INBOX"
+                      className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-3 border-t border-border">
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">HR Manager Email (for Interview Alerts)</span>
+                  <input
+                    type="email"
+                    value={hrManagerEmail}
+                    onChange={(e) => setHrManagerEmail(e.target.value)}
+                    placeholder="e.g. hr@yourcompany.com"
+                    className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none text-xs"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">When a candidate passes the assessment, the HR interview invite will be sent to this email alongside the candidate notification.</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Routing Rules & Regex Patterns</CardTitle>
+                  <CardDescription className="text-[10px] mt-0.5">Rules are evaluated sequentially. First match handles classification and job mapping.</CardDescription>
+                </div>
+                <Button onClick={addRule} size="sm" variant="outline" className="text-[10px] gap-1 font-bold">
+                  <Plus className="h-3 w-3" /> Add Rule
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 text-xs">
+                {rules.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground font-semibold text-[11px]">
+                    No custom routing rules defined. System will use default patterns.
+                  </div>
+                ) : (
+                  rules.map((rule, idx) => (
+                    <div key={idx} className="p-3 bg-secondary/20 rounded border border-border space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          value={rule.name}
+                          onChange={(e) => updateRule(idx, "name", e.target.value)}
+                          placeholder="Rule Name"
+                          className="font-bold text-foreground bg-transparent border-b border-transparent hover:border-border/60 focus:border-foreground outline-none text-xs w-2/3"
+                        />
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={rule.type}
+                            onChange={(e) => updateRule(idx, "type", e.target.value)}
+                            className="bg-secondary text-[9px] border border-border rounded px-1 py-0.5 font-bold uppercase"
+                          >
+                            <option value="resume">Resume App</option>
+                            <option value="jd">JD Ingest</option>
+                          </select>
+                          <button
+                            onClick={() => removeRule(idx)}
+                            className="text-muted-foreground hover:text-destructive cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                        <div className="space-y-1">
+                          <span className="block text-[9px] uppercase font-bold text-muted-foreground">Subject Line Match Regex</span>
+                          <input
+                            type="text"
+                            value={rule.subjectRegex}
+                            onChange={(e) => updateRule(idx, "subjectRegex", e.target.value)}
+                            placeholder="e.g. (?i)applying\s*for"
+                            className="w-full bg-card border border-border rounded px-2 py-1 outline-none font-mono text-[10px]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="block text-[9px] uppercase font-bold text-muted-foreground">Title Extraction Regex</span>
+                          <input
+                            type="text"
+                            value={rule.titleRegex}
+                            onChange={(e) => updateRule(idx, "titleRegex", e.target.value)}
+                            placeholder="e.g. (?i)applying\s*for\s*(.+)"
+                            className="w-full bg-card border border-border rounded px-2 py-1 outline-none font-mono text-[10px]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    onClick={triggerManualSync}
+                    disabled={syncingInbox}
+                    variant="outline"
+                    className="text-xs font-bold"
+                  >
+                    Sync Inbox Now
+                  </Button>
+                  <Button
+                    onClick={saveSmtpAndBranding}
+                    disabled={saving}
+                    className="text-xs font-bold gap-1.5 shadow-sm"
+                  >
+                    <Save className="h-3.5 w-3.5" /> Save Sync Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sandbox & Help */}
+          <div className="md:col-span-1 space-y-6">
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border">
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Interactive Routing Sandbox</CardTitle>
+                <CardDescription className="text-[10px] mt-0.5">Test how incoming subject lines get classified and routed by current active rules.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Sample Subject Line</span>
+                  <input
+                    type="text"
+                    value={testSubject}
+                    onChange={(e) => setTestSubject(e.target.value)}
+                    placeholder="e.g. Applying for React Developer - John Doe"
+                    className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Sample Email Body (Optional)</span>
+                  <textarea
+                    rows={4}
+                    value={testBody}
+                    onChange={(e) => setTestBody(e.target.value)}
+                    placeholder="Cloud resume URL, description, etc."
+                    className="w-full bg-secondary/30 border border-border rounded p-2 outline-none font-sans resize-none font-semibold"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleTestRoute}
+                  disabled={testingRoute || !testSubject}
+                  className="w-full text-xs font-bold"
+                >
+                  {testingRoute ? "Testing..." : "Evaluate Routing"}
+                </Button>
+
+                {testResult && (
+                  <div className="pt-3 border-t border-border space-y-2 leading-relaxed">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Evaluation Report</span>
+                    <div className="p-3 rounded border border-border bg-secondary/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-foreground">Match Status:</span>
+                        <Badge variant={testResult.matched ? "success" : "destructive"} className="text-[9px] font-bold">
+                          {testResult.matched ? "MATCHED" : "NO MATCH"}
+                        </Badge>
+                      </div>
+
+                      {testResult.matched && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="font-semibold text-slate-400">Classification:</span>
+                            <span className="font-bold uppercase text-foreground text-[10px]">{testResult.classification}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-semibold text-slate-400">Job Title Match:</span>
+                            <span className="font-bold text-amber-500">{testResult.jobTitleExtracted || "Not Found"}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {testResult.extractedLinks?.length > 0 && (
+                        <div>
+                          <span className="font-semibold text-slate-400 block mb-0.5">Resume Links Extracted:</span>
+                          {testResult.extractedLinks.map((link: string, i: number) => (
+                            <code key={i} className="text-[9px] text-sky-400 block truncate font-mono bg-card p-1 rounded border border-border/40 mt-1">{link}</code>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-border/40 text-[10px] flex gap-1.5 items-start">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <strong className="text-foreground block">Action to Take:</strong>
+                          <span className="text-slate-400 font-semibold block mt-0.5">{testResult.actionToTake}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border">
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Quick Syntax Help</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-2.5 text-[10px] text-slate-400 font-semibold leading-normal">
+                <p>
+                  <strong>(?i) Modifier:</strong> Use <code>(?i)</code> at the beginning of the regex pattern to trigger case-insensitive matching.
+                </p>
+                <p>
+                  <strong>Capture Groups <code>(...)</code>:</strong> Place parentheses around the section of the subject regex representing the Job Title to extract it.
+                </p>
+                <p>
+                  <strong>Matching Jobs:</strong> The system will try to find a Job profile matching the extracted Title using a SQL partial ILIKE match. If it finds one, candidate resumes are matched to it automatically.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 

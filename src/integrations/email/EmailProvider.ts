@@ -9,6 +9,8 @@ export interface NormalizedEmail {
   id: string;
   sender: string;
   subject: string;
+  bodyText?: string;
+  bodyHtml?: string;
   receivedAt: Date;
   attachments: EmailAttachment[];
 }
@@ -82,21 +84,20 @@ export class MockEmailProvider implements IEmailProvider {
   private readLogs: Set<string> = new Set();
 
   async fetchUnreadEmails(): Promise<NormalizedEmail[]> {
-    const emailId = `mock-email-${Date.now()}`;
-    if (this.readLogs.has(emailId)) return [];
+    const timeSalt = Date.now();
+    const emails: NormalizedEmail[] = [];
 
-    console.log("[Mock Email Sync] Pulling mock emails with attachments...");
-
-    // Create a dummy pdf content buffer (simulated)
-    const dummyPdfContent = Buffer.from(
-      "%PDF-1.4\n1 0 obj\n<< /Title (John Doe Resume) >>\nendobj\nstream\nEmail: john.doe.email@example.com\nPhone: +1 555-123-4567\nSkills: Python, React, Docker, Kubernetes\nendstream\nendobj\nxref\n0 2\n0000000000 65535 f\n0000000009 00000 n\ntrailer\n<< /Size 2 /Root 1 0 R >>\nstartxref\n310\n%%EOF\n"
-    );
-
-    return [
-      {
-        id: emailId,
-        sender: "candidate.apply@example.com",
+    // Email 1: Candidate applying with resume attachment
+    const email1Id = `mock-email-resume-${timeSalt}`;
+    if (!this.readLogs.has(email1Id)) {
+      const dummyPdfContent = Buffer.from(
+        "%PDF-1.4\n1 0 obj\n<< /Title (John Doe Resume) >>\nendobj\nstream\nEmail: john.doe.email@example.com\nPhone: +1 555-123-4567\nSkills: Python, React, Docker, Kubernetes\nendstream\nendobj\nxref\n0 2\n0000000000 65535 f\n0000000009 00000 n\ntrailer\n<< /Size 2 /Root 1 0 R >>\nstartxref\n310\n%%EOF\n"
+      );
+      emails.push({
+        id: email1Id,
+        sender: "john.doe@example.com",
         subject: "Applying for Python Developer opening - John Doe",
+        bodyText: "Hello Recruiting Team, please find my resume attached for the Python Developer role.",
         receivedAt: new Date(),
         attachments: [
           {
@@ -105,8 +106,61 @@ export class MockEmailProvider implements IEmailProvider {
             content: dummyPdfContent,
           },
         ],
-      },
-    ];
+      });
+    }
+
+    // Email 2: New Job Description Intake Email
+    const email2Id = `mock-email-jd-${timeSalt}`;
+    if (!this.readLogs.has(email2Id)) {
+      const jdBody = `Hello Team,
+
+Here is the job description for the new React Architect role.
+
+Title: React Architect
+Department: Engineering
+Location: New York City
+Experience Required: 8+ years
+Work Mode: Hybrid
+
+Required Skills: React, Next.js, Redux, Webpack, TypeScript, Micro-frontends.
+
+Description:
+We are looking for a senior front-end architect to design and scale our SaaS platforms. You will lead a team of 4 engineers and set the core UI standards.`;
+
+      emails.push({
+        id: email2Id,
+        sender: "hiring.manager@company.com",
+        subject: "New Job Description: React Architect",
+        bodyText: jdBody,
+        receivedAt: new Date(),
+        attachments: [],
+      });
+    }
+
+    // Email 3: Candidate applying with a resume link in the email body (no attachment)
+    const email3Id = `mock-email-link-${timeSalt}`;
+    if (!this.readLogs.has(email3Id)) {
+      emails.push({
+        id: email3Id,
+        sender: "bruce.wayne@waynecorp.com",
+        subject: "Application for Product Manager position - Bruce Wayne",
+        bodyText: `Hi Recruiting,
+
+I would love to apply for the Product Manager role.
+You can access my resume via this Google Drive link:
+https://drive.google.com/file/d/1A2B3C4D5E6F7G8H9I0J/view?usp=sharing
+
+Thanks,
+Bruce Wayne`,
+        receivedAt: new Date(),
+        attachments: [],
+      });
+    }
+
+    if (emails.length > 0) {
+      console.log(`[Mock Email Sync] Pulling ${emails.length} mock emails (applications & JDs)...`);
+    }
+    return emails;
   }
 
   async markAsRead(emailId: string): Promise<void> {

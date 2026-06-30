@@ -75,7 +75,8 @@ async function sendCalendarInvitation(params: {
             user: username,
             pass: decryptedPassword,
           },
-        });
+          family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+        } as any);
       }
     }
   }
@@ -92,7 +93,8 @@ async function sendCalendarInvitation(params: {
         port,
         secure: port === 465,
         auth: { user, pass },
-      });
+        family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+      } as any);
     }
   }
 

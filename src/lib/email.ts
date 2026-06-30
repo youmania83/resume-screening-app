@@ -31,7 +31,8 @@ const getTransporter = () => {
       user,
       pass,
     },
-  });
+    family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+  } as any);
 };
 
 const FROM_EMAIL = process.env.SMTP_FROM || '"Rison AI Recruitment" <recruiting@risonai.tech>';
@@ -98,8 +99,9 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
             auth: {
               user: config.username,
               pass: decryptedPass
-            }
-          });
+            },
+            family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+          } as any);
           const fromName = config.fromName || "Rison AI Recruitment";
           const fromEmail = `"${fromName}" <${config.username}>`;
           return { transporter, fromEmail };

@@ -144,7 +144,8 @@ export default function Dashboard() {
     handleSimulatedIngestion,
     isIngesting,
     uploadProgress,
-    screeningQueue
+    screeningQueue,
+    dismissQueueItem
   } = useIngestionPipeline({
     activeJD,
     setCandidates,
@@ -322,6 +323,7 @@ export default function Dashboard() {
               candidates={candidates}
               selectedCandidate={selectedCandidate}
               setSelectedCandidate={setSelectedCandidate}
+              dismissQueueItem={dismissQueueItem}
               handleDeleteCandidate={handleDeleteCandidate}
               assessmentScoreInput={assessmentScoreInput}
               setAssessmentScoreInput={setAssessmentScoreInput}

@@ -40,6 +40,7 @@ interface ScreeningViewProps {
   candidates: Candidate[];
   selectedCandidate: Candidate | null;
   setSelectedCandidate: (candidate: Candidate | null) => void;
+  dismissQueueItem: (id: string) => void;
 
   handleDeleteCandidate: (id: string) => void;
   assessmentScoreInput: number;
@@ -102,6 +103,7 @@ export function ScreeningView(props: ScreeningViewProps) {
           candidates={props.candidates}
           selectedCandidate={props.selectedCandidate}
           setSelectedCandidate={props.setSelectedCandidate}
+          dismissQueueItem={props.dismissQueueItem}
         />
 
         <AiScreeningConsole

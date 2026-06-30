@@ -133,4 +133,123 @@ router.get("/metrics", async (req, res, next) => {
   }
 });
 
+// GET /api/dashboard/pipeline - Autonomous Pipeline Funnel Analytics
+router.get("/pipeline", async (req, res, next) => {
+  try {
+    // 1. Funnel Stage Counts
+    const emailsSynced = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM resume_inbox WHERE tenant_id = :tenant_id;"
+    );
+
+    const resumesParsed = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM resume_inbox WHERE status IN ('Parsed', 'Matched', 'Duplicate', 'Needs Review') AND tenant_id = :tenant_id;"
+    );
+
+    const shortlisted = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE status IN ('shortlisted', 'Qualified', 'interviewing') AND tenant_id = :tenant_id;"
+    );
+
+    const assessmentsSent = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE assessment_token IS NOT NULL AND tenant_id = :tenant_id;"
+    );
+
+    const assessmentsCompleted = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE assessment_status IN ('passed', 'failed') AND tenant_id = :tenant_id;"
+    );
+
+    const qualified = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE status = 'Qualified' AND tenant_id = :tenant_id;"
+    );
+
+    const interviewsScheduled = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM interviews WHERE status = 'scheduled' AND tenant_id = :tenant_id;"
+    );
+
+    const hired = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE status = 'Hired' AND tenant_id = :tenant_id;"
+    );
+
+    const rejected = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE status IN ('Rejected', 'rejected') AND tenant_id = :tenant_id;"
+    );
+
+    const inReview = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM candidates WHERE status = 'Review' AND tenant_id = :tenant_id;"
+    );
+
+    // 2. Today's Activity
+    const todayResumes = await queryTenant(
+      "SELECT COUNT(*)::int as count FROM resume_inbox WHERE created_at >= CURRENT_DATE AND tenant_id = :tenant_id;"
+    );
+
+    const todayShortlisted = await queryTenant(
+      `SELECT COUNT(*)::int as count FROM candidate_activity_logs 
+       WHERE event_type = 'email_sent' AND created_at >= CURRENT_DATE AND tenant_id = :tenant_id;`
+    );
+
+    const todayAssessments = await queryTenant(
+      `SELECT COUNT(*)::int as count FROM candidate_activity_logs 
+       WHERE event_type = 'assessment_submitted' AND created_at >= CURRENT_DATE AND tenant_id = :tenant_id;`
+    );
+
+    const todayInterviews = await queryTenant(
+      `SELECT COUNT(*)::int as count FROM candidate_activity_logs 
+       WHERE event_type = 'interview_scheduled' AND created_at >= CURRENT_DATE AND tenant_id = :tenant_id;`
+    );
+
+    // 3. Recent Pipeline Events (last 20)
+    const recentEvents = await queryTenant(
+      `SELECT cal.event_type, cal.message, cal.created_at, c.name as candidate_name
+       FROM candidate_activity_logs cal
+       LEFT JOIN candidates c ON cal.candidate_id = c.id
+       WHERE cal.tenant_id = :tenant_id
+       ORDER BY cal.created_at DESC
+       LIMIT 20;`
+    );
+
+    // 4. Stage Score Distribution
+    const scoreDistribution = await queryTenant(
+      `SELECT 
+         COUNT(CASE WHEN final_score >= 80 THEN 1 END)::int as excellent,
+         COUNT(CASE WHEN final_score >= 60 AND final_score < 80 THEN 1 END)::int as good,
+         COUNT(CASE WHEN final_score >= 40 AND final_score < 60 THEN 1 END)::int as average,
+         COUNT(CASE WHEN final_score < 40 AND final_score IS NOT NULL THEN 1 END)::int as below_average
+       FROM candidates WHERE tenant_id = :tenant_id AND final_score IS NOT NULL;`
+    );
+
+    res.json({
+      success: true,
+      pipeline: {
+        funnel: {
+          emailsSynced: emailsSynced.rows[0]?.count || 0,
+          resumesParsed: resumesParsed.rows[0]?.count || 0,
+          shortlisted: shortlisted.rows[0]?.count || 0,
+          assessmentsSent: assessmentsSent.rows[0]?.count || 0,
+          assessmentsCompleted: assessmentsCompleted.rows[0]?.count || 0,
+          qualified: qualified.rows[0]?.count || 0,
+          interviewsScheduled: interviewsScheduled.rows[0]?.count || 0,
+          hired: hired.rows[0]?.count || 0,
+          rejected: rejected.rows[0]?.count || 0,
+          inReview: inReview.rows[0]?.count || 0
+        },
+        today: {
+          resumes: todayResumes.rows[0]?.count || 0,
+          shortlisted: todayShortlisted.rows[0]?.count || 0,
+          assessmentsCompleted: todayAssessments.rows[0]?.count || 0,
+          interviewsScheduled: todayInterviews.rows[0]?.count || 0
+        },
+        recentEvents: recentEvents.rows.map((e: any) => ({
+          type: e.event_type,
+          message: e.message,
+          candidateName: e.candidate_name,
+          timestamp: e.created_at
+        })),
+        scoreDistribution: scoreDistribution.rows[0] || { excellent: 0, good: 0, average: 0, below_average: 0 }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

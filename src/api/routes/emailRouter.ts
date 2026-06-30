@@ -44,7 +44,8 @@ async function getTenantTransporter(tenantId: string) {
               user: username,
               pass: decryptedPassword,
             },
-          }),
+            family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+          } as any),
           from: fromHeader,
           replyTo: replyTo || undefined,
         };
@@ -157,7 +158,12 @@ router.post("/settings", async (req: any, res: any, next: any) => {
       replyTo,
       logoUrl, 
       primaryColor, 
-      emailFooter 
+      emailFooter,
+      // INCOMING CONFIGURATION FIELDS
+      rules,
+      incomingSyncEnabled,
+      incomingProvider,
+      incomingFolder
     } = req.body;
 
     const resolvedUsername = username || user;
@@ -195,7 +201,12 @@ router.post("/settings", async (req: any, res: any, next: any) => {
       host: host || "",
       port: port || 587,
       fromName: fromName || "",
-      replyTo: replyTo || ""
+      replyTo: replyTo || "",
+      // Add incoming sync configurations
+      rules: rules || existingConfig.rules || undefined,
+      incomingSyncEnabled: incomingSyncEnabled !== undefined ? incomingSyncEnabled : existingConfig.incomingSyncEnabled,
+      incomingProvider: incomingProvider || existingConfig.incomingProvider || undefined,
+      incomingFolder: incomingFolder || existingConfig.incomingFolder || undefined
     };
 
     await queryTenant(
@@ -483,7 +494,8 @@ router.post("/send", async (req: any, res: any, next: any) => {
           port,
           secure: port === 465,
           auth: { user, pass },
-        });
+          family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+        } as any);
         await globalTransporter.sendMail({
           from: fromAddress,
           to: candidate.email,
@@ -512,6 +524,103 @@ router.post("/send", async (req: any, res: any, next: any) => {
       success: true,
       message: `${emailType} email sent successfully to ${candidate.email}`,
       historyId,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/email/test-routing
+ * Tests a sample email subject line and body against current tenant regex rules.
+ */
+router.post("/test-routing", async (req: any, res: any, next: any) => {
+  try {
+    const { subject, body } = req.body;
+    if (!subject) {
+      res.status(400).json({ error: "Subject line is required to test routing." });
+      return;
+    }
+
+    const tenantId = getTenantContext()?.tenantId || "default-tenant";
+
+    // Retrieve rules
+    const tenantRes = await queryTenant(
+      "SELECT email_config FROM tenants WHERE id = :tenant_id LIMIT 1;"
+    );
+    const emailConfig = tenantRes.rows[0]?.email_config || {};
+    const rules = emailConfig.rules || [
+      {
+        type: "resume",
+        name: "Default Resume Application",
+        subjectRegex: "(?i)applying\\s*for|job\\s*application|resume\\s*for|cv\\s*for",
+        titleRegex: "(?i)(?:applying\\s*for|job\\s*application|resume\\s*for|cv\\s*for)\\s*[:-]?\\s*(.+)"
+      },
+      {
+        type: "jd",
+        name: "Default Job Description Ingest",
+        subjectRegex: "(?i)job\\s*description|new\\s*jd|post\\s*job|hiring\\s*for",
+        titleRegex: "(?i)(?:job\\s*description|new\\s*jd|post\\s*job|hiring\\s*for)\\s*[:-]?\\s*(.+)"
+      }
+    ];
+
+    let matchedRule: any = null;
+    let jobTitleExtracted = "";
+    let matchDetails: any = null;
+
+    const matchHelper = (pattern: string, text: string) => {
+      try {
+        let flags = "i";
+        let cleanPattern = pattern;
+        if (pattern.startsWith("(?i)")) {
+          cleanPattern = pattern.substring(4);
+        }
+        return text.match(new RegExp(cleanPattern, flags));
+      } catch (err) {
+        return null;
+      }
+    };
+
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      const isMatch = matchHelper(rule.subjectRegex, subject);
+      if (isMatch) {
+        matchedRule = rule;
+        matchDetails = {
+          ruleIndex: i,
+          ruleName: rule.name || `Rule #${i + 1}`,
+          ruleType: rule.type,
+          subjectRegexUsed: rule.subjectRegex,
+          matchResult: isMatch[0]
+        };
+
+        if (rule.titleRegex) {
+          const titleMatch = matchHelper(rule.titleRegex, subject);
+          if (titleMatch && titleMatch[1]) {
+            jobTitleExtracted = titleMatch[1].trim();
+          }
+        }
+        break;
+      }
+    }
+
+    const urlRegex = /(https?:\/\/(?:drive\.google\.com|dropbox\.com|onedrive\.live\.com|docs\.google\.com)\/[^\s"'>]+)/gi;
+    const extractedLinks = body ? (body.match(urlRegex) || []) : [];
+
+    res.json({
+      success: true,
+      matched: !!matchedRule,
+      classification: matchedRule ? matchedRule.type : "unclassified",
+      jobTitleExtracted: jobTitleExtracted || null,
+      matchDetails,
+      extractedLinks,
+      actionToTake: matchedRule 
+        ? (matchedRule.type === "jd" 
+            ? "Create a new Job profile using AI Job Description parser." 
+            : `Parse attached resume(s) and associate candidate with Job: "${jobTitleExtracted || "General Intake"}"`)
+        : (extractedLinks.length > 0 
+            ? "Inspect body resume links and parse as unassigned Resume Application."
+            : "Store unclassified email without taking automated actions.")
     });
   } catch (err) {
     next(err);

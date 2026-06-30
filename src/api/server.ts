@@ -29,7 +29,10 @@ import kekaRouter from "../integrations/keka/routes/keka.routes.js";
 import zohoRouter from "../integrations/zoho/routes/zoho.routes.js";
 import "../lib/initDb.js";
 import cron from "node-cron";
+import { Worker, Job } from "bullmq";
 import { redisClient, isRedisConnected } from "./middleware/security.js";
+import { connection } from "./queue.js";
+import { parseAndEvalResume } from "../worker/resumeWorker.js";
 dotenv.config();
 
 async function runWithLock(lockKey: string, lockTtlSeconds: number, task: () => Promise<void>) {
@@ -141,14 +144,16 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
   });
 });
 
-// Twice-daily background job to sync emails for all tenants (Lock TTL = 1 hour)
-cron.schedule("0 9,21 * * *", () => { // Run at 9 AM and 9 PM daily
-  runWithLock("cron:email-sync-all-tenants", 3600, async () => {
+// ═══════════════════════════════════════════════════════════════════════════
+// 🤖 AUTONOMOUS PIPELINE: Email Sync (every 5 minutes) + Inline Resume Worker
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Email sync runs every 5 minutes for near-real-time ingestion (Lock TTL = 4 min)
+cron.schedule("*/5 * * * *", () => {
+  runWithLock("cron:email-sync-all-tenants", 240, async () => {
     try {
       const { queryGlobal } = await import("../lib/tenantDb.js");
       const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
-      
-      console.log("✉️ [Email Sync Job] Starting twice-daily email sync for all tenants...");
       
       const tenantsRes = await queryGlobal(
         "SELECT id, email_config FROM tenants WHERE email_config IS NOT NULL;"
@@ -161,23 +166,64 @@ cron.schedule("0 9,21 * * *", () => { // Run at 9 AM and 9 PM daily
         const config = tenant.email_config;
         const provider = config?.provider;
         
-        if (provider && provider !== "mock") {
+        if (provider) {
           try {
-            console.log(`✉️ [Email Sync Job] Syncing ${provider} for tenant ${tenantId}...`);
             const count = await EmailSyncService.syncMailbox(tenantId, provider);
+            if (count > 0) {
+              console.log(`✉️ [Auto-Sync] Ingested ${count} item(s) for tenant ${tenantId} via ${provider}`);
+            }
             totalIngested += count;
           } catch (err: any) {
-            console.error(`🚨 [Email Sync Job] Failed syncing for tenant ${tenantId}:`, err.message || err);
+            console.error(`🚨 [Auto-Sync] Failed for tenant ${tenantId}:`, err.message || err);
           }
         }
       }
       
-      console.log(`✉️ [Email Sync Job] Finished email sync. Total resumes ingested: ${totalIngested}`);
+      if (totalIngested > 0) {
+        console.log(`✉️ [Auto-Sync] Cycle complete. Total ingested: ${totalIngested}`);
+      }
     } catch (err) {
-      console.error("🚨 [Email Sync Job] Twice-daily email sync failed:", err);
+      console.error("🚨 [Auto-Sync] Email sync cycle failed:", err);
     }
   });
 });
+
+// Boot inline BullMQ Resume Worker — processes queue items automatically
+try {
+  const inlineResumeWorker = new Worker(
+    "resume-eval-queue",
+    async (job: Job) => {
+      const { tenantId, inboxId, filePath, mimeType, jobId: targetJobId } = job.data as {
+        tenantId: string;
+        inboxId: string;
+        filePath: string;
+        mimeType: string;
+        jobId?: string;
+      };
+      console.log(`🤖 [Pipeline Worker] Processing inbox ${inboxId} for tenant ${tenantId}...`);
+      await parseAndEvalResume(tenantId, inboxId, filePath, mimeType, targetJobId);
+      console.log(`✅ [Pipeline Worker] Finished processing inbox ${inboxId}`);
+    },
+    { connection }
+  );
+
+  inlineResumeWorker.on("failed", (job, err) => {
+    console.error(`❌ [Pipeline Worker] Job ${job?.id} failed:`, err);
+  });
+
+  console.log("🤖 [Autonomous Pipeline] Inline Resume Worker booted — listening on BullMQ queue 'resume-eval-queue'");
+} catch (workerErr) {
+  console.error("🚨 [Autonomous Pipeline] Failed to boot inline resume worker:", workerErr);
+}
+
+console.log("\n" + "═".repeat(70));
+console.log("🤖 AUTONOMOUS RECRUITMENT PIPELINE ACTIVE");
+console.log("   📧 Email Sync: Every 5 minutes (all tenants)");
+console.log("   📄 Resume Parse + AI Score: Automatic via BullMQ worker");
+console.log("   🧪 Assessment: Auto-generated MCQs via DeepSeek API");
+console.log("   📊 Scoring: Resume×40% + Assessment×60%");
+console.log("   📧 HR Interview: Auto-scheduled for score ≥ 80%");
+console.log("═".repeat(70) + "\n");
 
 const PORT = Number(process.env.PORT) || 4000;
 app.listen(PORT, "0.0.0.0", () => {

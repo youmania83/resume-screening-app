@@ -723,15 +723,26 @@ router.post("/submit", async (req: any, res: any) => {
         try {
           let hrEmail = "yogeshkumarwadhwa@localhost.com";
           try {
-            const ownerRes = await queryGlobal(
-              `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
+            // Priority 1: Check tenant's configured HR Manager email
+            const tenantCfgRes = await queryGlobal(
+              `SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;`,
               [candidate.tenant_id]
             );
-            if (ownerRes.rowCount && ownerRes.rowCount > 0) {
-              hrEmail = ownerRes.rows[0].email;
+            const emailCfg = tenantCfgRes.rows[0]?.email_config;
+            if (emailCfg?.hrManagerEmail) {
+              hrEmail = emailCfg.hrManagerEmail;
+            } else {
+              // Priority 2: Fall back to tenant owner email
+              const ownerRes = await queryGlobal(
+                `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
+                [candidate.tenant_id]
+              );
+              if (ownerRes.rowCount && ownerRes.rowCount > 0) {
+                hrEmail = ownerRes.rows[0].email;
+              }
             }
           } catch (dbErr) {
-            console.error("Failed to lookup tenant owner email, falling back to default:", dbErr);
+            console.error("Failed to lookup HR manager email, falling back to default:", dbErr);
           }
 
           await sendInterviewScheduleEmail({

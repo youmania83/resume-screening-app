@@ -41,7 +41,8 @@ router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, r
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
           },
-          timeout: 2000 // fast verification
+          timeout: 2000, // fast verification
+          family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
         } as any);
         await transporter.verify();
         emailStatus = "connected";
