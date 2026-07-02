@@ -1,7 +1,7 @@
 import React from "react";
 import { Clock, ShieldAlert, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/src/components/ui/badge";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 
 interface Question {
   id: string;
@@ -63,12 +63,19 @@ export default function ExamInterface({
     };
   }, []);
 
+  const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+
   const handleSubmitClick = () => {
     if (!isOnline) {
-      alert("⚠️ You are currently offline. Please restore your internet connection before submitting your assessment so your answers can be graded.");
+      toast.error("You are currently offline. Please restore your internet connection before submitting your assessment.");
       return;
     }
-    submitAssessment(false);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowConfirmModal(false);
+    submitAssessment(true);
   };
 
   const formatTime = (secs: number) => {
@@ -326,6 +333,39 @@ export default function ExamInterface({
         🛡️ Rison AI Secure Proctor System. Text selection, copy, paste, and right-clicks are disabled. Avoid exiting
         fullscreen mode.
       </footer>
+
+      {/* CUSTOM CONFIRM MODAL */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="h-10 w-10 bg-amber-50 rounded-full border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <h3 className="text-base font-bold text-slate-900">Submit Assessment?</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Are you sure you want to end and submit your test? Once submitted, your answers will be locked, and your final score will be graded. You cannot return to the test.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-md"
+              >
+                Yes, Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
