@@ -1,5 +1,6 @@
 // src/api/routes/emailRouter.ts
 import { Router } from "express";
+import dns from "dns";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import fs from "fs";
@@ -35,16 +36,91 @@ async function getTenantTransporter(tenantId: string) {
 
         const fromHeader = fromName ? `"${fromName}" <${username}>` : username;
 
+        if (config.provider === "resend") {
+          const transporter = {
+            sendMail: async (mailParams: any) => {
+              console.log(`[Resend HTTP API] Dispatching email to ${mailParams.to}`);
+              const response = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${decryptedPassword}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  from: mailParams.from || fromHeader,
+                  to: Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to],
+                  subject: mailParams.subject,
+                  html: mailParams.html,
+                  reply_to: replyTo || undefined
+                })
+              });
+              if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Resend API Error: ${errText}`);
+              }
+              return await response.json();
+            }
+          };
+          return { transporter, from: fromHeader, replyTo };
+        }
+
+        if (config.provider === "sendgrid") {
+          const transporter = {
+            sendMail: async (mailParams: any) => {
+              console.log(`[SendGrid HTTP API] Dispatching email to ${mailParams.to}`);
+              const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${decryptedPassword}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  personalizations: [{
+                    to: (Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to]).map((email: string) => ({ email }))
+                  }],
+                  from: {
+                    email: username,
+                    name: fromName || undefined
+                  },
+                  reply_to: replyTo ? { email: replyTo } : undefined,
+                  subject: mailParams.subject,
+                  content: [{
+                    type: "text/html",
+                    value: mailParams.html
+                  }]
+                })
+              });
+              if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`SendGrid API Error: ${errText}`);
+              }
+              return {};
+            }
+          };
+          return { transporter, from: fromHeader, replyTo };
+        }
+
+        const resolvedIp = await new Promise<string>((resolve, reject) => {
+          dns.lookup(host, { family: 4 }, (err, address) => {
+            if (err) reject(err);
+            else resolve(address);
+          });
+        });
+
         return {
           transporter: nodemailer.createTransport({
-            host,
+            host: resolvedIp,
             port,
             secure: port === 465,
             auth: {
               user: username,
               pass: decryptedPassword,
             },
-            family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
+            connectionTimeout: 10000, // 10s connection timeout
+            socketTimeout: 10000, // 10s socket timeout
+            tls: {
+              servername: host
+            }
           } as any),
           from: fromHeader,
           replyTo: replyTo || undefined,

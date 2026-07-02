@@ -1,4 +1,7 @@
 // src/api/server.ts
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -164,13 +167,14 @@ cron.schedule("*/5 * * * *", () => {
       for (const tenant of tenantsRes.rows) {
         const tenantId = tenant.id;
         const config = tenant.email_config;
-        const provider = config?.provider;
+        const incomingSyncEnabled = config?.incomingSyncEnabled === true;
+        const incomingProvider = config?.incomingProvider;
         
-        if (provider) {
+        if (incomingSyncEnabled && incomingProvider) {
           try {
-            const count = await EmailSyncService.syncMailbox(tenantId, provider);
+            const count = await EmailSyncService.syncMailbox(tenantId, incomingProvider);
             if (count > 0) {
-              console.log(`✉️ [Auto-Sync] Ingested ${count} item(s) for tenant ${tenantId} via ${provider}`);
+              console.log(`✉️ [Auto-Sync] Ingested ${count} item(s) for tenant ${tenantId} via ${incomingProvider}`);
             }
             totalIngested += count;
           } catch (err: any) {
@@ -187,6 +191,43 @@ cron.schedule("*/5 * * * *", () => {
     }
   });
 });
+
+// Zoho Mail sync runs every 5 minutes if enabled (Lock TTL = 4 min)
+cron.schedule("*/5 * * * *", () => {
+  runWithLock("cron:zoho-mail-sync", 240, async () => {
+    try {
+      const { zohoConfig } = await import("../integrations/zoho/config/zoho.config.js");
+      if (zohoConfig.enabled) {
+        const { zohoMailService } = await import("../integrations/zoho/services/zohoMail.service.js");
+        console.log("⏰ [Cron] Starting automatic Zoho Mail sync...");
+        const result = await zohoMailService.syncInbox();
+        console.log(`✅ [Cron] Zoho Mail sync complete. Synced: ${result.syncedCandidatesCount}, Errors: ${result.errors.length}`);
+      }
+    } catch (err: any) {
+      console.error("🚨 [Cron] Zoho Mail sync failed:", err.message || err);
+    }
+  });
+});
+
+// Keka jobs and candidates sync runs hourly if enabled (Lock TTL = 30 min)
+cron.schedule("0 * * * *", () => {
+  runWithLock("cron:keka-sync", 1800, async () => {
+    try {
+      const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
+      if (isKekaEnabled()) {
+        const { kekaJobsService } = await import("../integrations/keka/services/jobs.service.js");
+        const { kekaCandidatesService } = await import("../integrations/keka/services/candidates.service.js");
+        console.log("⏰ [Cron] Starting Keka jobs & candidates sync...");
+        await kekaJobsService.syncJobsFromKeka();
+        await kekaCandidatesService.syncCandidatesFromKeka();
+        console.log("✅ [Cron] Keka sync complete.");
+      }
+    } catch (err: any) {
+      console.error("🚨 [Cron] Keka sync failed:", err.message || err);
+    }
+  });
+});
+
 
 // Boot inline BullMQ Resume Worker — processes queue items automatically
 try {

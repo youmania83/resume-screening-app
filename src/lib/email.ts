@@ -1,5 +1,6 @@
 // src/lib/email.ts
 import nodemailer from "nodemailer";
+import dns from "dns";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
@@ -12,7 +13,7 @@ import { zohoMailService } from "../integrations/zoho/services/zohoMail.service"
 dotenv.config();
 
 // Create SMTP transporter using env variables
-const getTransporter = () => {
+const getTransporter = async () => {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT) || 587;
   const user = process.env.SMTP_USER;
@@ -23,16 +24,32 @@ const getTransporter = () => {
     return null;
   }
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true for 465, false for other ports
-    auth: {
-      user,
-      pass,
-    },
-    family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
-  } as any);
+  try {
+    const resolvedIp = await new Promise<string>((resolve, reject) => {
+      dns.lookup(host, { family: 4 }, (err, address) => {
+        if (err) reject(err);
+        else resolve(address);
+      });
+    });
+
+    return nodemailer.createTransport({
+      host: resolvedIp,
+      port,
+      secure: port === 465, // true for 465, false for other ports
+      auth: {
+        user,
+        pass,
+      },
+      connectionTimeout: 10000, // 10s connection timeout
+      socketTimeout: 10000, // 10s socket timeout
+      tls: {
+        servername: host
+      }
+    } as any);
+  } catch (err) {
+    console.error(`Failed to resolve SMTP host ${host} to IPv4:`, err);
+    return null;
+  }
 };
 
 const FROM_EMAIL = process.env.SMTP_FROM || '"Rison AI Recruitment" <recruiting@risonai.tech>';
@@ -90,21 +107,99 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
           ? JSON.parse(res.rows[0].email_config)
           : res.rows[0].email_config;
 
-        if (config && config.host && config.username) {
+        if (config && config.username) {
           const decryptedPass = decrypt(config.password || config.pass || "");
-          const transporter = nodemailer.createTransport({
-            host: config.host,
-            port: Number(config.port) || 587,
-            secure: Number(config.port) === 465,
-            auth: {
-              user: config.username,
-              pass: decryptedPass
-            },
-            family: 4 // Force IPv4 connection to prevent IPv6 network unreachable errors
-          } as any);
           const fromName = config.fromName || "Rison AI Recruitment";
           const fromEmail = `"${fromName}" <${config.username}>`;
-          return { transporter, fromEmail };
+
+          if (config.provider === "resend") {
+            const transporter = {
+              sendMail: async (mailParams: any) => {
+                console.log(`[Resend HTTP API] Dispatching email to ${mailParams.to}`);
+                const response = await fetch("https://api.resend.com/emails", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${decryptedPass}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    from: mailParams.from || fromEmail,
+                    to: Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to],
+                    subject: mailParams.subject,
+                    html: mailParams.html,
+                    reply_to: config.replyTo || undefined
+                  })
+                });
+                if (!response.ok) {
+                  const errText = await response.text();
+                  throw new Error(`Resend API Error: ${errText}`);
+                }
+                return await response.json();
+              }
+            };
+            return { transporter, fromEmail };
+          }
+
+          if (config.provider === "sendgrid") {
+            const transporter = {
+              sendMail: async (mailParams: any) => {
+                console.log(`[SendGrid HTTP API] Dispatching email to ${mailParams.to}`);
+                const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${decryptedPass}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    personalizations: [{
+                      to: (Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to]).map((email: string) => ({ email }))
+                    }],
+                    from: {
+                      email: config.username,
+                      name: fromName || undefined
+                    },
+                    reply_to: config.replyTo ? { email: config.replyTo } : undefined,
+                    subject: mailParams.subject,
+                    content: [{
+                      type: "text/html",
+                      value: mailParams.html
+                    }]
+                  })
+                });
+                if (!response.ok) {
+                  const errText = await response.text();
+                  throw new Error(`SendGrid API Error: ${errText}`);
+                }
+                return {};
+              }
+            };
+            return { transporter, fromEmail };
+          }
+
+          if (config.host) {
+            const resolvedIp = await new Promise<string>((resolve, reject) => {
+              dns.lookup(config.host, { family: 4 }, (err, address) => {
+                if (err) reject(err);
+                else resolve(address);
+              });
+            });
+
+            const transporter = nodemailer.createTransport({
+              host: resolvedIp,
+              port: Number(config.port) || 587,
+              secure: Number(config.port) === 465,
+              auth: {
+                user: config.username,
+                pass: decryptedPass
+              },
+              connectionTimeout: 10000, // 10s connection timeout
+              socketTimeout: 10000, // 10s socket timeout
+              tls: {
+                servername: config.host
+              }
+            } as any);
+            return { transporter, fromEmail };
+          }
         }
       }
     } catch (err) {
@@ -113,7 +208,7 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
   }
 
   // Fallback to env config
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   return { transporter, fromEmail: FROM_EMAIL };
 }
 

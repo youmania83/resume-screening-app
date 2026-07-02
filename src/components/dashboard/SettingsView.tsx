@@ -18,7 +18,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   // SMTP Settings State
   const [smtpProvider, setSmtpProvider] = useState("gmail");
   const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
-  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpPort, setSmtpPort] = useState(465);
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFromName, setSmtpFromName] = useState("");
@@ -147,13 +147,19 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
     setSmtpProvider(prov);
     if (prov === "gmail") {
       setSmtpHost("smtp.gmail.com");
-      setSmtpPort(587);
+      setSmtpPort(465);
     } else if (prov === "outlook") {
       setSmtpHost("smtp.office365.com");
-      setSmtpPort(587);
+      setSmtpPort(465);
     } else if (prov === "zoho") {
       setSmtpHost("smtp.zoho.com");
       setSmtpPort(465);
+    } else if (prov === "resend") {
+      setSmtpHost("api.resend.com (HTTPS)");
+      setSmtpPort(443);
+    } else if (prov === "sendgrid") {
+      setSmtpHost("api.sendgrid.com (HTTPS)");
+      setSmtpPort(443);
     }
   };
 
@@ -712,9 +718,11 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                   onChange={(e) => handleProviderChange(e.target.value)}
                   className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-semibold outline-none text-[11px] text-foreground"
                 >
-                  <option value="gmail">Gmail SMTP</option>
-                  <option value="outlook">Outlook SMTP</option>
+                  <option value="resend">Resend API (Recommended — No App Password Needed)</option>
+                  <option value="gmail">Gmail SMTP (Requires App Password)</option>
                   <option value="zoho">Zoho Mail SMTP</option>
+                  <option value="outlook">Outlook / Office 365 SMTP</option>
+                  <option value="sendgrid">SendGrid API</option>
                   <option value="custom">Custom SMTP Server</option>
                 </select>
               </div>
@@ -744,7 +752,9 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Username / Email</span>
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+                    {smtpProvider === "resend" || smtpProvider === "sendgrid" ? "Sender Email Address" : "Username / Email"}
+                  </span>
                   <input
                     type="email"
                     placeholder="recruiting@yourdomain.com"
@@ -754,10 +764,12 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Password / App Key</span>
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+                    {smtpProvider === "resend" || smtpProvider === "sendgrid" ? "API Key" : "Password / App Key"}
+                  </span>
                   <input
                     type="password"
-                    placeholder="••••••••••••"
+                    placeholder={smtpProvider === "resend" || smtpProvider === "sendgrid" ? "re_..." : "••••••••••••"}
                     value={smtpPassword}
                     onChange={(e) => setSmtpPassword(e.target.value)}
                     className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none"

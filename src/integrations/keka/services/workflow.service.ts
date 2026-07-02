@@ -277,13 +277,22 @@ export class KekaWorkflowService {
     }
     const { name, email, job_id: jobId, title: jobTitle, description: jobDesc } = candRes.rows[0];
 
-    if (aiScore < 80) {
+    if (aiScore < 60) {
       targetStage = "Rejected";
       status = "rejected";
-      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 80). Moved to Rejected Pool in Keka.`;
+      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 60). Moved to Rejected Pool in Keka.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Rejected");
+      await query(`UPDATE candidates SET status = 'rejected' WHERE id = $1;`, [candidateId]);
     } 
+    else if (aiScore < 80) {
+      targetStage = "HR Review";
+      status = "Review";
+      activityLog = `Candidate placed on Hold (Score ${aiScore}/100 is between 60 and 79). Moved to HR Review in Keka.`;
+      
+      await kekaApplicationsService.moveCandidateStage(candidateId, "HR Review");
+      await query(`UPDATE candidates SET status = 'Review' WHERE id = $1;`, [candidateId]);
+    }
     else {
       targetStage = "Assessment";
       status = "shortlisted";
@@ -312,6 +321,7 @@ export class KekaWorkflowService {
         await kekaAssessmentService.sendAssessmentEmail(candidateId, name, email, jobTitle, token);
       }
     }
+
 
     // Log the action to activity logs
     await query(`

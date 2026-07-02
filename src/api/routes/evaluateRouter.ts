@@ -10,7 +10,7 @@ import { ensureJobAssessment } from "../../lib/assessmentService.js";
 import { sendAssessmentInviteEmail } from "../../lib/email.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
-import { getTenantContext } from "../../lib/tenantContext.js";
+import { getTenantContext, tenantStorage } from "../../lib/tenantContext.js";
 import { detectPromptInjection } from "../../lib/guardrails.js";
 import { rateLimiter } from "../middleware/security.js";
 
@@ -67,7 +67,12 @@ Do not include markdown code block formatting or explanations outside the JSON.`
 }
 
 router.post("/", rateLimiter(1 * 60 * 1000, 10), creditCheck("ai_screen"), upload.single("file"), async (req: any, res: any, next: any) => {
-  try {
+  const tenantId = req.user?.tenantId || req.headers["x-tenant-id"] || "default-tenant";
+  const userId = req.user?.userId || "system";
+  const role = req.user?.role || "owner";
+
+  await tenantStorage.run({ tenantId, userId, role }, async () => {
+    try {
     const { jobDescription } = req.body as { jobDescription: string };
     if (jobDescription && detectPromptInjection(jobDescription)) {
        res.status(400).json({ error: "Security Alert: Potential prompt injection detected in Job Description." });
@@ -222,20 +227,25 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     let assessmentTokenExpiry = null;
     let assessmentStatusVal = null;
 
-    if (score < 80) {
+    if (score < 60) {
       status = "rejected";
       kekaStatus = "rejected_pool";
-      logMessage = `Candidate automatically rejected (Score ${score}/100 < 80). Moved to Rejected Pool in Keka HRMS.`;
+      logMessage = `Candidate automatically rejected (Score ${score}/100 < 60). Moved to Rejected Pool in Keka HRMS.`;
+    } else if (score < 80) {
+      status = "Review";
+      kekaStatus = "active";
+      logMessage = `Candidate placed on Hold / HR Review (Score ${score}/100 is between 60 and 79).`;
     } else {
       status = "shortlisted";
       kekaStatus = "active";
-      logMessage = `Candidate details logged (Score ${score}/100 >= 80). Assessment invitation automatically sent via email.`;
+      logMessage = `Candidate qualified for assessment (Score ${score}/100 >= 80). Assessment invitation automatically sent via email.`;
       
       assessmentToken = crypto.randomBytes(24).toString("hex");
       assessmentTokenExpiry = new Date();
       assessmentTokenExpiry.setDate(assessmentTokenExpiry.getDate() + 7);
       assessmentStatusVal = "pending";
     }
+
 
     const activityLogs = [
       { date: new Date().toISOString(), message: `Application received through ${applicationSource}` },
@@ -295,7 +305,7 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       );
       await queryTenant(
         `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) VALUES ($1, $2, $3, :tenant_id);`,
-        [candidateId, score < 80 ? "keka_rejected" : "email_sent", logMessage]
+        [candidateId, score < 60 ? "keka_rejected" : (score < 80 ? "stage_changed" : "email_sent"), logMessage]
       );
 
       if (score >= 80 && assessmentToken && assessmentTokenExpiry) {
@@ -335,9 +345,10 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       }
     });
 
-  } catch (err: any) {
-    next(err);
-  }
+    } catch (err: any) {
+      next(err);
+    }
+  });
 });
 
 export default router;

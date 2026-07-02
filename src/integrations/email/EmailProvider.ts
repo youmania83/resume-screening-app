@@ -183,7 +183,7 @@ export class EmailSyncManager {
       case "mock":
         return new MockEmailProvider();
       default:
-        return new MockEmailProvider();
+        throw new Error(`Unsupported incoming email sync provider: ${providerType}`);
     }
   }
 }

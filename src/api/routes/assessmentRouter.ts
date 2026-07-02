@@ -754,6 +754,7 @@ router.post("/submit", async (req: any, res: any) => {
             finalScore,
             scheduledDate: interviewDate,
             hrEmail,
+            tenantId: candidate.tenant_id,
           });
         } catch (mailErr) {
           console.error("⚠️ [Side-Effect] Failed to trigger automated interview emails:", mailErr);

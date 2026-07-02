@@ -1,4 +1,7 @@
 // src/worker/resumeWorker.ts
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import { Worker, Job } from "bullmq";
 import fs from "fs";
 import path from "path";
@@ -445,7 +448,7 @@ export async function parseAndEvalResume(
           await queryGlobal(
              `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
               VALUES ($1, 'email_sent', $2, $3);`,
-            [candidateId, `Candidate details logged (Score ${highestMatchScore}/100 >= 80). Assessment invitation automatically sent via email.`, tenantId]
+            [candidateId, `Candidate qualified for assessment (Score ${highestMatchScore}/100 >= 80). Assessment invitation automatically sent via email.`, tenantId]
           );
 
           await queryGlobal(
@@ -475,6 +478,29 @@ export async function parseAndEvalResume(
           } catch (err: any) {
             console.error(`[Worker] Failed to generate/send assessment for candidate ${candidateId}:`, err);
           }
+        } else if (highestMatchScore >= 60) {
+          // Hold / HR Review stage
+          await queryGlobal(
+            `UPDATE candidates 
+             SET status = 'Review', 
+                 job_id = $1, 
+                 score = $2, 
+                 match_percent = $2
+             WHERE id = $3;`,
+            [matchedJobId, highestMatchScore, candidateId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+             VALUES ($1, 'stage_changed', $2, $3);`,
+            [candidateId, `Candidate placed on Hold / HR Review (Score ${highestMatchScore}/100 is between 60 and 79).`, tenantId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+             VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', 'Candidate placed on Hold for manual review with match score: ' || $4 || '/100.');`,
+            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
+          );
         } else {
           // Reject candidate
           await queryGlobal(
@@ -490,7 +516,7 @@ export async function parseAndEvalResume(
           await queryGlobal(
             `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
              VALUES ($1, 'keka_rejected', $2, $3);`,
-            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 80).`, tenantId]
+            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 60).`, tenantId]
           );
 
           await queryGlobal(

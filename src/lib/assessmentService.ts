@@ -454,7 +454,7 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
     return selectFallbackQuestions(jobTitle);
   }
 
-  const prompt = `You are a senior recruiter and domain expert. Analyze the following Job Description and generate a comprehensive assessment of 10 Multiple Choice Questions (MCQs) for this role.
+  const prompt = `You are a senior psychometrician and domain expert designing a professional hiring assessment. Analyze the following Job Description and generate 10 high-quality Multiple Choice Questions (MCQs).
 
 Job Title: ${jobTitle}
 Job Description:
@@ -473,6 +473,19 @@ Generate exactly 10 questions meeting these requirements:
   * Medium (4 questions)
   * Hard (3 questions)
 
+CRITICAL RULES FOR OPTION QUALITY (MOST IMPORTANT):
+1. ALL 4 OPTIONS MUST BE PLAUSIBLE AND PROFESSIONAL. Every wrong answer (distractor) must sound like a reasonable answer that someone with partial knowledge might pick. NEVER include joke answers, absurd options, or obviously irrelevant choices.
+2. DISTRACTORS MUST BE DOMAIN-RELEVANT. Wrong options should come from the same field/domain as the correct answer. For example, if the question is about a React hook, all 4 options should be real React hooks or concepts — not unrelated terms.
+3. SIMILAR LENGTH AND STRUCTURE. All 4 options should have similar sentence length and grammatical structure. The correct answer must NOT be noticeably longer, more detailed, or more 'complete-sounding' than the wrong answers. If the correct answer is a full sentence, make ALL options full sentences of similar length.
+4. NO GIVEAWAY PATTERNS. Avoid these common flaws:
+   - The correct answer being the only 'positive' or 'professional-sounding' option
+   - The correct answer being the longest or most detailed option
+   - Wrong options containing extreme words like 'never', 'always', 'immediately', 'all', 'none'
+   - Wrong options being obviously humorous, sarcastic, or unprofessional
+   - Wrong options referencing clearly unrelated fields (e.g. cooking terms in a tech question)
+5. RANDOMIZE CORRECT ANSWER POSITION. The correct answer should appear in different positions (A, B, C, or D) across questions — not always the first or second option.
+6. EACH DISTRACTOR SHOULD REPRESENT A COMMON MISCONCEPTION or a closely related but incorrect concept that tests whether the candidate truly understands the topic.
+
 CRITICAL RULES FOR JSON VALIDITY:
 1. Do NOT use double quotes inside your question texts or options (e.g., instead of "What does "SCM" mean?", write "What does 'SCM' mean?"). If you need quotes inside the text, use single quotes.
 2. Return ONLY a valid, parseable JSON object matching the structure below. Do not include markdown code block formatting (such as \`\`\`json), and do not include any text outside of the JSON.
@@ -490,7 +503,7 @@ JSON Structure:
   ]
 }
 
-Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging but fair, and professionally written.`;
+Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging but fair, and professionally written. The assessment should genuinely test domain expertise — not reading comprehension.`;
 
   try {
     const rawResponse = await callDeepSeek(prompt);
@@ -527,9 +540,16 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
           correctAnswer = options[0];
         }
 
+        // Shuffle options (Fisher-Yates) to randomize correct answer position
+        const shuffled = [...options];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
         return {
           questionText: q.questionText || "What is a key requirement of this role?",
-          options,
+          options: shuffled,
           correctAnswer,
           difficulty,
           topic
