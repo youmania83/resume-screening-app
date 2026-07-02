@@ -454,7 +454,7 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
     return selectFallbackQuestions(jobTitle);
   }
 
-  const prompt = `You are a senior psychometrician and domain expert designing a professional hiring assessment. Analyze the following Job Description and generate 10 high-quality Multiple Choice Questions (MCQs).
+  const prompt = `You are a senior psychometrician and domain expert designing a rigorous, elite hiring assessment. Analyze the following Job Description and generate 10 highly challenging, scenario-based Multiple Choice Questions (MCQs). The assessment should target senior-level domain expertise.
 
 Job Title: ${jobTitle}
 Job Description:
@@ -469,22 +469,16 @@ Generate exactly 10 questions meeting these requirements:
   * Role-specific skills (2 questions)
   * Industry knowledge (2 questions)
 - Difficulty distribution:
-  * Easy (3 questions)
   * Medium (4 questions)
-  * Hard (3 questions)
+  * Hard/Expert (6 questions) (Do not generate 'Easy' questions)
 
-CRITICAL RULES FOR OPTION QUALITY (MOST IMPORTANT):
-1. ALL 4 OPTIONS MUST BE PLAUSIBLE AND PROFESSIONAL. Every wrong answer (distractor) must sound like a reasonable answer that someone with partial knowledge might pick. NEVER include joke answers, absurd options, or obviously irrelevant choices.
-2. DISTRACTORS MUST BE DOMAIN-RELEVANT. Wrong options should come from the same field/domain as the correct answer. For example, if the question is about a React hook, all 4 options should be real React hooks or concepts — not unrelated terms.
-3. SIMILAR LENGTH AND STRUCTURE. All 4 options should have similar sentence length and grammatical structure. The correct answer must NOT be noticeably longer, more detailed, or more 'complete-sounding' than the wrong answers. If the correct answer is a full sentence, make ALL options full sentences of similar length.
-4. NO GIVEAWAY PATTERNS. Avoid these common flaws:
-   - The correct answer being the only 'positive' or 'professional-sounding' option
-   - The correct answer being the longest or most detailed option
-   - Wrong options containing extreme words like 'never', 'always', 'immediately', 'all', 'none'
-   - Wrong options being obviously humorous, sarcastic, or unprofessional
-   - Wrong options referencing clearly unrelated fields (e.g. cooking terms in a tech question)
-5. RANDOMIZE CORRECT ANSWER POSITION. The correct answer should appear in different positions (A, B, C, or D) across questions — not always the first or second option.
-6. EACH DISTRACTOR SHOULD REPRESENT A COMMON MISCONCEPTION or a closely related but incorrect concept that tests whether the candidate truly understands the topic.
+CRITICAL RULES FOR QUESTION & OPTION QUALITY (MOST IMPORTANT):
+1. NO TRIVIAL OR DEFINITIONAL QUESTIONS: Forbid simple questions like 'What is the definition of X?' or 'What does Y stand for?'. Instead, design complex, real-world troubleshooting scenarios, architectural trade-off evaluations, or debugging/diagnostic situations.
+2. DISTRACTORS MUST BE EXTREMELY PLAUSIBLE: Wrong answers must represent common industry mistakes, subtle misconceptions, or syntactically valid but logically flawed options. A candidate without deep expertise must find all 4 options equally convincing.
+3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure, detail level, and length. The correct answer must NOT be longer or more detailed than the distractors.
+4. INCORRECT OPTIONS MUST BE REAL TERMS: Never use made-up words or joke choices. Wrong answers should be real concepts in the domain used incorrectly in this specific scenario.
+5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D) across questions.
+6. NO GIVEAWAY PATTERNS: Do not use words like 'never', 'always', 'all of the above', or 'none of the above' in wrong answers.
 
 CRITICAL RULES FOR JSON VALIDITY:
 1. Do NOT use double quotes inside your question texts or options (e.g., instead of "What does "SCM" mean?", write "What does 'SCM' mean?"). If you need quotes inside the text, use single quotes.
@@ -497,16 +491,16 @@ JSON Structure:
       "questionText": "What is ...?",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctAnswer": "Option A",
-      "difficulty": "easy",
+      "difficulty": "hard",
       "topic": "technical"
     }
   ]
 }
 
-Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging but fair, and professionally written. The assessment should genuinely test domain expertise — not reading comprehension.`;
+Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging, and professionally written.`;
 
   try {
-    const rawResponse = await callDeepSeek(prompt);
+    const rawResponse = await callDeepSeek(prompt, { maxTokens: 3072, temperature: 0.35 });
     let cleaned = rawResponse.trim();
     
     // Clean up code block wraps if any
