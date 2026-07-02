@@ -78,8 +78,30 @@ app.use(helmet({
 // Response compression
 app.use(compression());
 
+const allowedOrigins = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  "https://resume-screening-app-sage.vercel.app",
+  "https://risonaitech.com",
+  "https://www.risonaitech.com",
+  "http://localhost:3000"
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, or postman)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.includes(origin) || 
+                      origin.endsWith(".vercel.app") || 
+                      origin.endsWith("risonaitech.com");
+                      
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 app.use(cookieParser());
