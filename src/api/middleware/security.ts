@@ -146,7 +146,14 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
-  if (!origin || !origin.startsWith(expectedDomain)) {
+  const isAuthorized = origin && (
+    origin.startsWith(expectedDomain) ||
+    origin.startsWith("http://localhost:3000") ||
+    origin.endsWith(".vercel.app") ||
+    origin.includes("risonaitech.com")
+  );
+
+  if (!origin || !isAuthorized) {
      res.status(403).json({
       success: false,
       error: "CSRF Validation Failed: Request origin does not match authorized application domain."
