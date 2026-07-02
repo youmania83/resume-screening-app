@@ -15,16 +15,19 @@ if (typeof window !== "undefined") {
         url = (input as any).url;
       }
 
+      const targetApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://resume-screening-app-databaseurl.up.railway.app/api";
+      
       const isLocalApi = url.includes("localhost:4000/api") || url.startsWith("/api");
-      const isProdApi = url.includes("resume-screening-app-databaseurl.up.railway.app/api");
+      const isProdApi = url.includes("resume-screening-app-databaseurl.up.railway.app/api") || (!!process.env.NEXT_PUBLIC_API_URL && url.includes(process.env.NEXT_PUBLIC_API_URL));
 
       if (isLocalApi || isProdApi) {
         const hostname = window.location.hostname;
         if (hostname !== "localhost" && hostname !== "127.0.0.1") {
           if (isLocalApi) {
-            url = url.replace(/https?:\/\/localhost:4000\/api/, "https://resume-screening-app-databaseurl.up.railway.app/api");
+            url = url.replace(/https?:\/\/localhost:4000\/api/, targetApiUrl);
             if (url.startsWith("/api")) {
-              url = `https://resume-screening-app-databaseurl.up.railway.app${url}`;
+              const cleanPath = url.startsWith("/api/") ? url.substring(5) : url.substring(4);
+              url = `${targetApiUrl}/${cleanPath}`;
             }
           }
         }
