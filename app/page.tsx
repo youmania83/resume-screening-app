@@ -276,8 +276,8 @@ export default function Dashboard() {
                 <span>Screened: <strong className="text-foreground font-bold">{totalScreenedCount}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-muted-foreground/80" />
-                <span>API Credits: <strong className="text-foreground font-bold">{credits} Remaining</strong></span>
+                <Activity className="h-3.5 w-3.5 text-emerald-500/80" />
+                <span>API Status: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Unlimited Access</strong></span>
               </div>
             </div>
 
