@@ -42,7 +42,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
     restart: always
 
-# --- OPTIONAL: Uncomment below to self-host Postgres and Redis on your VPS ---
+# --- OPTIONAL: Uncomment below to self-host Postgres on your VPS ---
 #   postgres:
 #     image: postgres:15-alpine
 #     container_name: rison-postgres
@@ -55,13 +55,17 @@ services:
 #     volumes:
 #       - pgdata:/var/lib/postgresql/data
 #     restart: always
-#
-#   redis:
-#     image: redis:7-alpine
-#     container_name: rison-redis
-#     ports:
-#       - "6379:6379"
-#     restart: always
-#
-# volumes:
+
+  redis:
+    image: redis:7-alpine
+    container_name: rison-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-super-secure-vps-redis-pass-12345}
+    volumes:
+      - redisdata:/data
+    restart: always
+
+volumes:
+  redisdata:
 #   pgdata:

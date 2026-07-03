@@ -10,6 +10,7 @@ import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import fs from "fs";
 import dotenv from "dotenv";
+import { connection } from "../api/queue.js";
 
 dotenv.config();
 
@@ -62,12 +63,7 @@ const parseWorker = new Worker(
     console.log(`✅ Parsed resume ${batchId}`);
     return { batchId, status: "parsed" };
   },
-  {
-    connection: {
-      host: process.env.REDIS_HOST || "127.0.0.1",
-      port: Number(process.env.REDIS_PORT) || 6379,
-    },
-  }
+  { connection }
 );
 
 parseWorker.on("failed", (job, err) => {

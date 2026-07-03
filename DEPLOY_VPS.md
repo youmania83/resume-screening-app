@@ -12,7 +12,7 @@ This approach installs Node.js and PM2 directly on the host machine. It is simpl
 Log into your VPS and run:
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl nginx
+sudo apt install -y git curl nginx redis-server
 
 # Install Node.js 20.x
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -21,10 +21,45 @@ sudo apt install -y nodejs
 # Verify installation
 node -v
 npm -v
+redis-server --version
 
 # Install PM2 globally
 sudo npm install -g pm2
 ```
+
+### Step 1.5: Secure & Configure Redis (Local VPS Hosting)
+If you want to host Redis directly on the VPS:
+1. Open the configuration file:
+   ```bash
+   sudo nano /etc/redis/redis.conf
+   ```
+2. Modify the configuration to secure access:
+   ```conf
+   # Bind to 127.0.0.1 if your backend runs on the same VPS.
+   # Bind to 0.0.0.0 if you need to access it from Railway/external services.
+   bind 127.0.0.1
+   
+   # Enable password protection (REQUIRED)
+   requirepass your_strong_vps_redis_password
+   
+   # Enable systemd supervision
+   supervised systemd
+   ```
+3. Restart and enable the Redis service:
+   ```bash
+   sudo systemctl restart redis-server
+   sudo systemctl enable redis-server
+   ```
+4. Verify connectivity:
+   ```bash
+   redis-cli -a your_strong_vps_redis_password ping
+   # Expected output: PONG
+   ```
+5. Configure Firewall (if binding to 0.0.0.0 for external access):
+   Only allow specific trusted IP addresses to connect to port 6379, such as your backend/worker server:
+   ```bash
+   sudo ufw allow from <backend-server-ip> to any port 6379 proto tcp
+   ```
 
 ### Step 2: Clone and Configure Project
 ```bash
@@ -44,7 +79,10 @@ Fill out `.env` with your production variables:
 DEEPSEEK_API_KEY=your_production_key
 NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
 DATABASE_URL=postgresql://user:password@host:port/db
-REDIS_URL=redis://user:password@host:port
+# For Native VPS Setup (use the password set in /etc/redis/redis.conf):
+REDIS_URL=redis://:your_strong_vps_redis_password@127.0.0.1:6379
+# (Or use external host IP if backend runs on Railway and connects to VPS):
+# REDIS_URL=redis://:your_strong_vps_redis_password@vps_ip_address:6379
 ```
 
 ### Step 3: Build & Launch with PM2
@@ -84,11 +122,20 @@ cd /var/www/resume-screening-app
 # Create environment file
 cp .env.example .env
 nano .env
+```
+Fill out the variables in `.env`.
+For the Dockerized Redis setup, you can set the password using `REDIS_PASSWORD` and point the `REDIS_URL` to the `rison-redis` container hostname:
+```env
+REDIS_PASSWORD=your_strong_vps_redis_password
+# Connect using the container name 'rison-redis' inside the Docker network
+REDIS_URL=redis://:your_strong_vps_redis_password@rison-redis:6379
+```
 
-# Build and start all services in detached mode
+Build and start all services in detached mode:
+```bash
 docker compose up --build -d
 ```
-Docker will pull Node-Alpine, build the Next.js static files, and start all three containers (`rison-frontend`, `rison-backend`, `rison-worker`).
+Docker will start all containers including the self-hosted Redis container (`rison-redis`), persist its state in the `redisdata` volume, and start the app services connected to it.
 
 ---
 
