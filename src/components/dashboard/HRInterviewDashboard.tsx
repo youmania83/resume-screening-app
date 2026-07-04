@@ -78,14 +78,16 @@ export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterview
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           decision: "interview_scheduled",
-          remarks: `HR Interview scheduled for ${scheduledDateTime.toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+          remarks: `HR Interview scheduled for ${scheduledDateTime.toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}`,
+          scheduledDate: scheduledDateTime.toISOString()
         })
       });
 
       if (decisionResp.ok) {
         toast.success(`Interview scheduled! Calendar invite sent to ${schedulingCandidate.email}`, { id: "schedule-loader" });
       } else {
-        toast.success(`Interview created but status update may have failed.`, { id: "schedule-loader" });
+        const errorData = await decisionResp.json().catch(() => ({}));
+        toast.error(`Interview created but candidate status update failed: ${errorData.error || "Unknown error"}`, { id: "schedule-loader" });
       }
 
       // 3. Reset form and refresh candidates

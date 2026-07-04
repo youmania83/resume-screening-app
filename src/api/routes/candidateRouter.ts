@@ -271,7 +271,7 @@ router.put("/:id", async (req: any, res, next) => {
 router.post("/:id/decision", async (req: any, res, next) => {
   try {
     const { id } = req.params;
-    const { decision, remarks } = req.body;
+    const { decision, remarks, scheduledDate } = req.body;
 
     if (!decision) {
       res.status(400).json({ success: false, error: "Decision status is required." });
@@ -299,17 +299,24 @@ router.post("/:id/decision", async (req: any, res, next) => {
     const candidate = existing.rows[0];
     const oldStatus = candidate.status;
 
-    // Skip if status hasn't changed
-    if (oldStatus === normalizedDecision) {
+    // Skip if status hasn't changed (unless scheduledDate changed)
+    if (oldStatus === normalizedDecision && !scheduledDate) {
       res.json({ success: true, message: "No change needed. Candidate is already in this status.", status: normalizedDecision });
       return;
     }
 
     // Update status in DB
-    await queryTenant(
-      `UPDATE candidates SET status = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = :tenant_id;`,
-      [normalizedDecision, id]
-    );
+    if (normalizedDecision === "interview_scheduled" && scheduledDate) {
+      await queryTenant(
+        `UPDATE candidates SET status = $1, interview_scheduled_date = $2 WHERE id = $3 AND tenant_id = :tenant_id;`,
+        [normalizedDecision, new Date(scheduledDate), id]
+      );
+    } else {
+      await queryTenant(
+        `UPDATE candidates SET status = $1 WHERE id = $2 AND tenant_id = :tenant_id;`,
+        [normalizedDecision, id]
+      );
+    }
 
     // Log timeline events
     const updaterId = req.user?.userId || null;
