@@ -284,8 +284,14 @@ export default function LoginPage() {
           </form>
         </section>
 
-        <footer className="text-center text-xs text-muted-foreground font-semibold">
-          Contact your administrator to request access.
+        <footer className="text-center space-y-2 text-[10px] text-muted-foreground font-semibold">
+          <div>Contact your administrator to request access.</div>
+          <div className="font-bold text-slate-500">
+            Powered by IRA from Rison Ai Tech
+          </div>
+          <div className="text-[9px] text-slate-400 font-normal max-w-sm mx-auto leading-normal">
+            Apple, App Store, and Google Play are trademarks of their respective owners. No endorsement or affiliation is implied.
+          </div>
         </footer>
       </div>
     </main>

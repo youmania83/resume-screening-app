@@ -35,7 +35,7 @@
 
 @layer base {
   :root {
-    /* Premium modern Indigo & Slate theme for Rison AI Tech */
+    /* Premium modern Techsol Engineers bright blue/cyan theme */
     --background: #f8fafc; /* Slate 50 - fresh tinted light background */
     --foreground: #0f172a; /* Slate 900 */
 
@@ -45,24 +45,24 @@
     --popover: #ffffff;
     --popover-foreground: #0f172a;
 
-    --primary: #4f46e5; /* Vibrant Indigo 600 */
+    --primary: #00abec; /* Bright Techsol Cyan/Blue */
     --primary-foreground: #ffffff;
 
-    --secondary: #eef2ff; /* Soft Indigo 50 tint */
-    --secondary-foreground: #4f46e5;
+    --secondary: #e0f2fe; /* Light sky/cyan tint (Sky 50) */
+    --secondary-foreground: #0077c0;
 
     --muted: #f1f5f9;
     --muted-foreground: #64748b; /* Slate 500 */
 
-    --accent: #e0e7ff; /* Indigo 100 */
-    --accent-foreground: #4f46e5;
+    --accent: #bae6fd; /* Sky 100 */
+    --accent-foreground: #0077c0;
 
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
 
     --border: #e2e8f0; /* Slate 200 */
     --input: #ffffff;
-    --ring: #6366f1;
+    --ring: #00abec;
 
     --success: #10b981; /* Emerald 500 */
     --success-foreground: #ffffff;
@@ -83,24 +83,24 @@
     --popover: #111827;
     --popover-foreground: #f8fafc;
 
-    --primary: #6366f1; /* Vibrant Indigo 500 */
+    --primary: #38bdf8; /* Sky 400 */
     --primary-foreground: #ffffff;
 
-    --secondary: #1e1b4b; /* Deep Indigo 950 tint */
-    --secondary-foreground: #e0e7ff;
+    --secondary: #0c4a6e; /* Sky 900 tint */
+    --secondary-foreground: #e0f2fe;
 
     --muted: #1f2937;
     --muted-foreground: #9ca3af;
 
-    --accent: #1e1b4b;
-    --accent-foreground: #e0e7ff;
+    --accent: #0c4a6e;
+    --accent-foreground: #e0f2fe;
 
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
 
     --border: #1f2937;
     --input: #18181b;
-    --ring: #6366f1;
+    --ring: #38bdf8;
 
     --success: #10b981;
     --success-foreground: #ffffff;

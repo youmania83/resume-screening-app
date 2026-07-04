@@ -259,9 +259,17 @@ export default function PublicAssessmentRegistrationPage() {
         </div>
 
         {/* Security / System status footer */}
-        <div className="text-center text-[10px] text-slate-400 flex items-center justify-center gap-1">
-          <Sparkles className="h-3 w-3 text-amber-500" />
-          Mobile, desktop and tablet support active. Bounded to one active session at a time.
+        <div className="text-center space-y-2 text-[10px] text-slate-400">
+          <div className="flex items-center justify-center gap-1">
+            <Sparkles className="h-3 w-3 text-amber-500" />
+            Mobile, desktop and tablet support active. Bounded to one active session at a time.
+          </div>
+          <div className="font-semibold text-slate-500">
+            Powered by IRA from Rison Ai Tech
+          </div>
+          <div className="text-[9px] text-slate-400 font-normal max-w-sm mx-auto leading-normal">
+            Apple, App Store, and Google Play are trademarks of their respective owners. This portal is not endorsed by or affiliated with Apple Inc. or Google LLC.
+          </div>
         </div>
       </div>
     </div>

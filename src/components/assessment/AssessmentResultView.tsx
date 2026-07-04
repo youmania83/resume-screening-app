@@ -135,8 +135,11 @@ export default function AssessmentResultView({ result, sessionId }: AssessmentRe
         </div>
       </div>
 
-      <div className="text-center text-[10px] text-muted-foreground font-medium">
-        Powered by Techsole Engineers Screen & Assessment Engine
+      <div className="text-center space-y-1.5 text-[10px] text-muted-foreground font-medium">
+        <div>Powered by IRA from Rison Ai Tech</div>
+        <div className="text-[9px] text-slate-400 font-normal max-w-md mx-auto leading-relaxed">
+          Apple, App Store, and Google Play are trademarks of their respective owners. This platform is not endorsed by or affiliated with Apple Inc. or Google LLC.
+        </div>
       </div>
     </div>
   );

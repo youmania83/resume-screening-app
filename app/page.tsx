@@ -254,6 +254,15 @@ export default function Dashboard() {
               Sign Out
             </button>
           </div>
+
+          <div className="mt-3.5 text-center space-y-1 text-[9px] text-muted-foreground select-none leading-normal border-t border-border/30 pt-3">
+            <div className="font-semibold text-slate-500 dark:text-slate-400">
+              Powered by IRA from Rison Ai Tech
+            </div>
+            <div className="text-[8px] text-slate-400 dark:text-slate-500 font-normal px-1">
+              Apple, App Store, and Google Play are trademarks of their respective owners.
+            </div>
+          </div>
         </div>
       </aside>
 

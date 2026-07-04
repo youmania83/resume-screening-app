@@ -585,11 +585,17 @@ export default function CandidatePortalPage() {
 
       </main>
 
-      {branding?.emailFooter && (
-        <footer className="mt-16 text-center text-[11px] text-slate-500 border-t border-slate-900 py-8 px-4 max-w-6xl mx-auto">
-          <p dangerouslySetInnerHTML={{ __html: branding.emailFooter.replace(/\n/g, "<br/>") }} />
-        </footer>
-      )}
+      <footer className="mt-16 text-center text-[10px] text-slate-500 border-t border-slate-900 py-8 px-4 max-w-6xl mx-auto space-y-2">
+        {branding?.emailFooter && (
+          <p dangerouslySetInnerHTML={{ __html: branding.emailFooter.replace(/\n/g, "<br/>") }} className="mb-2" />
+        )}
+        <div className="font-semibold text-slate-400">
+          Powered by IRA from Rison Ai Tech
+        </div>
+        <div className="text-[9px] text-slate-500 font-normal max-w-lg mx-auto leading-normal">
+          Apple, App Store, and Google Play are trademarks of their respective owners. This portal operates independently and is not endorsed by or affiliated with Apple Inc. or Google LLC.
+        </div>
+      </footer>
     </div>
   );
 }
