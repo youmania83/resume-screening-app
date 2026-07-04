@@ -52,7 +52,7 @@ const getTransporter = async () => {
   }
 };
 
-const FROM_EMAIL = process.env.SMTP_FROM || '"Rison AI Recruitment" <recruiting@risonai.tech>';
+const FROM_EMAIL = process.env.SMTP_FROM || '"Techsole Engineers Recruitment" <recruiting@techsoleengineers.com>';
 
 // Ensure logs directory exists for email fallbacks
 const ensureLogsDir = () => {
@@ -97,7 +97,7 @@ function escapeHtml(text: string): string {
 
 async function resolveTransporter(tenantId?: string): Promise<{ transporter: any; fromEmail: string }> {
   const resolvedTenantId = tenantId || getTenantContext()?.tenantId;
-  const FROM_EMAIL = process.env.SMTP_FROM || '"Rison AI Recruitment" <recruiting@risonai.tech>';
+  const FROM_EMAIL = process.env.SMTP_FROM || '"Techsole Engineers Recruitment" <recruiting@techsoleengineers.com>';
 
   if (resolvedTenantId) {
     try {
@@ -109,7 +109,7 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
 
         if (config && config.username) {
           const decryptedPass = decrypt(config.password || config.pass || "");
-          const fromName = config.fromName || "Rison AI Recruitment";
+          const fromName = config.fromName || "Techsole Engineers Recruitment";
           const fromEmail = `"${fromName}" <${config.username}>`;
 
           if (config.provider === "resend") {
@@ -237,7 +237,7 @@ export async function sendAssessmentInviteEmail(params: {
     minute: "2-digit",
   });
 
-  const subject = `Assessment Invitation: ${safeJobTitle} Role - Rison AI Tech`;
+  const subject = `Assessment Invitation: ${safeJobTitle} Role - Techsole Engineers`;
   
   const html = `
     <!DOCTYPE html>
@@ -269,7 +269,7 @@ export async function sendAssessmentInviteEmail(params: {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Rison AI Tech</h1>
+          <h1>Techsole Engineers</h1>
           <p>Candidate Assessment Portal</p>
         </div>
         <div class="content">
@@ -300,7 +300,7 @@ export async function sendAssessmentInviteEmail(params: {
           <p class="message" style="font-size: 12px; color: #64748b; text-align: center;">If the button above does not work, copy and paste this URL into your browser:<br>${assessmentLink}</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Rison AI Tech. All rights reserved.</p>
+          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
           <p>This is an automated message. Please do not reply directly to this email.</p>
         </div>
       </div>
@@ -359,7 +359,7 @@ export async function sendInterviewScheduleEmail(params: {
     timeZoneName: "short",
   });
 
-  const candidateSubject = `HR Interview Scheduled: ${safeJobTitle} Role - Rison AI Tech`;
+  const candidateSubject = `HR Interview Scheduled: ${safeJobTitle} Role - Techsole Engineers`;
   const hrSubject = `[ALERT] Qualified Candidate: HR Interview Scheduled for ${safeCandidateName}`;
 
   // 1. HTML Email for Candidate
@@ -391,7 +391,7 @@ export async function sendInterviewScheduleEmail(params: {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Rison AI Tech</h1>
+          <h1>Techsole Engineers</h1>
           <p>Interview Scheduling Automation</p>
         </div>
         <div class="content">
@@ -417,10 +417,10 @@ export async function sendInterviewScheduleEmail(params: {
             </div>
           </div>
           
-          <p class="message">Our HR team will reach out with calendar link details shortly. If this slot does not work for you, please contact us at support@risonai.tech to reschedule.</p>
+          <p class="message">Our HR team will reach out with calendar link details shortly. If this slot does not work for you, please contact us at support@techsoleengineers.com to reschedule.</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Rison AI Tech. All rights reserved.</p>
+          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -491,7 +491,7 @@ export async function sendInterviewScheduleEmail(params: {
           <p class="message">No actions are required at this stage. The candidate record has been marked as <strong>interviewing</strong>, and details are logged in the assessment dashboard.</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Rison AI Tech. All rights reserved.</p>
+          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
         </div>
       </div>
     </body>

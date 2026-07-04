@@ -421,7 +421,7 @@ router.post("/send", async (req: any, res: any, next: any) => {
 
     const candidate = candRes.rows[0];
     const jobTitle = candidate.job_title || "Position";
-    const companyName = candidate.company_name || "IRA SaaS";
+    const companyName = candidate.company_name || "Techsole Engineers";
 
     // Map internal API type to seeded template name
     let templateName = emailType;
@@ -561,7 +561,7 @@ router.post("/send", async (req: any, res: any, next: any) => {
       const user = process.env.SMTP_USER;
       const pass = process.env.SMTP_PASS;
 
-      const fromAddress = process.env.SMTP_FROM || `"IRA SaaS" <recruiting@ira-saas.tech>`;
+      const fromAddress = process.env.SMTP_FROM || `"Techsole Engineers" <recruiting@techsoleengineers.com>`;
       sentFrom = fromAddress;
 
       if (host && user && pass) {

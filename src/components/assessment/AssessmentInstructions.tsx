@@ -123,8 +123,8 @@ export default function AssessmentInstructions({
           </button>
           <p className="text-[10px] text-slate-400 text-center">
             {isMobile
-              ? "By clicking, you authorize Rison AI to start the session monitoring alerts."
-              : "By clicking, you authorize Rison AI to request Fullscreen access and start the session monitoring alerts."}
+              ? "By clicking, you authorize Techsole Engineers to start the session monitoring alerts."
+              : "By clicking, you authorize Techsole Engineers to request Fullscreen access and start the session monitoring alerts."}
           </p>
         </div>
       </div>

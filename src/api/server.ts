@@ -83,6 +83,8 @@ const allowedOrigins = [
   "https://resume-screening-app-sage.vercel.app",
   "https://risonaitech.com",
   "https://www.risonaitech.com",
+  "https://techsoleengineers.com",
+  "https://www.techsoleengineers.com",
   "http://localhost:3000"
 ].filter(Boolean) as string[];
 
@@ -93,7 +95,8 @@ app.use(cors({
     
     const isAllowed = allowedOrigins.includes(origin) || 
                       origin.endsWith(".vercel.app") || 
-                      origin.endsWith("risonaitech.com");
+                      origin.endsWith("risonaitech.com") ||
+                      origin.endsWith("techsoleengineers.com");
                       
     if (isAllowed) {
       callback(null, true);

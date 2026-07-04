@@ -191,7 +191,7 @@ export default function Dashboard() {
               <Sparkles className="h-4 w-4 animate-pulse" />
             </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground via-indigo-900 to-indigo-700 dark:from-foreground dark:to-indigo-300">Rison AI Tech</span>
+              <span className="font-bold text-sm tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground via-indigo-900 to-indigo-700 dark:from-foreground dark:to-indigo-300">Techsole Engineers</span>
               <span className="block text-[9px] text-muted-foreground font-bold tracking-wider leading-none">RECRUIT SUITE</span>
             </div>
           </div>

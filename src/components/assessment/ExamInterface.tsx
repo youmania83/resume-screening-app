@@ -330,7 +330,7 @@ export default function ExamInterface({
 
       {/* C. FOOTER */}
       <footer className="bg-secondary border-t border-border py-3.5 text-center text-[10px] text-muted-foreground">
-        🛡️ Rison AI Secure Proctor System. Text selection, copy, paste, and right-clicks are disabled. Avoid exiting
+        🛡️ Techsole Engineers Secure Proctor System. Text selection, copy, paste, and right-clicks are disabled. Avoid exiting
         fullscreen mode.
       </footer>
 

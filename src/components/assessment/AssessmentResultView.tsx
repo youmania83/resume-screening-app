@@ -136,7 +136,7 @@ export default function AssessmentResultView({ result, sessionId }: AssessmentRe
       </div>
 
       <div className="text-center text-[10px] text-muted-foreground font-medium">
-        Powered by Rison AI Screen & Assessment Engine
+        Powered by Techsole Engineers Screen & Assessment Engine
       </div>
     </div>
   );

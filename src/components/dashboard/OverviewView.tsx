@@ -114,7 +114,7 @@ export function OverviewView({ candidates }: OverviewViewProps) {
             <div>
               <CardTitle className="text-xs uppercase tracking-wider font-extrabold text-foreground flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-indigo-500" />
-                IRA AI SaaS Quick-Start Guide
+                Techsole Engineers Quick-Start Guide
               </CardTitle>
               <CardDescription className="text-[10px] text-muted-foreground font-semibold mt-0.5">
                 Follow these 5 steps to successfully configure your workspace and begin screening candidates automatically.

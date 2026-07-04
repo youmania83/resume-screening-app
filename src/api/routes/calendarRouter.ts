@@ -45,7 +45,7 @@ async function sendCalendarInvitation(params: {
     "SELECT email_config FROM tenants WHERE id = :tenant_id LIMIT 1;"
   );
   let transporter: any = null;
-  let fromAddress = process.env.SMTP_FROM || `"IRA Calendar" <calendar@ira-saas.tech>`;
+  let fromAddress = process.env.SMTP_FROM || `"Techsole Engineers Calendar" <calendar@techsoleengineers.com>`;
   let replyToAddress: string | undefined = undefined;
 
   if (tenantRes.rowCount && tenantRes.rowCount > 0) {
@@ -104,7 +104,7 @@ async function sendCalendarInvitation(params: {
     const icsContent = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//IRA AI Resume Screening SaaS//Calendar//EN",
+      "PRODID:-//Techsole Engineers Resume Screening//Calendar//EN",
       "CALSCALE:GREGORIAN",
       `METHOD:${methodType}`,
       "BEGIN:VEVENT",
@@ -113,7 +113,7 @@ async function sendCalendarInvitation(params: {
       `DTSTART:${params.scheduledDate.toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
       `DTEND:${new Date(params.scheduledDate.getTime() + 45 * 60 * 1000).toISOString().replace(/[-:]/g, "").split(".")[0]}Z`, // 45-min duration
       `SUMMARY:${params.action === "cancel" ? "Cancelled: " : ""}Interview - ${params.candidateName} for ${params.jobTitle}`,
-      `DESCRIPTION:Interview ${params.action === "cancel" ? "cancelled" : "scheduled"} via IRA Candidate Portal.`,
+      `DESCRIPTION:Interview ${params.action === "cancel" ? "cancelled" : "scheduled"} via Techsole Engineers Candidate Portal.`,
       `ORGANIZER;CN=Recruiter:MAILTO:${params.recruiterEmail}`,
       `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${params.candidateName}:MAILTO:${params.candidateEmail}`,
       ...(params.action === "cancel" ? ["STATUS:CANCELLED", "SEQUENCE:1"] : []),
@@ -285,7 +285,7 @@ router.post("/schedule", async (req: any, res: any, next: any) => {
     );
 
     // Send invites
-    const recruiterEmail = req.user?.email || "recruiter@ira-saas.tech";
+    const recruiterEmail = req.user?.email || "recruiter@techsoleengineers.com";
     await sendCalendarInvitation({
       tenantId,
       candidateEmail: candidate.email,
@@ -373,7 +373,7 @@ router.post("/reschedule", async (req: any, res: any, next: any) => {
     );
 
     // Send invite update
-    const recruiterEmail = req.user?.email || "recruiter@ira-saas.tech";
+    const recruiterEmail = req.user?.email || "recruiter@techsoleengineers.com";
     await sendCalendarInvitation({
       tenantId,
       candidateEmail: interview.candidate_email,
@@ -446,7 +446,7 @@ router.post("/cancel", async (req: any, res: any, next: any) => {
     );
 
     // Send calendar cancellation email
-    const recruiterEmail = req.user?.email || "recruiter@ira-saas.tech";
+    const recruiterEmail = req.user?.email || "recruiter@techsoleengineers.com";
     await sendCalendarInvitation({
       tenantId,
       candidateEmail: interview.candidate_email,
