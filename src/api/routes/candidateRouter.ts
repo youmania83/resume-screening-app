@@ -139,12 +139,26 @@ router.post("/", async (req: any, res, next) => {
     if (c.email) {
       const emailCheck = String(c.email).trim().toLowerCase();
       const existing = await queryTenant(
-        `SELECT id FROM candidates WHERE LOWER(email) = $1 AND tenant_id = :tenant_id LIMIT 1;`,
+        `SELECT id, created_at FROM candidates WHERE LOWER(email) = $1 AND tenant_id = :tenant_id LIMIT 1;`,
         [emailCheck]
       );
       if (existing.rowCount && existing.rowCount > 0) {
-        res.status(409).json({ success: false, error: `Candidate with email '${c.email}' is already registered in the system.` });
-        return;
+        const candRecord = existing.rows[0];
+        const appliedTime = new Date(candRecord.created_at).getTime();
+        const twoYearsMs = 2 * 365 * 24 * 60 * 60 * 1000;
+        
+        if (Date.now() - appliedTime < twoYearsMs) {
+          res.status(409).json({ success: false, error: `Candidate with email '${c.email}' is already registered in the system (applied within 2-year cooling-off period).` });
+          return;
+        } else {
+          console.log(`[Cooling Off Passed] Removing old candidate records for candidate ${candRecord.id}`);
+          const oldId = candRecord.id;
+          await queryTenant(`DELETE FROM candidate_activity_logs WHERE candidate_id = $1;`, [oldId]);
+          await queryTenant(`DELETE FROM candidate_timeline WHERE candidate_id = $1;`, [oldId]);
+          await queryTenant(`DELETE FROM candidate_documents WHERE candidate_id = $1;`, [oldId]);
+          await queryTenant(`DELETE FROM interviews WHERE candidate_id = $1;`, [oldId]);
+          await queryTenant(`DELETE FROM candidates WHERE id = $1;`, [oldId]);
+        }
       }
     }
     const appliedDate = c.appliedDate || new Date().toISOString().split("T")[0];

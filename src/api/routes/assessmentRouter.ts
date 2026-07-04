@@ -972,18 +972,31 @@ router.post("/public-register", async (req: any, res: any) => {
 
     // 3. Check if candidate is already registered for this job
     const candidateCheck = await queryGlobal(
-      `SELECT assessment_token, assessment_status FROM candidates WHERE email = $1 AND job_id = $2 LIMIT 1;`,
+      `SELECT id, created_at, assessment_token, assessment_status FROM candidates WHERE email = $1 AND job_id = $2 LIMIT 1;`,
       [email, jobId]
     );
 
     if (candidateCheck.rowCount && candidateCheck.rowCount > 0) {
       const existingCandidate = candidateCheck.rows[0];
-      return res.json({ 
-        success: true, 
-        token: existingCandidate.assessment_token, 
-        message: "Retrieved existing test registration link.",
-        assessmentStatus: existingCandidate.assessment_status
-      });
+      const appliedTime = new Date(existingCandidate.created_at).getTime();
+      const twoYearsMs = 2 * 365 * 24 * 60 * 60 * 1000;
+
+      if (Date.now() - appliedTime < twoYearsMs) {
+        return res.json({ 
+          success: true, 
+          token: existingCandidate.assessment_token, 
+          message: "Retrieved existing test registration link.",
+          assessmentStatus: existingCandidate.assessment_status
+        });
+      } else {
+        console.log(`[Cooling Off Passed] Removing old candidate records for candidate ${existingCandidate.id}`);
+        const oldId = existingCandidate.id;
+        await queryGlobal(`DELETE FROM candidate_activity_logs WHERE candidate_id = $1;`, [oldId]);
+        await queryGlobal(`DELETE FROM candidate_timeline WHERE candidate_id = $1;`, [oldId]);
+        await queryGlobal(`DELETE FROM candidate_documents WHERE candidate_id = $1;`, [oldId]);
+        await queryGlobal(`DELETE FROM interviews WHERE candidate_id = $1;`, [oldId]);
+        await queryGlobal(`DELETE FROM candidates WHERE id = $1;`, [oldId]);
+      }
     }
 
     // 4. Register new candidate

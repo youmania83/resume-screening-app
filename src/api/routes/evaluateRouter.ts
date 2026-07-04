@@ -223,12 +223,26 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     if (emailCheck) {
       try {
         const existingCandidate = await queryTenant(
-          `SELECT id FROM candidates WHERE LOWER(email) = $1 AND job_id = $2 AND tenant_id = :tenant_id LIMIT 1;`,
+          `SELECT id, created_at FROM candidates WHERE LOWER(email) = $1 AND job_id = $2 AND tenant_id = :tenant_id LIMIT 1;`,
           [emailCheck, jobId]
         );
         if (existingCandidate.rowCount && existingCandidate.rowCount > 0) {
-          res.status(409).json({ error: `Candidate with email '${emailCheck}' has already applied for this job.` });
-          return;
+          const candRecord = existingCandidate.rows[0];
+          const appliedTime = new Date(candRecord.created_at).getTime();
+          const twoYearsMs = 2 * 365 * 24 * 60 * 60 * 1000;
+          
+          if (Date.now() - appliedTime < twoYearsMs) {
+            res.status(409).json({ error: `Candidate with email '${emailCheck}' has already applied for this job within the 2-year cooling-off period.` });
+            return;
+          } else {
+            console.log(`[Cooling Off Passed] Removing old candidate records for candidate ${candRecord.id}`);
+            const oldId = candRecord.id;
+            await queryTenant(`DELETE FROM candidate_activity_logs WHERE candidate_id = $1;`, [oldId]);
+            await queryTenant(`DELETE FROM candidate_timeline WHERE candidate_id = $1;`, [oldId]);
+            await queryTenant(`DELETE FROM candidate_documents WHERE candidate_id = $1;`, [oldId]);
+            await queryTenant(`DELETE FROM interviews WHERE candidate_id = $1;`, [oldId]);
+            await queryTenant(`DELETE FROM candidates WHERE id = $1;`, [oldId]);
+          }
         }
       } catch (checkErr) {
         console.error("Failed to check duplicate candidate:", checkErr);
