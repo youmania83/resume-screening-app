@@ -2,7 +2,7 @@
 "use client"
 import React, { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Briefcase, Users, Layers, Settings, Sparkles, FileCheck2, BarChart3, Activity, Award, UserCheck } from "lucide-react"
+import { Briefcase, Users, Layers, Settings, Sparkles, FileCheck2, BarChart3, Activity, Award, UserCheck, Calendar } from "lucide-react"
 import { Badge } from "@/src/components/ui/badge"
 import { toast } from "sonner"
 import { useCandidates } from "@/src/hooks/useCandidates"
@@ -20,6 +20,7 @@ import { PipelineView } from "@/src/components/dashboard/PipelineView"
 import { AnalyticsView } from "@/src/components/dashboard/AnalyticsView"
 import { SettingsView } from "@/src/components/dashboard/SettingsView"
 import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthView"
+import { HRInterviewDashboard } from "@/src/components/dashboard/HRInterviewDashboard"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -201,6 +202,7 @@ export default function Dashboard() {
               { id: "candidates", label: "Candidates DB", icon: Users },
               { id: "assessments", label: "AI Assessments", icon: Award },
               { id: "pipeline", label: "ATS Pipeline", icon: UserCheck },
+              { id: "hr_interview", label: "HR Interview", icon: Calendar },
               { id: "analytics", label: "Analytics", icon: BarChart3 },
               { id: "health", label: "System Health", icon: Activity }
             ].map(item => {
@@ -381,6 +383,7 @@ export default function Dashboard() {
             />
           )}
           {activeTab === "pipeline" && <PipelineView candidates={candidates} setSelectedCandidate={setSelectedCandidate} setActiveTab={setActiveTab} />}
+          {activeTab === "hr_interview" && <HRInterviewDashboard candidates={candidates} loadCandidates={loadCandidates} />}
           {activeTab === "analytics" && <AnalyticsView candidates={candidates} />}
           {activeTab === "health" && <PlatformHealthView />}
           {activeTab === "settings" && <SettingsView webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}

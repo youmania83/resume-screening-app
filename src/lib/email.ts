@@ -255,6 +255,11 @@ export async function sendCandidateDecisionEmail(params: {
     headerSubtitle = "Interview Stage Notification";
     greeting = `Dear ${safeName},`;
     bodyMessage = `Your application for the <strong>${safeJob}</strong> position has progressed to the <strong>interview stage</strong>. Our HR team will contact you shortly with interview scheduling details. Please ensure your contact information is up to date.`;
+  } else if (decisionLower === "interview_scheduled") {
+    headerBg = "linear-gradient(135deg, #0891b2 0%, #0e7490 100%)";
+    headerSubtitle = "Interview Scheduled";
+    greeting = `Dear ${safeName},`;
+    bodyMessage = `Your HR interview for the <strong>${safeJob}</strong> position has been officially <strong>scheduled</strong>. A calendar invitation with the date, time, and meeting details has been sent to your email. Please check your inbox (and spam/junk folder) for the calendar invite.${safeRemarks ? `<br/><br/><strong>Schedule:</strong> ${safeRemarks}` : ""}`;
   } else if (decisionLower === "hold") {
     headerBg = "linear-gradient(135deg, #d97706 0%, #b45309 100%)";
     headerSubtitle = "Application Status Update";

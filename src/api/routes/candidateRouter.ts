@@ -278,7 +278,7 @@ router.post("/:id/decision", async (req: any, res, next) => {
       return;
     }
 
-    const validDecisions = ["shortlisted", "interviewing", "hold", "rejected", "selected", "hired", "onboarded"];
+    const validDecisions = ["shortlisted", "interviewing", "hold", "rejected", "selected", "hired", "onboarded", "interview_scheduled"];
     const normalizedDecision = String(decision).toLowerCase();
     if (!validDecisions.includes(normalizedDecision)) {
       res.status(400).json({ success: false, error: `Invalid decision. Must be one of: ${validDecisions.join(", ")}` });

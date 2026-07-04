@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 export function useDashboardMetrics(candidatesCount: number) {
   const [activeTab, setActiveTab] = useState<
-    "screening" | "dashboard" | "candidates" | "jobs" | "pipeline" | "analytics" | "settings" | "assessments" | "health"
+    "screening" | "dashboard" | "candidates" | "jobs" | "pipeline" | "analytics" | "settings" | "assessments" | "health" | "hr_interview"
   >("screening");
   const [isDark, setIsDark] = useState(false);
   const [credits, setCredits] = useState(480);
