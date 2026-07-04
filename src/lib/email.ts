@@ -282,9 +282,9 @@ export async function sendCandidateDecisionEmail(params: {
   }
 
   const subject = decisionLower === "selected" || decisionLower === "hired"
-    ? `🎉 Congratulations! You've been selected - ${safeJob} at Techsole Engineers`
+    ? `Selection Notification: ${safeJob} - Techsole Engineers`
     : decisionLower === "rejected"
-    ? `Application Update: ${safeJob} - Techsole Engineers`
+    ? `Application Status: ${safeJob} - Techsole Engineers`
     : `Application Status Update: ${safeJob} - Techsole Engineers`;
 
   const html = `
