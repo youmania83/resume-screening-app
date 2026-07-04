@@ -219,6 +219,22 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       console.error("Failed to map candidate to job:", dbJobErr);
     }
 
+    const emailCheck = parsedResult.email ? String(parsedResult.email).trim().toLowerCase() : "";
+    if (emailCheck) {
+      try {
+        const existingCandidate = await queryTenant(
+          `SELECT id FROM candidates WHERE LOWER(email) = $1 AND job_id = $2 AND tenant_id = :tenant_id LIMIT 1;`,
+          [emailCheck, jobId]
+        );
+        if (existingCandidate.rowCount && existingCandidate.rowCount > 0) {
+          res.status(409).json({ error: `Candidate with email '${emailCheck}' has already applied for this job.` });
+          return;
+        }
+      } catch (checkErr) {
+        console.error("Failed to check duplicate candidate:", checkErr);
+      }
+    }
+
     let status = "applied";
     let kekaStatus = "active";
     let logMessage = "";

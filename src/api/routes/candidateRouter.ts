@@ -136,6 +136,17 @@ router.get("/:id", async (req, res, next) => {
 router.post("/", async (req: any, res, next) => {
   try {
     const c = req.body;
+    if (c.email) {
+      const emailCheck = String(c.email).trim().toLowerCase();
+      const existing = await queryTenant(
+        `SELECT id FROM candidates WHERE LOWER(email) = $1 AND tenant_id = :tenant_id LIMIT 1;`,
+        [emailCheck]
+      );
+      if (existing.rowCount && existing.rowCount > 0) {
+        res.status(409).json({ success: false, error: `Candidate with email '${c.email}' is already registered in the system.` });
+        return;
+      }
+    }
     const appliedDate = c.appliedDate || new Date().toISOString().split("T")[0];
 
     await queryTenant(
