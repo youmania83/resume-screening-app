@@ -95,6 +95,7 @@ export default function Dashboard() {
     handleInterviewSubmit,
     handleOnboardSubmit,
     handleDeleteCandidate,
+    handleDecision,
     filteredCandidates,
     loadCandidates
   } = useCandidates(!!user)
@@ -155,12 +156,8 @@ export default function Dashboard() {
 
   const jdFileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const handleDecision = (id: string, newStatus: string) => {
-    setCandidates(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c))
-    if (selectedCandidate?.id === id) {
-      setSelectedCandidate(prev => prev ? { ...prev, status: newStatus } : null)
-    }
-  }
+  // handleDecision is now provided by useCandidates hook
+  // It persists to DB and sends email notifications automatically
 
   const handleSaveJD = () => {
     if (activeJD) {

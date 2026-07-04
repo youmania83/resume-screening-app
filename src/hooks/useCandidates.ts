@@ -293,6 +293,52 @@ export function useCandidates(isLoggedIn?: boolean) {
     toast.success("Candidate profile removed.");
   };
 
+  const handleDecision = async (id: string, newStatus: string) => {
+    // Optimistic update in UI immediately
+    setCandidates(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    if (selectedCandidate?.id === id) {
+      setSelectedCandidate(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+
+    try {
+      const resp = await fetch(`${apiBase}/candidates/${id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: newStatus })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.success) {
+          // Update activity logs
+          setCandidates(prev => prev.map(c => {
+            if (c.id === id) {
+              const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: data.logMessage || `Status changed to ${newStatus}` }];
+              return { ...c, status: data.status, activityLogs: updatedLogs };
+            }
+            return c;
+          }));
+          if (selectedCandidate?.id === id) {
+            setSelectedCandidate(prev => prev ? { ...prev, status: data.status } : null);
+          }
+
+          const statusLabel = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+          if (data.emailSent) {
+            toast.success(`Candidate ${statusLabel}. Notification email sent.`);
+          } else {
+            toast.success(`Candidate ${statusLabel}. Updated in database.`);
+          }
+          return;
+        }
+      }
+      // Non-ok response fallback
+      toast.warning(`Candidate status updated locally. Backend sync may have failed.`);
+    } catch (e) {
+      console.warn("Backend decision call failed, keeping optimistic update:", e);
+      toast.warning(`Candidate status updated locally. Backend sync failed.`);
+    }
+  };
+
   // Filtered Candidates
   const filteredCandidates = useMemo(() => {
     return candidates.filter(candidate => {
@@ -359,6 +405,7 @@ export function useCandidates(isLoggedIn?: boolean) {
     handleInterviewSubmit,
     handleOnboardSubmit,
     handleDeleteCandidate,
+    handleDecision,
     filteredCandidates,
     loadCandidates
   };

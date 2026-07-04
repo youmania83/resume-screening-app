@@ -132,6 +132,9 @@ export function CandidatesView({
               <option value="applied">Applied</option>
               <option value="shortlisted">Shortlisted</option>
               <option value="interviewing">Interviewing</option>
+              <option value="selected">Selected</option>
+              <option value="hired">Hired</option>
+              <option value="hold">On Hold</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
@@ -253,7 +256,7 @@ export function CandidatesView({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={c.status === "shortlisted" ? "success" : c.status === "interviewing" ? "purple" : c.status === "hold" ? "warning" : c.status === "rejected" ? "destructive" : "secondary"} className="text-[9px] uppercase tracking-wider py-0">
+                      <Badge variant={c.status === "shortlisted" ? "success" : c.status === "interviewing" ? "purple" : c.status === "hold" ? "warning" : c.status === "rejected" ? "destructive" : c.status === "selected" || c.status === "hired" || c.status === "onboarded" ? "success" : "secondary"} className="text-[9px] uppercase tracking-wider py-0">
                         {c.status}
                       </Badge>
                     </TableCell>

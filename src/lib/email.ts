@@ -213,6 +213,138 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
 }
 
 /**
+ * Send candidate decision notification email (selected, rejected, shortlisted, hold, interviewing)
+ */
+export async function sendCandidateDecisionEmail(params: {
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  decision: string;
+  remarks?: string;
+  tenantId?: string;
+}) {
+  const safeName = escapeHtml(params.candidateName);
+  const safeJob = escapeHtml(params.jobTitle);
+  const safeRemarks = params.remarks ? escapeHtml(params.remarks) : "";
+  const decisionLower = params.decision.toLowerCase();
+
+  // Build decision-specific copy
+  let headerBg = "";
+  let headerSubtitle = "";
+  let greeting = "";
+  let bodyMessage = "";
+  let remarksBlock = "";
+
+  if (decisionLower === "selected" || decisionLower === "hired") {
+    headerBg = "linear-gradient(135deg, #059669 0%, #047857 100%)";
+    headerSubtitle = "Candidate Selection Notification";
+    greeting = `Congratulations, ${safeName}!`;
+    bodyMessage = `We are delighted to inform you that you have been <strong>selected</strong> for the <strong>${safeJob}</strong> position at Techsole Engineers. Our HR team will contact you shortly with the next steps regarding your onboarding process.`;
+  } else if (decisionLower === "rejected") {
+    headerBg = "linear-gradient(135deg, #64748b 0%, #475569 100%)";
+    headerSubtitle = "Application Status Update";
+    greeting = `Dear ${safeName},`;
+    bodyMessage = `Thank you for your interest in the <strong>${safeJob}</strong> position and for the time you invested in our evaluation process. After careful consideration, we regret to inform you that we have decided to move forward with other candidates whose qualifications more closely match the requirements of this role. We encourage you to apply for future openings that align with your skills and experience.`;
+  } else if (decisionLower === "shortlisted") {
+    headerBg = "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)";
+    headerSubtitle = "Shortlist Notification";
+    greeting = `Great news, ${safeName}!`;
+    bodyMessage = `We are pleased to inform you that your application for the <strong>${safeJob}</strong> position has been <strong>shortlisted</strong>. You have successfully passed our initial screening criteria. Our recruitment team will reach out to you with next steps shortly.`;
+  } else if (decisionLower === "interviewing") {
+    headerBg = "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)";
+    headerSubtitle = "Interview Stage Notification";
+    greeting = `Dear ${safeName},`;
+    bodyMessage = `Your application for the <strong>${safeJob}</strong> position has progressed to the <strong>interview stage</strong>. Our HR team will contact you shortly with interview scheduling details. Please ensure your contact information is up to date.`;
+  } else if (decisionLower === "hold") {
+    headerBg = "linear-gradient(135deg, #d97706 0%, #b45309 100%)";
+    headerSubtitle = "Application Status Update";
+    greeting = `Dear ${safeName},`;
+    bodyMessage = `Thank you for your application for the <strong>${safeJob}</strong> position. Your profile is currently <strong>under review</strong> and has been placed on hold. We will update you as soon as there is further progress on your application.`;
+  } else {
+    // Generic fallback
+    headerBg = "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)";
+    headerSubtitle = "Application Status Update";
+    greeting = `Dear ${safeName},`;
+    bodyMessage = `Your application for the <strong>${safeJob}</strong> position has been updated to: <strong>${escapeHtml(params.decision)}</strong>. Our team will contact you with further details if required.`;
+  }
+
+  if (safeRemarks) {
+    remarksBlock = `
+      <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; margin: 20px 0; border-left: 4px solid #94a3b8;">
+        <p style="font-size: 13px; font-weight: 600; color: #64748b; margin: 0 0 4px 0;">HR Remarks:</p>
+        <p style="font-size: 14px; color: #1e293b; margin: 0; line-height: 1.5;">${safeRemarks}</p>
+      </div>`;
+  }
+
+  const subject = decisionLower === "selected" || decisionLower === "hired"
+    ? `🎉 Congratulations! You've been selected - ${safeJob} at Techsole Engineers`
+    : decisionLower === "rejected"
+    ? `Application Update: ${safeJob} - Techsole Engineers`
+    : `Application Status Update: ${safeJob} - Techsole Engineers`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Application Status</title>
+      <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background: ${headerBg}; padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; }
+        .header p { color: rgba(255,255,255,0.8); font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; }
+        .message { font-size: 15px; line-height: 1.7; color: #475569; margin: 16px 0; }
+        .footer { background-color: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+        .footer p { margin: 4px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Techsole Engineers</h1>
+          <p>${headerSubtitle}</p>
+        </div>
+        <div class="content">
+          <p class="greeting">${greeting}</p>
+          <p class="message">${bodyMessage}</p>
+          ${remarksBlock}
+          <p class="message" style="font-size: 13px; color: #94a3b8; margin-top: 28px;">If you have any questions, please reach out to our recruitment team.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
+          <p style="font-size: 10px; color: #94a3b8; margin-top: 6px;">Powered by IRA from Rison Ai Tech</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (zohoConfig.enabled) {
+    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    return { success: true, mock: false };
+  }
+
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+  if (!transporter) {
+    logEmailFallback(params.candidateEmail, subject, html);
+    return { success: true, mock: true };
+  }
+
+  await transporter.sendMail({
+    from: fromEmail,
+    to: params.candidateEmail,
+    subject,
+    html,
+  });
+
+  console.log(`📧 Decision email (${params.decision}) sent to ${params.candidateEmail}`);
+  return { success: true, mock: false };
+}
+
+/**
  * Send candidate assessment invite email
  */
 export async function sendAssessmentInviteEmail(params: {

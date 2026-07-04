@@ -267,6 +267,101 @@ router.put("/:id", async (req: any, res, next) => {
   }
 });
 
+// POST /api/candidates/:id/decision - HR decision: select, reject, shortlist, hold, interview
+router.post("/:id/decision", async (req: any, res, next) => {
+  try {
+    const { id } = req.params;
+    const { decision, remarks } = req.body;
+
+    if (!decision) {
+      res.status(400).json({ success: false, error: "Decision status is required." });
+      return;
+    }
+
+    const validDecisions = ["shortlisted", "interviewing", "hold", "rejected", "selected", "hired", "onboarded"];
+    const normalizedDecision = String(decision).toLowerCase();
+    if (!validDecisions.includes(normalizedDecision)) {
+      res.status(400).json({ success: false, error: `Invalid decision. Must be one of: ${validDecisions.join(", ")}` });
+      return;
+    }
+
+    // Fetch current candidate
+    const existing = await queryTenant(
+      "SELECT id, name, email, status, role, job_id FROM candidates WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
+      [id]
+    );
+
+    if (existing.rowCount === 0) {
+      res.status(404).json({ success: false, error: "Candidate not found." });
+      return;
+    }
+
+    const candidate = existing.rows[0];
+    const oldStatus = candidate.status;
+
+    // Skip if status hasn't changed
+    if (oldStatus === normalizedDecision) {
+      res.json({ success: true, message: "No change needed. Candidate is already in this status.", status: normalizedDecision });
+      return;
+    }
+
+    // Update status in DB
+    await queryTenant(
+      `UPDATE candidates SET status = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = :tenant_id;`,
+      [normalizedDecision, id]
+    );
+
+    // Log timeline events
+    const updaterId = req.user?.userId || null;
+    await logTimelineEvent(id, "stage_changed", "HR Decision Applied", `Status changed from "${oldStatus}" to "${normalizedDecision}".${remarks ? ` Remarks: ${remarks}` : ""}`, updaterId);
+
+    if (normalizedDecision === "selected" || normalizedDecision === "hired") {
+      await logTimelineEvent(id, "hired", "Candidate Selected", `Candidate officially ${normalizedDecision} for the role.`, updaterId);
+    } else if (normalizedDecision === "rejected") {
+      await logTimelineEvent(id, "rejected", "Candidate Rejected", `Candidate rejected by HR.${remarks ? ` Reason: ${remarks}` : ""}`, updaterId);
+    }
+
+    // Resolve job title for email
+    let jobTitle = candidate.role || "Open Position";
+    if (candidate.job_id) {
+      try {
+        const jobResult = await queryTenant("SELECT title FROM jobs WHERE id = $1 LIMIT 1;", [candidate.job_id]);
+        if (jobResult.rowCount! > 0) {
+          jobTitle = jobResult.rows[0].title;
+        }
+      } catch (e) { /* use role fallback */ }
+    }
+
+    // Send decision email to candidate (fire-and-forget, don't block response)
+    if (candidate.email) {
+      const { sendCandidateDecisionEmail } = await import("../../lib/email.js");
+      sendCandidateDecisionEmail({
+        candidateName: candidate.name,
+        candidateEmail: candidate.email,
+        jobTitle,
+        decision: normalizedDecision,
+        remarks: remarks || undefined,
+        tenantId: req.user?.tenantId || undefined
+      }).then(result => {
+        console.log(`📧 Decision notification (${normalizedDecision}) email delivery result for ${candidate.email}:`, result);
+      }).catch(err => {
+        console.error(`❌ Failed to send decision email to ${candidate.email}:`, err.message || err);
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Candidate ${normalizedDecision} successfully.`,
+      status: normalizedDecision,
+      previousStatus: oldStatus,
+      emailSent: !!candidate.email,
+      logMessage: `HR decision applied: "${normalizedDecision}".${remarks ? ` Remarks: ${remarks}` : ""}`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/candidates/:id - Delete a candidate
 router.delete("/:id", async (req, res, next) => {
   try {

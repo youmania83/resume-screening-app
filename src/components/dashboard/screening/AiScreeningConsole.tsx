@@ -280,9 +280,10 @@ export function AiScreeningConsole({
           </div>
         </CardContent>
 
-        <CardFooter className="pb-5 pt-0 grid grid-cols-2 gap-2 mt-4">
+        <CardFooter className="pb-5 pt-0 grid grid-cols-5 gap-2 mt-4">
           <Button variant="success" size="sm" onClick={() => handleDecision(selectedCandidate.id, "shortlisted")} className="text-xs font-bold">✓ Shortlist</Button>
-          <Button variant="info" size="sm" onClick={() => handleDecision(selectedCandidate.id, "interviewing")} className="text-xs font-bold">✉ Invite Interview</Button>
+          <Button variant="info" size="sm" onClick={() => handleDecision(selectedCandidate.id, "interviewing")} className="text-xs font-bold">✉ Interview</Button>
+          <Button variant="success" size="sm" onClick={() => handleDecision(selectedCandidate.id, "selected")} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700">★ Select</Button>
           <Button variant="outline" size="sm" onClick={() => handleDecision(selectedCandidate.id, "hold")} className="text-xs font-semibold border-border text-foreground/90">Hold</Button>
           <Button variant="destructive" size="sm" onClick={() => handleDecision(selectedCandidate.id, "rejected")} className="text-xs font-bold">Reject</Button>
         </CardFooter>
