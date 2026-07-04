@@ -49,6 +49,7 @@
     "node-cron": "^4.5.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.1",
+    "openai": "^6.45.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.21.0",
     "postcss": "^8.5.15",
