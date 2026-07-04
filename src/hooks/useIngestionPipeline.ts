@@ -136,7 +136,7 @@ export function useIngestionPipeline({
       formData.append("applicationSource", source);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout to allow DeepSeek to finish
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout to allow DeepSeek reasoning to finish
 
       const evalResp = await fetch(`${apiBase}/evaluate`, {
         method: "POST",
