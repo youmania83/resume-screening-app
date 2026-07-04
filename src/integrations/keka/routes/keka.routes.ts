@@ -5,9 +5,9 @@ import { kekaController } from "../controllers/keka.controller";
 
 const router = Router();
 
-// Webhook intake endpoint
-router.post("/webhooks/keka", (req, res, next) => {
-  kekaController.handleWebhook(req, res).catch(next);
+// Webhook intake endpoint (Disabled)
+router.post("/webhooks/keka", (req, res) => {
+  res.status(404).json({ success: false, error: "Keka webhook integration has been disabled." });
 });
 
 // Integration config check
