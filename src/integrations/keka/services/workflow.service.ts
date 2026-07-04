@@ -123,9 +123,9 @@ export class KekaWorkflowService {
     }
 
     // 4. Run LLM Scoring via DeepSeek
-    console.log("Calling DeepSeek for resume parsing and score calculation...");
+    console.log("Calling AI model for resume parsing and score calculation...");
     const prompt = buildEvaluatePrompt(jobDescription, resumeText);
-    const responseText = await callDeepSeek(prompt);
+    const responseText = await callDeepSeek(prompt, { maxTokens: 4000 });
 
     let parsedResult;
     try {
@@ -135,9 +135,10 @@ export class KekaWorkflowService {
       if (firstBrace !== -1 && lastBrace !== -1) {
         cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
       }
+      cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
       parsedResult = JSON.parse(cleanedJson);
     } catch {
-      console.error("Failed to parse DeepSeek response JSON:", responseText);
+      console.error("Failed to parse AI response JSON:", responseText);
       throw new Error("Invalid response formatting from AI model during automated screening");
     }
 

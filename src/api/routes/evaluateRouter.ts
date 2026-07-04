@@ -155,7 +155,7 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     }
 
     const prompt = buildEvaluatePrompt(formattedJobDescription, rawText);
-    const responseText = await callDeepSeek(prompt);
+    const responseText = await callDeepSeek(prompt, { maxTokens: 4000 });
 
     let parsedResult;
     try {
@@ -165,9 +165,10 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       if (firstBrace !== -1 && lastBrace !== -1) {
         cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
       }
+      cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
       parsedResult = JSON.parse(cleanedJson);
     } catch {
-      console.error("Failed to parse DeepSeek response as JSON:", responseText);
+      console.error("Failed to parse AI response as JSON:", responseText);
        res.status(500).json({ error: "Invalid response formatting from AI model" });
        return;
     }

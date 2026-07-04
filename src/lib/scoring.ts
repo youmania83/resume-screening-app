@@ -65,13 +65,19 @@ Return ONLY a JSON object with the shape {\"overall\": number, \"criteria\": {\"
 export async function computeScore(batchId: string, jobDescription: string): Promise<ScoreResult> {
   const resumeText = await getResumeText(batchId);
   const prompt = buildPrompt(jobDescription, resumeText);
-  const response = await callDeepSeek(prompt);
-  // DeepSeek should return pure JSON – attempt to parse safely.
+  const response = await callDeepSeek(prompt, { maxTokens: 4000 });
   try {
-    const parsed = JSON.parse(response) as ScoreResult;
+    let cleaned = response.trim();
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
+    const parsed = JSON.parse(cleaned) as ScoreResult;
     return parsed;
   } catch {
-    console.error("Failed to parse DeepSeek response as JSON:", response);
-    throw new Error("Invalid scoring response from DeepSeek");
+    console.error("Failed to parse AI scoring response as JSON:", response);
+    throw new Error("Invalid scoring response from AI model");
   }
 }

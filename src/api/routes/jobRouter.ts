@@ -237,14 +237,21 @@ Do not include any extra explanation or formatting.
 Job Description text:
 ${jdText}`;
 
-    const aiResponse = await callDeepSeek(prompt);
+    const aiResponse = await callDeepSeek(prompt, { maxTokens: 4000 });
     try {
-      const parsed = JSON.parse(aiResponse);
+      let clean = aiResponse.trim();
+      const firstBrace = clean.indexOf("{");
+      const lastBrace = clean.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        clean = clean.substring(firstBrace, lastBrace + 1);
+      }
+      clean = clean.replace(/,\s*([\]}])/g, "$1");
+      const parsed = JSON.parse(clean);
       res.json({ success: true, jd: parsed });
       return;
     } catch {
-      console.error("Failed to parse DeepSeek JD extraction response:", aiResponse);
-      throw new Error("Invalid structured JSON returned from DeepSeek");
+      console.error("Failed to parse JD extraction response:", aiResponse);
+      throw new Error("Invalid structured JSON returned from AI model");
     }
   } catch (err: any) {
     console.warn("JD AI extraction failed or API unconfigured, falling back to heuristic parser:", err.message);

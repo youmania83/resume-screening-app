@@ -103,6 +103,20 @@ Resume Text:
 ${rawText}`;
 }
 
+function parseCleanJson(text: string): any {
+  let cleaned = text.trim();
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  // Strip trailing commas before closing braces/brackets to prevent JSON parse errors
+  cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
+  // Strip comments if any
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
+  return JSON.parse(cleaned);
+}
+
 // 1. DeepSeek Resume Parser
 export class DeepSeekParser implements IResumeParserProvider {
   name = "DeepSeek";
@@ -110,8 +124,8 @@ export class DeepSeekParser implements IResumeParserProvider {
 
   async parseResume(rawText: string, jobDescription?: string): Promise<ParsedResumeData> {
     const prompt = buildParserPrompt(rawText, jobDescription);
-    const response = await this.adapter.generateText(prompt);
-    return JSON.parse(response.replace(/```json/g, "").replace(/```/g, "").trim());
+    const response = await this.adapter.generateText(prompt, { maxTokens: 4000 });
+    return parseCleanJson(response);
   }
 }
 
@@ -122,8 +136,8 @@ export class OpenAIParser implements IResumeParserProvider {
 
   async parseResume(rawText: string, jobDescription?: string): Promise<ParsedResumeData> {
     const prompt = buildParserPrompt(rawText, jobDescription);
-    const response = await this.adapter.generateText(prompt);
-    return JSON.parse(response.replace(/```json/g, "").replace(/```/g, "").trim());
+    const response = await this.adapter.generateText(prompt, { maxTokens: 4000 });
+    return parseCleanJson(response);
   }
 }
 
@@ -134,8 +148,8 @@ export class GeminiParser implements IResumeParserProvider {
 
   async parseResume(rawText: string, jobDescription?: string): Promise<ParsedResumeData> {
     const prompt = buildParserPrompt(rawText, jobDescription);
-    const response = await this.adapter.generateText(prompt);
-    return JSON.parse(response.replace(/```json/g, "").replace(/```/g, "").trim());
+    const response = await this.adapter.generateText(prompt, { maxTokens: 4000 });
+    return parseCleanJson(response);
   }
 }
 

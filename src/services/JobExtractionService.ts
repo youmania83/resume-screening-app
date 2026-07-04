@@ -40,12 +40,14 @@ Return ONLY a valid JSON object matching the following schema. Do NOT wrap in ma
   "workMode": "string (must be one of: 'Remote', 'Hybrid', 'Onsite', or 'Not Specified')"
 }`;
 
-      const response = await adapter.generateText(prompt, { temperature: 0.1 });
-      const cleanJsonStr = response
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
+      const response = await adapter.generateText(prompt, { temperature: 0.1, maxTokens: 4000 });
+      let cleanJsonStr = response.trim();
+      const firstBrace = cleanJsonStr.indexOf("{");
+      const lastBrace = cleanJsonStr.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        cleanJsonStr = cleanJsonStr.substring(firstBrace, lastBrace + 1);
+      }
+      cleanJsonStr = cleanJsonStr.replace(/,\s*([\]}])/g, "$1");
       const parsed = JSON.parse(cleanJsonStr);
 
       return {
