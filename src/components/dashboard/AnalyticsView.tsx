@@ -2,38 +2,109 @@
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, Legend } from "recharts";
 import { Candidate } from "../../types/index";
-import { BarChart3, TrendingUp, PieChart as PieIcon, Award, UserCheck, Percent } from "lucide-react";
+import { BarChart3, TrendingUp, UserCheck, XCircle, Users, CheckCircle } from "lucide-react";
+import { Badge } from "../ui/badge";
 
 interface AnalyticsViewProps {
   candidates: Candidate[];
 }
 
 export function AnalyticsView({ candidates }: AnalyticsViewProps) {
-  const totalScreenedCount = candidates.length;
+  const totalApplied = candidates.length;
 
-  const dynamicPieData = useMemo(() => {
-    const highMatchCount = candidates.filter(c => (c.score || 0) >= 80).length;
-    const moderateMatchCount = candidates.filter(c => (c.score || 0) >= 50 && (c.score || 0) < 80).length;
-    const lowMatchCount = candidates.filter(c => (c.score || 0) < 50).length;
+  // Calculate counts for key stages
+  const stats = useMemo(() => {
+    const total = candidates.length;
+    
+    // Status counts
+    const appliedCount = total;
+    const shortlistedCount = candidates.filter(c => (c.status || "").toLowerCase() === "shortlisted").length;
+    const interviewingCount = candidates.filter(c => (c.status || "").toLowerCase() === "interviewing").length;
+    const scheduledCount = candidates.filter(c => (c.status || "").toLowerCase() === "interview_scheduled").length;
+    const rejectedCount = candidates.filter(c => (c.status || "").toLowerCase() === "rejected").length;
+    const selectedCount = candidates.filter(c => ["selected", "hired", "onboarded"].includes((c.status || "").toLowerCase())).length;
+    const holdCount = candidates.filter(c => (c.status || "").toLowerCase() === "hold").length;
 
-    if (totalScreenedCount === 0) {
+    // Percentages (relative to total applied)
+    const shortlistedPercent = total > 0 ? Math.round((shortlistedCount / total) * 100) : 0;
+    const scheduledPercent = total > 0 ? Math.round((scheduledCount / total) * 100) : 0;
+    const rejectedPercent = total > 0 ? Math.round((rejectedCount / total) * 100) : 0;
+    const selectedPercent = total > 0 ? Math.round((selectedCount / total) * 100) : 0;
+    
+    // Average scores
+    const scoredCandidates = candidates.filter(c => (c.score || 0) > 0);
+    const avgScore = scoredCandidates.length > 0
+      ? Math.round(scoredCandidates.reduce((acc, c) => acc + (c.score || 0), 0) / scoredCandidates.length)
+      : 0;
+
+    return {
+      total,
+      appliedCount,
+      shortlistedCount,
+      interviewingCount,
+      scheduledCount,
+      rejectedCount,
+      selectedCount,
+      holdCount,
+      shortlistedPercent,
+      scheduledPercent,
+      rejectedPercent,
+      selectedPercent,
+      avgScore
+    };
+  }, [candidates]);
+
+  // Data for the main funnel bar chart (Applied vs Shortlisted vs Interview Scheduled vs Selected vs Rejected)
+  const funnelChartData = useMemo(() => {
+    if (totalApplied === 0) {
+      // Mock data if empty
       return [
-        { name: "Shortlisted (>80)", value: 42, color: "#10b981" },
-        { name: "Moderate Match (50-80)", value: 58, color: "#6366f1" },
-        { name: "Low Match (<50)", value: 14, color: "#f43f5e" },
+        { stage: "Applied", Count: 100, Percentage: 100, color: "#6366f1" },
+        { stage: "Shortlisted", Count: 60, Percentage: 60, color: "#3b82f6" },
+        { stage: "Interview Scheduled", Count: 35, Percentage: 35, color: "#06b6d4" },
+        { stage: "Selected / Hired", Count: 15, Percentage: 15, color: "#10b981" },
+        { stage: "Rejected", Count: 25, Percentage: 25, color: "#f43f5e" }
       ];
     }
 
     return [
-      { name: "Shortlisted (>80)", value: highMatchCount, color: "#10b981" },
-      { name: "Moderate Match (50-80)", value: moderateMatchCount, color: "#6366f1" },
-      { name: "Low Match (<50)", value: lowMatchCount, color: "#f43f5e" },
+      {
+        stage: "Applied",
+        Count: stats.appliedCount,
+        Percentage: 100,
+        color: "#6366f1" // Indigo
+      },
+      {
+        stage: "Shortlisted",
+        Count: stats.shortlistedCount,
+        Percentage: stats.shortlistedPercent,
+        color: "#3b82f6" // Blue
+      },
+      {
+        stage: "Interview Scheduled",
+        Count: stats.scheduledCount,
+        Percentage: stats.scheduledPercent,
+        color: "#06b6d4" // Cyan
+      },
+      {
+        stage: "Selected / Hired",
+        Count: stats.selectedCount,
+        Percentage: stats.selectedPercent,
+        color: "#10b981" // Emerald
+      },
+      {
+        stage: "Rejected",
+        Count: stats.rejectedCount,
+        Percentage: stats.rejectedPercent,
+        color: "#f43f5e" // Rose
+      }
     ];
-  }, [candidates, totalScreenedCount]);
+  }, [stats, totalApplied]);
 
-  const dynamicVolumeData = useMemo(() => {
+  // Dynamic daily upload volume line/area chart data
+  const volumeData = useMemo(() => {
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const volumeCounts: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
 
@@ -51,66 +122,18 @@ export function AnalyticsView({ candidates }: AnalyticsViewProps) {
       }
     });
 
-    return totalScreenedCount > 0
-      ? daysOfWeek.map(day => ({ name: day, Volume: volumeCounts[day] }))
+    return totalApplied > 0
+      ? daysOfWeek.map(day => ({ name: day, Candidates: volumeCounts[day] }))
       : [
-          { name: "Mon", Volume: 12 },
-          { name: "Tue", Volume: 19 },
-          { name: "Wed", Volume: 32 },
-          { name: "Thu", Volume: 24 },
-          { name: "Fri", Volume: 45 },
-          { name: "Sat", Volume: 15 },
-          { name: "Sun", Volume: 8 },
+          { name: "Mon", Candidates: 12 },
+          { name: "Tue", Candidates: 19 },
+          { name: "Wed", Candidates: 32 },
+          { name: "Thu", Candidates: 24 },
+          { name: "Fri", Candidates: 45 },
+          { name: "Sat", Candidates: 15 },
+          { name: "Sun", Candidates: 8 },
         ];
-  }, [candidates, totalScreenedCount]);
-
-  // Experience level distribution data
-  const dynamicExperienceData = useMemo(() => {
-    let entry = 0, mid = 0, senior = 0, lead = 0;
-
-    candidates.forEach(c => {
-      const exp = c.experienceYears || 0;
-      if (exp < 2) entry++;
-      else if (exp <= 5) mid++;
-      else if (exp <= 10) senior++;
-      else lead++;
-    });
-
-    if (totalScreenedCount === 0) {
-      return [
-        { name: "Entry (<2y)", Count: 5, color: "#818cf8" },
-        { name: "Mid (2-5y)", Count: 14, color: "#6366f1" },
-        { name: "Senior (5-10y)", Count: 8, color: "#4f46e5" },
-        { name: "Lead (>10y)", Count: 3, color: "#3730a3" },
-      ];
-    }
-
-    return [
-      { name: "Entry (<2y)", Count: entry, color: "#818cf8" },
-      { name: "Mid (2-5y)", Count: mid, color: "#6366f1" },
-      { name: "Senior (5-10y)", Count: senior, color: "#4f46e5" },
-      { name: "Lead (>10y)", Count: lead, color: "#3730a3" },
-    ];
-  }, [candidates, totalScreenedCount]);
-
-  // Summary Metrics calculations
-  const summaryStats = useMemo(() => {
-    const total = candidates.length;
-    const scoredCandidates = candidates.filter(c => (c.score || 0) > 0);
-    const avgScore = scoredCandidates.length > 0
-      ? Math.round(scoredCandidates.reduce((acc, c) => acc + (c.score || 0), 0) / scoredCandidates.length)
-      : 74; // Fallback mock average
-
-    const passThresholdRate = scoredCandidates.length > 0
-      ? Math.round((candidates.filter(c => (c.score || 0) >= 70).length / scoredCandidates.length) * 100)
-      : 68; // Fallback mock pass rate
-
-    return {
-      avgScore,
-      passThresholdRate,
-      activeJobs: totalScreenedCount > 0 ? Array.from(new Set(candidates.map(c => c.role))).length : 4
-    };
-  }, [candidates, totalScreenedCount]);
+  }, [candidates, totalApplied]);
 
   return (
     <motion.div
@@ -120,146 +143,236 @@ export function AnalyticsView({ candidates }: AnalyticsViewProps) {
       transition={{ duration: 0.15 }}
       className="space-y-6"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 select-none">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Recruitment Performance Metrics</h2>
-          <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Vibrant interactive charts monitoring match splits, upload timelines, and experience splits.</p>
-        </div>
+      <div>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Recruitment Analytics</h2>
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">
+          Performance metrics for Techsole Engineers recruitment funnel
+        </p>
       </div>
 
+      {/* Modern Stats Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Total Applied */}
+        <Card className="shadow-sm border-border bg-card relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Total Applied</span>
+              <p className="text-2xl font-bold text-foreground">{stats.appliedCount}</p>
+              <span className="text-[9px] text-muted-foreground font-semibold">100% of candidate pool</span>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+              <Users className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Interview Scheduled */}
+        <Card className="shadow-sm border-border bg-card relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500" />
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Interview Scheduled</span>
+              <p className="text-2xl font-bold text-foreground">{stats.scheduledCount}</p>
+              <div className="flex items-center gap-1">
+                <Badge className="bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20 text-[9px] font-bold py-0">
+                  {stats.scheduledPercent}%
+                </Badge>
+                <span className="text-[9px] text-muted-foreground font-semibold">schedule rate</span>
+              </div>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-500">
+              <UserCheck className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Selected / Hired */}
+        <Card className="shadow-sm border-border bg-card relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Selected / Hired</span>
+              <p className="text-2xl font-bold text-foreground">{stats.selectedCount}</p>
+              <div className="flex items-center gap-1">
+                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-[9px] font-bold py-0">
+                  {stats.selectedPercent}%
+                </Badge>
+                <span className="text-[9px] text-muted-foreground font-semibold">selection rate</span>
+              </div>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Rejected */}
+        <Card className="shadow-sm border-border bg-card relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Rejected</span>
+              <p className="text-2xl font-bold text-foreground">{stats.rejectedCount}</p>
+              <div className="flex items-center gap-1">
+                <Badge className="bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-[9px] font-bold py-0">
+                  {stats.rejectedPercent}%
+                </Badge>
+                <span className="text-[9px] text-muted-foreground font-semibold">rejection rate</span>
+              </div>
+            </div>
+            <div className="h-10 w-10 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500">
+              <XCircle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Analysis Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Daily Volume Area Chart (Col Span 2) */}
-        <Card className="lg:col-span-2 shadow-sm border-border bg-card relative overflow-hidden group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-indigo-650 to-cyan-500" />
-          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 text-indigo-500" />
-                Daily Upload Volume
-              </CardTitle>
-              <CardDescription className="text-[10px] text-muted-foreground mt-0.5">Evaluations triggered per week-day cycle.</CardDescription>
-            </div>
+        
+        {/* Recruitment Funnel Comparison (Col Span 2) */}
+        <Card className="lg:col-span-2 shadow-sm border-border bg-card relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-cyan-500 to-emerald-500" />
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Recruitment Funnel Breakdown
+            </CardTitle>
+            <CardDescription className="text-[10px] text-muted-foreground">
+              Comparison of candidates by stage (number count and percentage of total applied)
+            </CardDescription>
           </CardHeader>
-          <CardContent className="h-[250px]">
+
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dynamicVolumeData}>
-                <defs>
-                  <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={funnelChartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} vertical={false} />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)' }} />
-                <Area type="monotone" dataKey="Volume" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorVolume)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Pie Split Chart (Col Span 1) */}
-        <Card className="lg:col-span-1 shadow-sm border-border bg-card relative overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-indigo-500 to-rose-500" />
-          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-                <PieIcon className="h-4 w-4 text-emerald-500" />
-                Candidate Score Split
-              </CardTitle>
-              <CardDescription className="text-[10px] text-muted-foreground mt-0.5">Division ratio of compatibility brackets.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="h-[250px] flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={dynamicPieData} cx="50%" cy="45%" innerRadius={65} outerRadius={85} paddingAngle={4} dataKey="value">
-                  {dynamicPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ fontSize: '10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--card)' }} />
-                <Legend verticalAlign="bottom" height={36} iconSize={8} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Experience Level Bar Chart (Col Span 2) */}
-        <Card className="lg:col-span-2 shadow-sm border-border bg-card relative overflow-hidden group">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-500 to-indigo-650" />
-          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-                <BarChart3 className="h-4 w-4 text-violet-500" />
-                Experience Level Distribution
-              </CardTitle>
-              <CardDescription className="text-[10px] text-muted-foreground mt-0.5">Candidate counts classified by career seniority bands.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dynamicExperienceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} horizontal={false} />
-                <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} width={80} />
-                <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)' }} />
-                <Bar dataKey="Count" radius={[0, 4, 4, 0]} barSize={18}>
-                  {dynamicExperienceData.map((entry, index) => (
+                <XAxis dataKey="stage" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} label={{ value: 'Candidate Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '9px', fill: '#94a3b8', fontWeight: 'bold' } }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} label={{ value: 'Percentage (%)', angle: 90, position: 'insideRight', style: { textAnchor: 'middle', fontSize: '9px', fill: '#94a3b8', fontWeight: 'bold' } }} />
+                <Tooltip 
+                  contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)' }}
+                  formatter={(value: any, name?: any) => [value, name || ""]}
+                />
+                <Bar yAxisId="left" dataKey="Count" name="Count (Candidate)" radius={[4, 4, 0, 0]} barSize={24}>
+                  {funnelChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
+                <Bar yAxisId="right" dataKey="Percentage" name="Percentage (%)" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={8} opacity={0.3} />
+                <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Match Statistics Widget (Col Span 1) */}
+        {/* Funnel Conversion Insights Panel (Col Span 1) */}
         <Card className="lg:col-span-1 shadow-sm border-border bg-card relative overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 to-blue-500" />
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-500 to-indigo-500" />
           <CardHeader className="pb-3 border-b border-border">
-            <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-              <Award className="h-4 w-4 text-indigo-500" />
-              Recruitment Performance Summary
+            <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">
+              Conversion Insights
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4 space-y-4 select-none">
-            {/* Stat Item 1 */}
-            <div className="flex items-center gap-3 border border-border/60 bg-secondary/20 hover:bg-secondary/40 transition-colors p-3.5 rounded-xl">
-              <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                <Percent className="h-4.5 w-4.5" />
+          <CardContent className="pt-5 space-y-5">
+            {/* Shortlist Conversion */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-[10px] uppercase text-muted-foreground">Shortlist Rate</span>
+                <span className="text-foreground">{stats.shortlistedCount} Candidates ({stats.shortlistedPercent}%)</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Average Candidate Score</span>
-                <span className="block text-lg font-extrabold text-foreground mt-0.5">{summaryStats.avgScore}%</span>
-              </div>
-            </div>
-
-            {/* Stat Item 2 */}
-            <div className="flex items-center gap-3 border border-border/60 bg-secondary/20 hover:bg-secondary/40 transition-colors p-3.5 rounded-xl">
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <UserCheck className="h-4.5 w-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Interview Conversion Rate</span>
-                <span className="block text-lg font-extrabold text-foreground mt-0.5">{summaryStats.passThresholdRate}%</span>
+              <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.shortlistedPercent}%` }}
+                  transition={{ duration: 0.8 }}
+                  className="bg-blue-500 h-full rounded-full"
+                />
               </div>
             </div>
 
-            {/* Stat Item 3 */}
-            <div className="flex items-center gap-3 border border-border/60 bg-secondary/20 hover:bg-secondary/40 transition-colors p-3.5 rounded-xl">
-              <div className="h-8 w-8 rounded-lg bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
-                <BarChart3 className="h-4.5 w-4.5" />
+            {/* Scheduled Conversion */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-[10px] uppercase text-muted-foreground">Interview Scheduled Rate</span>
+                <span className="text-foreground">{stats.scheduledCount} Candidates ({stats.scheduledPercent}%)</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Active Job Roles Profiled</span>
-                <span className="block text-lg font-extrabold text-foreground mt-0.5">{summaryStats.activeJobs} positions</span>
+              <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.scheduledPercent}%` }}
+                  transition={{ duration: 0.8 }}
+                  className="bg-cyan-500 h-full rounded-full"
+                />
+              </div>
+            </div>
+
+            {/* Selection Conversion */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-[10px] uppercase text-muted-foreground">Selection/Hiring Rate</span>
+                <span className="text-foreground">{stats.selectedCount} Candidates ({stats.selectedPercent}%)</span>
+              </div>
+              <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.selectedPercent}%` }}
+                  transition={{ duration: 0.8 }}
+                  className="bg-emerald-500 h-full rounded-full"
+                />
+              </div>
+            </div>
+
+            {/* Rejection Rate */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-semibold">
+                <span className="text-[10px] uppercase text-rose-500">Rejection Rate</span>
+                <span className="text-foreground">{stats.rejectedCount} Candidates ({stats.rejectedPercent}%)</span>
+              </div>
+              <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.rejectedPercent}%` }}
+                  transition={{ duration: 0.8 }}
+                  className="bg-rose-500 h-full rounded-full"
+                />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Timeline Trend Line Chart */}
+      <Card className="shadow-sm border-border bg-card relative overflow-hidden">
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 to-cyan-500" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
+            <TrendingUp className="h-4 w-4 text-indigo-500" />
+            Weekly Recruitment Volume
+          </CardTitle>
+          <CardDescription className="text-[10px] text-muted-foreground">
+            Daily candidate upload/application trend
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={volumeData}>
+              <defs>
+                <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} vertical={false} />
+              <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)' }} />
+              <Area type="monotone" dataKey="Candidates" name="Intake Count" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorVolume)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }
