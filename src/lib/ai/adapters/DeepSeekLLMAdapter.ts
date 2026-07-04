@@ -9,7 +9,7 @@ export class DeepSeekLLMAdapter implements LLMAdapter {
     }
 
     const temperature = options?.temperature ?? 0.3;
-    const maxTokens = options?.maxTokens ?? 8192;
+    const maxTokens = options?.maxTokens ?? 4096;
 
     const maxRetries = 2;
     let lastError: any = null;
@@ -21,16 +21,14 @@ export class DeepSeekLLMAdapter implements LLMAdapter {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🤖 DeepSeek (v4-pro) API request (Attempt ${attempt}/${maxRetries})...`);
+        console.log(`🤖 DeepSeek (chat) API request (Attempt ${attempt}/${maxRetries})...`);
         const completion = await openai.chat.completions.create({
-          model: "deepseek-v4-pro",
+          model: "deepseek-chat",
           messages: [{ role: "user", content: prompt }],
           temperature,
           max_tokens: maxTokens,
-          thinking: { type: "enabled" },
-          reasoning_effort: "high",
           stream: false,
-        } as any);
+        });
 
         const content = completion.choices[0]?.message?.content;
         if (!content) {
