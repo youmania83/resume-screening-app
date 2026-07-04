@@ -65,7 +65,8 @@ export function useCandidates(isLoggedIn?: boolean) {
             assessmentCompletedAt: c.assessment_completed_at,
             finalScore: c.final_score,
             violationCount: c.violation_count,
-            activityLogs: c.activityLogs || []
+            activityLogs: c.activityLogs || [],
+            jobCode: c.job_code || undefined
           }));
           setCandidates(mapped);
           if (mapped.length > 0) {

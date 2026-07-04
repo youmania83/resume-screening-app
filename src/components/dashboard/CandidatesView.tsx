@@ -225,7 +225,9 @@ export function CandidatesView({
                         <span className="text-[10px] text-muted-foreground font-semibold block mt-0.5">{c.email}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-foreground font-semibold">{c.role}</TableCell>
+                    <TableCell className="text-xs text-foreground font-semibold">
+                      {c.role} {c.jobCode && <span className="text-[10px] font-normal text-slate-400">({c.jobCode})</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
                     <TableCell className="text-xs text-muted-foreground font-mono font-semibold">{c.appliedDate}</TableCell>
                     <TableCell>

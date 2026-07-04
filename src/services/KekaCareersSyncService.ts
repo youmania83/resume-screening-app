@@ -164,13 +164,17 @@ ${plainDescription}`;
             );
 
             if (checkRes.rowCount !== null && checkRes.rowCount > 0) {
-              console.log(`[Keka Careers Sync] Job "${rawJob.title}" (ID ${rawJob.id}) already exists for tenant ${tenantId}. Skipping duplicate.`);
+              console.log(`[Keka Careers Sync] Job "${rawJob.title}" (ID ${rawJob.id}) already exists for tenant ${tenantId}. Updating job code.`);
+              await query(
+                "UPDATE jobs SET job_code = $1 WHERE external_id = $2 AND tenant_id = $3;",
+                [rawJob.jobNumber, rawJob.id.toString(), tenantId]
+              );
               continue;
             } else {
               // Insert new job record
               await query(
-                `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, source_system, sync_status, last_synced_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW());`,
+                `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, job_code, source_system, sync_status, last_synced_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW());`,
                 [
                   deterministicJobId,
                   tenantId,
@@ -183,6 +187,7 @@ ${plainDescription}`;
                   rawJob.skillNames || [],
                   "Onsite",
                   rawJob.id.toString(),
+                  rawJob.jobNumber,
                   "Keka",
                   "synced"
                 ]

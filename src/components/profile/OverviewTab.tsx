@@ -62,7 +62,9 @@ export default function OverviewTab({
               <Briefcase size={16} className="text-slate-500" />
               <div>
                 <div className="text-xs text-slate-500">Target Role</div>
-                <div className="text-sm font-medium">{candidate.role || "N/A"}</div>
+                <div className="text-sm font-medium">
+                  {candidate.role || "N/A"} {candidate.jobCode && <span className="text-xs text-slate-500 font-normal">({candidate.jobCode})</span>}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">

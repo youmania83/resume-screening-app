@@ -36,6 +36,7 @@ export interface Candidate {
   finalScore?: number;
   violationCount?: number;
   activityLogs?: Array<{ date: string; message: string }>;
+  jobCode?: string;
 }
 
 export interface StructuredJD {
@@ -60,4 +61,6 @@ export interface JobListItem {
   candidates: number;
   status: "Active" | "Closed";
   jd: StructuredJD;
+  jobCode?: string;
 }
+

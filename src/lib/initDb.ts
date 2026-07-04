@@ -230,6 +230,7 @@ async function init() {
     
     await client.query(`
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS external_id VARCHAR;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_code VARCHAR;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_system VARCHAR;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS sync_status VARCHAR;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;

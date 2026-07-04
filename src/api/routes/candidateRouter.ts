@@ -79,7 +79,7 @@ router.get("/", async (req, res, next) => {
 
     // Fetch paginated candidate rows
     const candidatesRes = await queryTenant(
-      `SELECT candidates.*, j.title as job_title, j.location as job_location
+      `SELECT candidates.*, j.title as job_title, j.location as job_location, j.job_code as job_code
        FROM candidates
        LEFT JOIN jobs j ON candidates.job_id = j.id
        WHERE ${whereClause}
@@ -113,7 +113,7 @@ router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const result = await queryTenant(
-      `SELECT c.*, j.title as job_title, j.description as job_description, j.location as job_location, u.name as recruiter_owner_name
+      `SELECT c.*, j.title as job_title, j.description as job_description, j.location as job_location, j.job_code as job_code, u.name as recruiter_owner_name
        FROM candidates c
        LEFT JOIN jobs j ON c.job_id = j.id
        LEFT JOIN users u ON c.recruiter_owner_id = u.id

@@ -49,7 +49,9 @@ export function JobsView({ jobs, setActiveTab, setImportTab, setActiveJD }: Jobs
             <CardHeader className="pb-3 border-b border-border">
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-sm font-bold text-foreground">{job.title}</CardTitle>
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    {job.title} {job.jobCode && <span className="text-[10px] font-normal text-slate-400">({job.jobCode})</span>}
+                  </CardTitle>
                   <CardDescription className="text-[10px] mt-0.5 font-semibold">{job.dept} • {job.loc}</CardDescription>
                 </div>
                 <Badge variant={job.status === "Active" ? "success" : "secondary"} className="text-[8px] uppercase tracking-wider">
