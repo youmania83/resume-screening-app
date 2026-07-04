@@ -9,7 +9,7 @@ export class DeepSeekLLMAdapter implements LLMAdapter {
     }
 
     const temperature = options?.temperature ?? 0.3;
-    const maxTokens = options?.maxTokens ?? 1024;
+    const maxTokens = options?.maxTokens ?? 8192;
 
     const maxRetries = 2;
     let lastError: any = null;
