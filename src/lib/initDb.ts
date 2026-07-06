@@ -492,6 +492,8 @@ async function init() {
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS source_campaign VARCHAR;
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS source_medium VARCHAR;
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS source_provider VARCHAR;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS cal_link VARCHAR;
+      ALTER TABLE interviews ADD COLUMN IF NOT EXISTS meeting_link VARCHAR;
     `);
 
     await client.query(`

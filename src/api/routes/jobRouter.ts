@@ -27,7 +27,7 @@ router.get("/", async (req, res, next) => {
 // POST /api/jobs – Generates a job description record under tenant
 router.post("/", rateLimiter(1 * 60 * 1000, 15), creditCheck("job_create"), async (req, res, next) => {
   try {
-    const { title, description, department, location, experienceRequired, jd } = req.body;
+    const { title, description, department, location, experienceRequired, jd, calLink, cal_link } = req.body;
     
     if (!title || !description) {
        res.status(400).json({ success: false, error: "Title and Description are required" });
@@ -42,8 +42,8 @@ router.post("/", rateLimiter(1 * 60 * 1000, 15), creditCheck("job_create"), asyn
     const jobId = crypto.randomUUID();
 
     await queryTenant(
-      `INSERT INTO jobs (id, title, description, department, location, experience_required, jd, skills, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, :tenant_id);`,
+      `INSERT INTO jobs (id, title, description, department, location, experience_required, jd, skills, cal_link, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, :tenant_id);`,
       [
         jobId,
         title,
@@ -52,7 +52,8 @@ router.post("/", rateLimiter(1 * 60 * 1000, 15), creditCheck("job_create"), asyn
         location || "Remote",
         experienceRequired || "Not Specified",
         jd ? JSON.stringify(jd) : null,
-        jd?.requiredSkills || null
+        jd?.requiredSkills || null,
+        calLink || cal_link || null
       ]
     );
 
@@ -366,7 +367,7 @@ ${jdText}`;
 router.put("/:id", async (req: any, res: any, next: any) => {
   try {
     const { id } = req.params;
-    const { title, description, department, location, experienceRequired, skills, workMode, jd } = req.body;
+    const { title, description, department, location, experienceRequired, skills, workMode, jd, calLink, cal_link } = req.body;
 
     const existingRes = await queryTenant(
       "SELECT * FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
@@ -397,8 +398,9 @@ router.put("/:id", async (req: any, res: any, next: any) => {
            experience_required = COALESCE($5, experience_required),
            skills = COALESCE($6, skills),
            work_mode = COALESCE($7, work_mode),
-           jd = COALESCE($8, jd)
-       WHERE id = $9 AND tenant_id = :tenant_id;`,
+           jd = COALESCE($8, jd),
+           cal_link = COALESCE($9, cal_link)
+       WHERE id = $10 AND tenant_id = :tenant_id;`,
       [
         title || null,
         description || null,
@@ -408,6 +410,7 @@ router.put("/:id", async (req: any, res: any, next: any) => {
         skills || null,
         workMode || null,
         jd ? JSON.stringify(jd) : null,
+        calLink || cal_link || null,
         id
       ]
     );

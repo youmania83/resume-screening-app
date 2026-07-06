@@ -186,7 +186,7 @@ router.post("/settings", async (req: any, res: any, next: any) => {
       return;
     }
 
-    const { provider, credentials } = req.body;
+    const { provider, credentials, calLink, cal_link } = req.body;
 
     if (!provider) {
       res.status(400).json({ error: "Provider is required." });
@@ -194,8 +194,9 @@ router.post("/settings", async (req: any, res: any, next: any) => {
     }
 
     const calendarConfig = {
-      provider, // 'google', 'outlook', or 'mock'
+      provider, // 'google', 'outlook', 'calcom', or 'mock'
       credentials: credentials || {},
+      calLink: calLink || cal_link || "",
       connectedAt: new Date().toISOString(),
     };
 

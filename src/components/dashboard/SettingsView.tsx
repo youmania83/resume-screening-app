@@ -15,6 +15,10 @@ interface SettingsViewProps {
 export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "inbox-sync" | "smtp" | "templates">("general");
 
+  // Calendar Settings State
+  const [calendarProvider, setCalendarProvider] = useState("mock");
+  const [calendarCalLink, setCalendarCalLink] = useState("");
+
   // SMTP Settings State
   const [smtpProvider, setSmtpProvider] = useState("gmail");
   const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
@@ -100,6 +104,21 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
           setPrimaryColor(brand.primaryColor || "#0f172a");
           setEmailFooter(brand.emailFooter || "");
         }
+      }
+
+      // 1.5. Fetch Calendar Settings
+      try {
+        const calResp = await fetch(`${apiBase}/calendar/settings`);
+        if (calResp.ok) {
+          const calData = await calResp.json();
+          if (calData.success) {
+            const calCfg = calData.settings || {};
+            setCalendarProvider(calCfg.provider || "mock");
+            setCalendarCalLink(calCfg.calLink || "");
+          }
+        }
+      } catch (calErr) {
+        console.warn("Failed to load calendar settings:", calErr);
       }
 
       // 2. Fetch Email Templates
@@ -262,6 +281,32 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
 
   const removeRule = (index: number) => {
     setRules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveCalendarSettings = async () => {
+    setSaving(true);
+    toast.loading("Saving calendar settings...", { id: "save-cal-toast" });
+    try {
+      const resp = await fetch(`${apiBase}/calendar/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: calendarProvider,
+          calLink: calendarCalLink
+        })
+      });
+      if (resp.ok) {
+        toast.success("Calendar settings updated successfully!", { id: "save-cal-toast" });
+      } else {
+        const errorText = await resp.text();
+        toast.error(`Error saving calendar settings: ${errorText}`, { id: "save-cal-toast" });
+      }
+    } catch (err) {
+      console.error("Error saving calendar settings", err);
+      toast.error("Could not save calendar settings.", { id: "save-cal-toast" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Sandbox route test trigger
@@ -434,6 +479,77 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                   </Badge>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Cal.com Scheduling Integration Card */}
+          <Card className="shadow-sm border-border bg-card">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Cal.com Scheduling Integration</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4 text-xs">
+              <div className="space-y-1 pb-3 border-b border-border">
+                <span className="block text-[10px] uppercase font-bold text-muted-foreground">Active Calendar Provider</span>
+                <select
+                  value={calendarProvider}
+                  onChange={(e) => setCalendarProvider(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-semibold outline-none text-[11px] text-foreground"
+                >
+                  <option value="mock">Mock Scheduling (No live connection)</option>
+                  <option value="calcom">Cal.com Scheduling Embed</option>
+                </select>
+              </div>
+
+              {calendarProvider === "calcom" && (
+                <>
+                  <div className="space-y-1 pb-3 border-b border-border">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Global Fallback Cal.com Booking Link</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. acme-hr/interview"
+                      value={calendarCalLink}
+                      onChange={(e) => setCalendarCalLink(e.target.value)}
+                      className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
+                    />
+                    <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
+                      Input your Cal.com username/event-slug (e.g. `acme-hr/interview`). Individual jobs can override this link.
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 p-3 rounded-lg border border-border bg-secondary/20 leading-normal">
+                    <span className="block text-[10px] uppercase font-bold text-amber-500">Webhook Connection Setup</span>
+                    <span className="text-[10px] text-slate-300 block">
+                      To sync interviews back to the platform, configure a webhook in your **Cal.com account**:
+                    </span>
+                    <div className="flex gap-2 items-center mt-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={
+                          typeof window !== "undefined"
+                            ? `${window.location.origin.replace("3000", "4000")}/api/webhooks/calcom`
+                            : "https://your-api-domain.com/api/webhooks/calcom"
+                        }
+                        className="w-full bg-card border border-border rounded px-2 py-1 font-mono text-[9px] text-slate-400"
+                      />
+                    </div>
+                    <span className="text-[9px] text-slate-400 block mt-1">
+                      1. Go to Cal.com -> Settings -> Webhooks. <br/>
+                      2. Add Webhook, paste the URL above, and select the **Booking Created**, **Booking Rescheduled**, and **Booking Cancelled** triggers.
+                    </span>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={saveCalendarSettings}
+                  disabled={saving}
+                  className="text-xs font-bold gap-1.5 shadow-sm"
+                >
+                  <Save className="h-3.5 w-3.5" /> Save Calendar Settings
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

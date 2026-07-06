@@ -28,6 +28,7 @@ import inboxRouter from "./routes/inboxRouter.js";
 import candidatePortalRouter from "./routes/candidatePortalRouter.js";
 import emailRouter from "./routes/emailRouter.js";
 import calendarRouter from "./routes/calendarRouter.js";
+import webhookRouter from "./routes/webhookRouter.js";
 import kekaRouter from "../integrations/keka/routes/keka.routes.js";
 import zohoRouter from "../integrations/zoho/routes/zoho.routes.js";
 import "../lib/initDb.js";
@@ -131,6 +132,7 @@ app.use("/api/inbox", inboxRouter);
 app.use("/api/candidate-portal", candidatePortalRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/calendar", calendarRouter);
+app.use("/api", webhookRouter);
 app.use("/api", kekaRouter);
 app.use("/api", zohoRouter);
 

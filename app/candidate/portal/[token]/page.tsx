@@ -61,6 +61,7 @@ interface CandidatePortalData {
     logoUrl: string;
     primaryColor: string;
     emailFooter: string;
+    calLink?: string | null;
   };
 }
 
@@ -107,6 +108,45 @@ export default function CandidatePortalPage() {
       loadPortalData();
     }
   }, [token]);
+
+  // Initialize Cal.com scheduling widget
+  useEffect(() => {
+    if (!data) return;
+    const { candidate, interviews, branding } = data;
+    const hasActiveInterview = interviews && interviews.some(slot => slot.status !== 'cancelled');
+    if (typeof window !== "undefined" && !hasActiveInterview && candidate?.status?.toLowerCase() === "interviewing" && branding?.calLink) {
+      const initCal = () => {
+        const Cal = (window as any).Cal;
+        if (Cal) {
+          Cal("init", { origin: "https://cal.com" });
+          Cal("inline", {
+            elementOrSelector: "#cal-inline-widget",
+            calLink: branding.calLink,
+            config: {
+              name: candidate.name,
+              email: candidate.email,
+            }
+          });
+        }
+      };
+
+      if (!(window as any).Cal) {
+        (function (C, A, L) {
+          let p = function (a: any, ar: any) { a.q.push(ar); };
+          C.Cal = C.Cal || function () { let a = arguments; p(C.Cal, a); };
+          C.Cal.q = C.Cal.q || [];
+        })(window as any, window.document, "cal");
+        
+        const script = document.createElement("script");
+        script.src = "https://embed.cal.com/embed/parent.js";
+        script.async = true;
+        script.onload = initCal;
+        document.body.appendChild(script);
+      } else {
+        initCal();
+      }
+    }
+  }, [data]);
 
   const handleConfirmSlot = async (interviewId: string) => {
     setIsConfirming(interviewId);
@@ -371,6 +411,24 @@ export default function CandidatePortalPage() {
               })}
             </div>
           </div>
+
+          {/* CAL.COM SCHEDULING CARD */}
+          {!interviews.some(slot => slot.status !== 'cancelled') && candidate.status.toLowerCase() === "interviewing" && branding?.calLink && (
+            <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-6.5 space-y-4 shadow-sm backdrop-blur-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-slate-400" />
+                Schedule Your Interview
+              </h2>
+              <p className="text-xs text-slate-400 font-medium">
+                Please pick a convenient date and time for your interview with our team.
+              </p>
+              
+              <div 
+                id="cal-inline-widget" 
+                className="w-full h-[600px] rounded-xl overflow-hidden bg-slate-950/40 border border-slate-900" 
+              />
+            </div>
+          )}
 
           {/* ACTIVE INTERVIEWS CARD */}
           {interviews.length > 0 && (

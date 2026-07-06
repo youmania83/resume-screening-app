@@ -74,7 +74,7 @@ router.get("/:token", async (req: any, res: any, next: any) => {
     let job = null;
     if (candidate.job_id) {
       const jobRes = await queryTenant(
-        "SELECT id, title, description, department, location FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
+        "SELECT id, title, description, department, location, cal_link FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;",
         [candidate.job_id]
       );
       if (jobRes.rowCount && jobRes.rowCount > 0) {
@@ -104,9 +104,10 @@ router.get("/:token", async (req: any, res: any, next: any) => {
 
     // Fetch tenant white-label branding
     const brandingRes = await queryTenant(
-      "SELECT name, logo_url, primary_color, email_footer FROM tenants WHERE id = :tenant_id LIMIT 1;"
+      "SELECT name, logo_url, primary_color, email_footer, calendar_config FROM tenants WHERE id = :tenant_id LIMIT 1;"
     );
     const tenantInfo = brandingRes.rows[0];
+    const calLink = job?.cal_link || tenantInfo?.calendar_config?.calLink || null;
 
     res.json({
       success: true,
@@ -127,7 +128,8 @@ router.get("/:token", async (req: any, res: any, next: any) => {
         companyName: tenantInfo?.name || "Techsole Engineers",
         logoUrl: tenantInfo?.logo_url || "",
         primaryColor: tenantInfo?.primary_color || "#0f172a",
-        emailFooter: tenantInfo?.email_footer || ""
+        emailFooter: tenantInfo?.email_footer || "",
+        calLink: calLink
       }
     });
   } catch (err) {
