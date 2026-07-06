@@ -534,7 +534,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                       />
                     </div>
                     <span className="text-[9px] text-slate-400 block mt-1">
-                      1. Go to Cal.com -> Settings -> Webhooks. <br/>
+                      1. Go to Cal.com {"->"} Settings {"->"} Webhooks. <br/>
                       2. Add Webhook, paste the URL above, and select the **Booking Created**, **Booking Rescheduled**, and **Booking Cancelled** triggers.
                     </span>
                   </div>
