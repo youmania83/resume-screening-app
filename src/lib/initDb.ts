@@ -731,6 +731,13 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_assessment_attempts_candidate ON assessment_attempts(candidate_id, assessment_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_interviews_candidate ON interviews(candidate_id);
+      CREATE INDEX IF NOT EXISTS idx_interviews_status ON interviews(tenant_id, status);
+      CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(tenant_id, status);
+      CREATE INDEX IF NOT EXISTS idx_candidate_timeline_event ON candidate_timeline(tenant_id, event_type, created_at);
+      CREATE INDEX IF NOT EXISTS idx_candidates_source ON candidates(tenant_id, source);
+      CREATE INDEX IF NOT EXISTS idx_candidate_assignments_recruiter ON candidate_assignments(tenant_id, recruiter_id);
+      CREATE INDEX IF NOT EXISTS idx_client_submissions_submitted_by ON client_submissions(tenant_id, submitted_by);
+      CREATE INDEX IF NOT EXISTS idx_candidate_activity_logs_logged_at ON candidate_activity_logs(tenant_id, logged_at DESC);
     `);
 
     console.log("✅ Database tables and schema alterations ensured.");

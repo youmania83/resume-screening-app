@@ -435,16 +435,19 @@ function queueRecalculateJobMatches(tenantId: string, jobId: string) {
     try {
       const { tenantStorage } = await import("../../lib/tenantContext.js");
       await tenantStorage.run({ tenantId, userId: "system", role: "owner" }, async () => {
-        const weightsRes = await queryTenant("SELECT scoring_weights FROM tenants WHERE id = :tenant_id;", []);
+        // Retrieve weights, job details, and all candidates concurrently in parallel
+        const [weightsRes, jobRes, candidatesRes] = await Promise.all([
+          queryTenant("SELECT scoring_weights FROM tenants WHERE id = :tenant_id;", []),
+          queryTenant("SELECT * FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;", [jobId]),
+          queryTenant("SELECT * FROM candidates WHERE tenant_id = :tenant_id;", [])
+        ]);
+
         const weights = weightsRes.rows[0]?.scoring_weights || {
           skills: 30, experience: 25, industry: 15, education: 15, location: 15
         };
 
-        const jobRes = await queryTenant("SELECT * FROM jobs WHERE id = $1 AND tenant_id = :tenant_id LIMIT 1;", [jobId]);
         if (jobRes.rowCount === 0) return;
         const job = jobRes.rows[0];
-
-        const candidatesRes = await queryTenant("SELECT * FROM candidates WHERE tenant_id = :tenant_id;", []);
         for (const candidate of candidatesRes.rows) {
           const mockParsed = {
             firstName: candidate.first_name || "",

@@ -77,25 +77,25 @@ router.get("/", async (req, res, next) => {
       }
     }
 
-    // Fetch paginated candidate rows
-    const candidatesRes = await queryTenant(
-      `SELECT candidates.*, j.title as job_title, j.location as job_location, j.job_code as job_code
-       FROM candidates
-       LEFT JOIN jobs j ON candidates.job_id = j.id
-       WHERE ${whereClause}
-       ORDER BY candidates.${sortBy} ${sortOrder}
-       LIMIT ${limit} OFFSET ${offset};`,
-      queryParams
-    );
-
-    // Fetch total candidate count for meta
-    const countRes = await queryTenant(
-      `SELECT COUNT(*) as total
-       FROM candidates
-       LEFT JOIN jobs j ON candidates.job_id = j.id
-       WHERE ${whereClause};`,
-      queryParams
-    );
+    // Fetch paginated candidate rows and total candidate count concurrently in parallel
+    const [candidatesRes, countRes] = await Promise.all([
+      queryTenant(
+        `SELECT candidates.*, j.title as job_title, j.location as job_location, j.job_code as job_code
+         FROM candidates
+         LEFT JOIN jobs j ON candidates.job_id = j.id
+         WHERE ${whereClause}
+         ORDER BY candidates.${sortBy} ${sortOrder}
+         LIMIT ${limit} OFFSET ${offset};`,
+        queryParams
+      ),
+      queryTenant(
+        `SELECT COUNT(*) as total
+         FROM candidates
+         LEFT JOIN jobs j ON candidates.job_id = j.id
+         WHERE ${whereClause};`,
+        queryParams
+      )
+    ]);
     const total = parseInt(countRes.rows[0].total) || 0;
 
     res.json({
