@@ -698,6 +698,28 @@ async function init() {
       ON CONFLICT (key) DO NOTHING;
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        id VARCHAR PRIMARY KEY,
+        tenant_id VARCHAR REFERENCES tenants(id) ON DELETE CASCADE,
+        user_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        candidate_id VARCHAR REFERENCES candidates(id) ON DELETE SET NULL,
+        name VARCHAR NOT NULL,
+        email VARCHAR NOT NULL,
+        subject VARCHAR NOT NULL,
+        message TEXT NOT NULL,
+        status VARCHAR NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+        priority VARCHAR NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+        source VARCHAR NOT NULL DEFAULT 'recruiter' CHECK (source IN ('recruiter', 'candidate', 'anonymous')),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_tenant_id ON support_tickets(tenant_id);
+    `);
+
     // Ensure critical indexes are created for performance and security
     console.log("Adding missing database performance indexes...");
     await client.query(`

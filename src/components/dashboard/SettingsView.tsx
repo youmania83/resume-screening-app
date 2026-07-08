@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import { Key, Mail, Palette, FileText, Save, Info, AlertTriangle, Inbox, Plus, Trash2, CheckCircle2 } from "lucide-react";
+import { Key, Mail, Palette, FileText, Save, Info, AlertTriangle, Inbox, Plus, Trash2, CheckCircle2, LifeBuoy, Clock, Eye, AlertCircle } from "lucide-react";
 
 interface SettingsViewProps {
   webhookUrl: string;
@@ -13,7 +13,7 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "inbox-sync" | "smtp" | "templates">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "inbox-sync" | "smtp" | "templates" | "support">("general");
 
   // Calendar Settings State
   const [calendarProvider, setCalendarProvider] = useState("mock");
@@ -69,6 +69,15 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   // Loading States
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Support Tickets State
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [ticketPriority, setTicketPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [submittingTicket, setSubmittingTicket] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
@@ -144,9 +153,89 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
     }
   };
 
+  const loadTickets = async () => {
+    setLoadingTickets(true);
+    try {
+      const resp = await fetch(`${apiBase}/support-tickets`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.tickets)) {
+          setTickets(data.tickets);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load tickets:", err);
+    } finally {
+      setLoadingTickets(false);
+    }
+  };
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject.trim() || !ticketMessage.trim()) {
+      toast.error("Subject and message are required.");
+      return;
+    }
+    setSubmittingTicket(true);
+    try {
+      const resp = await fetch(`${apiBase}/support-tickets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: ticketSubject,
+          message: ticketMessage,
+          priority: ticketPriority
+        })
+      });
+      if (resp.ok) {
+        toast.success("Support ticket created successfully!");
+        setTicketSubject("");
+        setTicketMessage("");
+        setTicketPriority("medium");
+        loadTickets();
+      } else {
+        const data = await resp.json();
+        toast.error(data.error || "Failed to submit ticket.");
+      }
+    } catch (err) {
+      console.error("Error submitting ticket:", err);
+      toast.error("An error occurred while submitting.");
+    } finally {
+      setSubmittingTicket(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
+    try {
+      const resp = await fetch(`${apiBase}/support-tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (resp.ok) {
+        toast.success(`Ticket marked as ${newStatus}.`);
+        loadTickets();
+        if (selectedTicket && selectedTicket.id === ticketId) {
+          setSelectedTicket((prev: any) => prev ? { ...prev, status: newStatus } : null);
+        }
+      } else {
+        toast.error("Failed to update ticket status.");
+      }
+    } catch (err) {
+      console.error("Error updating ticket:", err);
+      toast.error("An error occurred.");
+    }
+  };
+
   useEffect(() => {
     loadSettingsData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "support") {
+      loadTickets();
+    }
+  }, [activeTab]);
 
   // Update form fields when template changes
   const handleTemplateChange = (name: string) => {
@@ -395,7 +484,8 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
           { id: "general", label: "Integrations & Sync", icon: Key },
           { id: "inbox-sync", label: "Email Inbox Sync", icon: Inbox },
           { id: "smtp", label: "SMTP & Branding", icon: Mail },
-          { id: "templates", label: "Email Templates", icon: FileText }
+          { id: "templates", label: "Email Templates", icon: FileText },
+          { id: "support", label: "Support Tickets", icon: LifeBuoy }
         ].map(t => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -1078,6 +1168,261 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
               >
                 <Save className="h-3.5 w-3.5" /> Save Template Changes
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Support Tickets Tab */}
+      {activeTab === "support" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Submit ticket Form */}
+          <div className="md:col-span-1">
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border">
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">
+                  Submit Support Ticket
+                </CardTitle>
+                <CardDescription className="text-[10px] text-muted-foreground font-semibold">
+                  Report a platform issue or ask a technical question.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <form onSubmit={handleSubmitTicket} className="space-y-4 text-xs">
+                  <div className="space-y-1">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Subject / Issue Title</span>
+                    <input
+                      type="text"
+                      value={ticketSubject}
+                      onChange={(e) => setTicketSubject(e.target.value)}
+                      placeholder="e.g., Candidates reporting login delay"
+                      className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-bold outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Message / Detailed Description</span>
+                    <textarea
+                      rows={6}
+                      value={ticketMessage}
+                      onChange={(e) => setTicketMessage(e.target.value)}
+                      placeholder="Describe the issue or request in detail..."
+                      className="w-full bg-secondary/30 border border-border rounded p-2.5 font-sans text-xs outline-none leading-relaxed resize-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Priority Level</span>
+                    <select
+                      value={ticketPriority}
+                      onChange={(e: any) => setTicketPriority(e.target.value)}
+                      className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-bold outline-none"
+                    >
+                      <option value="low">Low (General inquiry)</option>
+                      <option value="medium">Medium (Standard platform issue)</option>
+                      <option value="high">High (Assessment/blocking issue)</option>
+                      <option value="urgent">Urgent (Production outage/down)</option>
+                    </select>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={submittingTicket}
+                    className="w-full text-xs font-bold gap-1.5 shadow-sm mt-2"
+                  >
+                    {submittingTicket ? "Submitting Request..." : "File Support Ticket"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Ticket history */}
+          <div className="md:col-span-2 space-y-6">
+            <Card className="shadow-sm border-border bg-card">
+              <CardHeader className="pb-3 border-b border-border">
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">
+                  Ticket History
+                </CardTitle>
+                <CardDescription className="text-[10px] text-muted-foreground font-semibold">
+                  Track and manage technical tickets filed under your account.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 p-0">
+                {loadingTickets ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-bold">Retrieving tickets...</span>
+                  </div>
+                ) : tickets.length === 0 ? (
+                  <div className="text-center py-12 space-y-2">
+                    <LifeBuoy className="h-8 w-8 text-muted-foreground/45 mx-auto" />
+                    <p className="text-xs text-muted-foreground font-bold italic">No support tickets filed yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-border bg-secondary/20 font-bold uppercase tracking-wider text-[9px] text-muted-foreground">
+                          <th className="p-3">Created</th>
+                          <th className="p-3">Source</th>
+                          <th className="p-3">Subject</th>
+                          <th className="p-3">Priority</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {tickets.map((t) => (
+                          <tr key={t.id} className="hover:bg-secondary/10 transition-colors">
+                            <td className="p-3 text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
+                              {new Date(t.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <Badge variant="outline" className={`text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 border ${
+                                t.source === "candidate"
+                                  ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+                                  : t.source === "recruiter"
+                                  ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                  : "bg-slate-500/10 text-slate-600 border-slate-500/20"
+                              }`}>
+                                {t.source}
+                              </Badge>
+                            </td>
+                            <td className="p-3 font-bold truncate max-w-[150px]">{t.subject}</td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center text-[8.5px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider border ${
+                                t.priority === "urgent"
+                                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                  : t.priority === "high"
+                                  ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+                                  : t.priority === "medium"
+                                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              }`}>
+                                {t.priority}
+                              </span>
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center text-[8.5px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider border ${
+                                t.status === "open"
+                                  ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 animate-pulse"
+                                  : t.status === "in_progress"
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              }`}>
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => setSelectedTicket(t)}
+                                className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-200 text-[10px] font-bold px-2 py-1 rounded transition-colors cursor-pointer mr-1.5"
+                              >
+                                <Eye className="h-3 w-3" /> View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket Details Modal Overlay */}
+      {selectedTicket && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans select-none animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-border bg-secondary/15 flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block">Ticket Details</span>
+                <h3 className="text-sm font-bold text-foreground truncate max-w-[280px]">
+                  {selectedTicket.subject}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedTicket(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-xs font-bold bg-secondary/80 border border-border p-1.5 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4.5 text-xs overflow-y-auto max-h-[380px] custom-scrollbar">
+              <div className="grid grid-cols-2 gap-3.5 bg-secondary/10 p-3.5 rounded-lg border border-border/80">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider block">Submitted By</span>
+                  <span className="font-bold text-foreground block truncate">{selectedTicket.name}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block truncate">{selectedTicket.email}</span>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider block">Source & Date</span>
+                  <span className="font-bold text-foreground block uppercase text-[10px]">{selectedTicket.source}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block">
+                    {new Date(selectedTicket.created_at).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider block">Message Description</span>
+                <div className="bg-secondary/20 p-3.5 rounded-lg border border-border/60 text-xs leading-relaxed text-foreground font-medium whitespace-pre-wrap max-h-[160px] overflow-y-auto custom-scrollbar">
+                  {selectedTicket.message}
+                </div>
+              </div>
+
+              <div className="flex gap-2 text-[10px]">
+                <div className="flex-1 bg-secondary/10 p-2.5 rounded border border-border flex flex-col justify-center items-center">
+                  <span className="text-[8px] text-muted-foreground uppercase font-extrabold tracking-wider">Priority</span>
+                  <span className="font-extrabold text-foreground uppercase mt-0.5 tracking-wider">{selectedTicket.priority}</span>
+                </div>
+                <div className="flex-1 bg-secondary/10 p-2.5 rounded border border-border flex flex-col justify-center items-center">
+                  <span className="text-[8px] text-muted-foreground uppercase font-extrabold tracking-wider">Status</span>
+                  <span className="font-extrabold text-foreground uppercase mt-0.5 tracking-wider">{selectedTicket.status}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border bg-secondary/15 flex justify-between gap-2.5 select-none">
+              <div className="flex gap-2">
+                {selectedTicket.status !== "resolved" && (
+                  <button
+                    onClick={() => handleUpdateTicketStatus(selectedTicket.id, "resolved")}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                  >
+                    Resolve Ticket
+                  </button>
+                )}
+                {selectedTicket.status !== "in_progress" && selectedTicket.status !== "resolved" && (
+                  <button
+                    onClick={() => handleUpdateTicketStatus(selectedTicket.id, "in_progress")}
+                    className="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                  >
+                    Mark In Progress
+                  </button>
+                )}
+                {selectedTicket.status === "resolved" && (
+                  <button
+                    onClick={() => handleUpdateTicketStatus(selectedTicket.id, "open")}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                  >
+                    Re-open Ticket
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedTicket(null)}
+                className="bg-secondary hover:bg-secondary/80 border border-border text-muted-foreground text-[10px] font-extrabold px-4.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                Close View
+              </button>
             </div>
           </div>
         </div>

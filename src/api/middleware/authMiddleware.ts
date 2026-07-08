@@ -45,6 +45,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     publicPaths.some(p => req.path.startsWith(p)) ||
     req.path.startsWith("/api/candidate-portal") ||
     req.path.startsWith("/api/webhooks") ||
+    req.path.startsWith("/api/support-tickets/public") ||
     (req.path.startsWith("/api/assessment") && 
      !req.path.startsWith("/api/assessment/generate") && 
      !req.path.startsWith("/api/assessment/send"))

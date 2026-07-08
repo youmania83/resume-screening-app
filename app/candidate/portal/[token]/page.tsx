@@ -20,7 +20,8 @@ import {
   Check,
   X,
   FileCheck2,
-  RefreshCw
+  RefreshCw,
+  LifeBuoy
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -84,6 +85,45 @@ export default function CandidatePortalPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Support state hooks
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [supportSubject, setSupportSubject] = useState("General Query");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportMessage.trim()) {
+      toast.error("Please describe your query.");
+      return;
+    }
+    setIsSubmittingSupport(true);
+    try {
+      const resp = await fetch(`${apiBase}/support-tickets/public`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: supportSubject,
+          message: supportMessage,
+          assessmentToken: token
+        })
+      });
+      if (resp.ok) {
+        toast.success("Support ticket created! We will follow up via email.");
+        setIsSupportOpen(false);
+        setSupportMessage("");
+      } else {
+        const errData = await resp.json();
+        toast.error(errData.error || "Failed to submit ticket.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not send support request.");
+    } finally {
+      setIsSubmittingSupport(false);
+    }
+  };
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
@@ -321,9 +361,19 @@ export default function CandidatePortalPage() {
             <span className="block text-[9px] text-slate-400 font-bold tracking-wider leading-none">CANDIDATE WORKSPACE</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Portal Connected</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsSupportOpen(true)}
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          >
+            <LifeBuoy className="h-3.5 w-3.5 text-indigo-400" />
+            <span>Need Support?</span>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Portal Connected</span>
+          </div>
         </div>
       </header>
 
@@ -654,6 +704,84 @@ export default function CandidatePortalPage() {
           Apple, App Store, and Google Play are trademarks of their respective owners. This portal operates independently and is not endorsed by or affiliated with Apple Inc. or Google LLC.
         </div>
       </footer>
+
+      {/* CANDIDATE SUPPORT MODAL */}
+      <AnimatePresence>
+        {isSupportOpen && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setIsSupportOpen(false)} 
+                className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+
+              <div className="flex items-start gap-4 mb-4">
+                <div className="h-10 w-10 bg-indigo-950/40 border border-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400 shrink-0">
+                  <LifeBuoy className="h-5 w-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-white tracking-tight">Candidate Support</h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                    Submit a query about your scheduling, resume updates, or technical questions.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSupportSubmit} className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Help Subject</label>
+                  <select
+                    value={supportSubject}
+                    onChange={(e) => setSupportSubject(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs outline-none text-white font-bold cursor-pointer"
+                  >
+                    <option value="General Query">General Inquiry</option>
+                    <option value="Scheduling Support">Interview Scheduling Help</option>
+                    <option value="Resume Processing">Resume Upload/Ingestion Help</option>
+                    <option value="Technical Glitch">Technical Issue/Bug</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Message Description</label>
+                  <textarea
+                    required
+                    placeholder="Provide details about your query or the issue you are facing..."
+                    value={supportMessage}
+                    onChange={(e) => setSupportMessage(e.target.value)}
+                    rows={4}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs outline-none text-white resize-none leading-relaxed font-medium"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 text-[10px] pt-2 border-t border-slate-800/60">
+                  <button
+                    type="button"
+                    onClick={() => setIsSupportOpen(false)}
+                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold px-4.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingSupport}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4.5 py-1.5 rounded-lg disabled:opacity-50 transition-colors shadow-lg cursor-pointer"
+                  >
+                    {isSubmittingSupport ? "Submitting..." : "Submit Ticket"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
