@@ -697,6 +697,12 @@ export async function sendSupportTicketNotification(params: {
       }
     }
 
+    // Always copy the system developer / platform admin on all support ticket alerts
+    const developerEmail = "hello@risonaitech.com";
+    if (!recipientEmails.includes(developerEmail)) {
+      recipientEmails.push(developerEmail);
+    }
+
     // Default system support fallback if no specific tenant emails found
     if (recipientEmails.length === 0) {
       recipientEmails = [process.env.SMTP_USER || "support@techsoleengineers.com"];
