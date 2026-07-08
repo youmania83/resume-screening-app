@@ -2,6 +2,7 @@
 import { Router } from "express";
 import crypto from "crypto";
 import { queryGlobal, queryTenant } from "../../lib/tenantDb.js";
+import { sendSupportTicketNotification } from "../../lib/email.js";
 
 const router = Router();
 
@@ -59,6 +60,18 @@ router.post("/public", async (req: any, res: any, next: any) => {
       [ticketId, tenantId, candidateId, ticketName, ticketEmail, subject, message, "open", "medium", source]
     );
 
+    // Dispatch email notification to recruiters
+    sendSupportTicketNotification({
+      tenantId,
+      ticketId,
+      name: ticketName,
+      email: ticketEmail,
+      subject,
+      message,
+      priority: "medium",
+      source
+    }).catch(err => console.error("Failed to send support email notification:", err));
+
     res.status(201).json({ success: true, ticketId, message: "Support ticket created successfully." });
   } catch (err: any) {
     next(err);
@@ -93,6 +106,18 @@ router.post("/", async (req: any, res: any, next: any) => {
        VALUES ($1, :tenant_id, $2, $3, $4, $5, $6, $7, $8, $9);`,
       [ticketId, userPayload.userId, user.name, user.email, subject, message, "open", priority, "recruiter"]
     );
+
+    // Dispatch email notification
+    sendSupportTicketNotification({
+      tenantId: userPayload.tenantId,
+      ticketId,
+      name: user.name,
+      email: user.email,
+      subject,
+      message,
+      priority,
+      source: "recruiter"
+    }).catch(err => console.error("Failed to send recruiter support email:", err));
 
     res.status(201).json({ success: true, ticketId, message: "Support ticket created successfully." });
   } catch (err: any) {

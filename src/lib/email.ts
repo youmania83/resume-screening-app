@@ -667,3 +667,87 @@ export async function sendInterviewScheduleEmail(params: {
   console.log(`📧 Interview scheduled emails sent successfully to candidate (${params.candidateEmail}) and HR (${params.hrEmail})`);
   return { success: true, mock: false };
 }
+
+/**
+ * Sends an email notification when a support ticket is filed
+ */
+export async function sendSupportTicketNotification(params: {
+  tenantId: string | null;
+  ticketId: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  priority: string;
+  source: string;
+}) {
+  const { tenantId, name, email, subject, message, priority, source } = params;
+
+  try {
+    let recipientEmails: string[] = [];
+
+    // Find recruiters/owners for this tenant to notify
+    if (tenantId) {
+      const usersRes = await query(
+        "SELECT email FROM users WHERE tenant_id = $1 AND role IN ('owner', 'recruiter');",
+        [tenantId]
+      );
+      if (usersRes.rowCount && usersRes.rowCount > 0) {
+        recipientEmails = usersRes.rows.map((u: any) => u.email);
+      }
+    }
+
+    // Default system support fallback if no specific tenant emails found
+    if (recipientEmails.length === 0) {
+      recipientEmails = [process.env.SMTP_USER || "support@techsoleengineers.com"];
+    }
+
+    const { transporter, fromEmail } = await resolveTransporter(tenantId || undefined);
+
+    if (!transporter) {
+      console.warn("⚠️ [Email Notification] No SMTP transporter configured. Support ticket logged in DB only.");
+      return;
+    }
+
+    const recipientCsv = recipientEmails.join(", ");
+    const htmlContent = `
+      <div style="font-family: sans-serif; padding: 24px; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; margin-top: 0; font-size: 18px; font-weight: 800;">New Support Ticket</h2>
+        <p style="font-size: 13px; color: #334155;">A new support request was submitted by a <strong>${source}</strong>.</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr style="background-color: #f8fafc;">
+            <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Submitted By</th>
+            <td style="padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; color: #0f172a; font-weight: 600;">${name} (${email})</td>
+          </tr>
+          <tr>
+            <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Subject</th>
+            <td style="padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; font-weight: bold; color: #0f172a;">${subject}</td>
+          </tr>
+          <tr style="background-color: #f8fafc;">
+            <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Priority</th>
+            <td style="padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; color: #ef4444; font-weight: bold; text-transform: uppercase;">${priority}</td>
+          </tr>
+        </table>
+        
+        <div style="background-color: #f1f5f9; padding: 18px; border-radius: 8px; font-size: 12px; color: #334155; line-height: 1.6; white-space: pre-wrap; margin-bottom: 20px; font-family: monospace; border: 1px solid #e2e8f0;">
+${message}
+        </div>
+        
+        <p style="font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; pt-15; margin-top: 20px;">You can view and manage this ticket directly under <strong>Workspace Settings -> Support Tickets</strong> in your admin console.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: fromEmail,
+      to: recipientCsv,
+      subject: `[Support Ticket] ${priority.toUpperCase()}: ${subject}`,
+      html: htmlContent
+    });
+
+    console.log(`✉️ [Email Notification] Support ticket notification dispatched to ${recipientCsv}`);
+  } catch (err: any) {
+    console.error("🚨 [Email Notification] Error dispatching support ticket email:", err);
+  }
+}
+
