@@ -20,13 +20,13 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [calendarCalLink, setCalendarCalLink] = useState("");
 
   // SMTP Settings State
-  const [smtpProvider, setSmtpProvider] = useState("gmail");
-  const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
-  const [smtpPort, setSmtpPort] = useState(465);
-  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpProvider, setSmtpProvider] = useState("zoho");
+  const [smtpHost, setSmtpHost] = useState("smtp.zoho.com");
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState("hr@techsolengineers.com");
   const [smtpPassword, setSmtpPassword] = useState("");
-  const [smtpFromName, setSmtpFromName] = useState("");
-  const [smtpReplyTo, setSmtpReplyTo] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("Techsole Engineers HR");
+  const [smtpReplyTo, setSmtpReplyTo] = useState("hr@techsolengineers.com");
 
   // Zoho Live Status State
   const [zohoStatus, setZohoStatus] = useState<{enabled:boolean;configured:boolean;smtpUser:string;smtpHost:string;smtpPort:string;senderName:string} | null>(null);

@@ -265,8 +265,25 @@ router.get("/settings", async (req: any, res: any, next: any) => {
       return;
     }
 
-        const tenantData = tenantRes.rows[0];
-    const config = tenantData.email_config || {};
+    const tenantData = tenantRes.rows[0];
+    let config = tenantData.email_config || {};
+    
+    // Auto-override hello@risonaitech.com or empty config to Zoho default
+    if (Object.keys(config).length === 0 || config.username === "hello@risonaitech.com" || config.user === "hello@risonaitech.com") {
+      config = {
+        provider: "zoho",
+        username: "hr@techsolengineers.com",
+        user: "hr@techsolengineers.com",
+        host: "smtp.zoho.com",
+        port: 587,
+        fromName: "Techsole Engineers HR",
+        replyTo: "hr@techsolengineers.com",
+        incomingProvider: "zoho",
+        incomingSyncEnabled: true,
+        incomingFolder: "INBOX"
+      };
+    }
+
     const maskedConfig = { ...config };
     if (maskedConfig.pass) {
       maskedConfig.pass = "********";

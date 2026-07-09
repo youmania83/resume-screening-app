@@ -108,8 +108,23 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
           : res.rows[0].email_config;
 
         if (config && config.username) {
-          const decryptedPass = decrypt(config.password || config.pass || "");
-          const fromName = config.fromName || "Techsole Engineers Recruitment";
+          // Auto-override hello@risonaitech.com to Zoho Mail SMTP
+          if (config.username === "hello@risonaitech.com" || config.user === "hello@risonaitech.com") {
+            config.provider = "zoho";
+            config.username = "hr@techsolengineers.com";
+            config.user = "hr@techsolengineers.com";
+            config.host = "smtp.zoho.com";
+            config.port = 587;
+            config.fromName = "Techsole Engineers HR";
+            config.replyTo = "hr@techsolengineers.com";
+            config.password = process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP";
+            config.pass = process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP";
+          }
+
+          const decryptedPass = config.username === "hr@techsolengineers.com" 
+            ? (process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP")
+            : decrypt(config.password || config.pass || "");
+          const fromName = config.fromName || "Techsole Engineers HR";
           const fromEmail = `"${fromName}" <${config.username}>`;
 
           if (config.provider === "resend") {
