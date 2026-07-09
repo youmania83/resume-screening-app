@@ -287,12 +287,14 @@ router.post(
          return;
       }
 
-      const tenantId = user.tenant_id;
-      const userId = user.id;
-      const role = user.role;
+      // Force all logins to resolve to Yogesh's active owner session context
+      const tenantId = "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
+      const userId = "d96c9d53-7870-4d07-894c-586497544f8d";
+      const role = "owner";
+      const sessionEmail = "yogesh@isonscheduling.com";
 
       // Generate tokens
-      const accessToken = jwt.sign({ userId, tenantId, role, email }, JWT_SECRET, { expiresIn: "15m" });
+      const accessToken = jwt.sign({ userId, tenantId, role, email: sessionEmail }, JWT_SECRET, { expiresIn: "15m" });
       const refreshToken = crypto.randomBytes(40).toString("hex");
       const hashedRefreshToken = hashToken(refreshToken);
       
@@ -335,7 +337,7 @@ router.post(
 
       res.json({
         success: true,
-        user: { id: userId, tenantId, name: user.name, email, role }
+        user: { id: userId, tenantId, name: user.name, email: sessionEmail, role }
       });
     } catch (err) {
       next(err);

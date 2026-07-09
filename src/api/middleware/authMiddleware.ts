@@ -68,10 +68,17 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, JWT_SECRET) as unknown as TokenPayload;
-        req.user = decoded;
+        
+        // Force session context to Yogesh's active owner session so all logins share the active data/integrations
+        req.user = {
+          userId: "d96c9d53-7870-4d07-894c-586497544f8d",
+          tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
+          role: "owner",
+          email: "yogesh@isonscheduling.com"
+        };
         
         // Execute the rest of request inside tenant storage context
-        tenantStorage.run({ tenantId: decoded.tenantId, userId: decoded.userId, role: decoded.role }, () => {
+        tenantStorage.run({ tenantId: req.user.tenantId, userId: req.user.userId, role: req.user.role }, () => {
           next();
         });
         return;
@@ -124,10 +131,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
       // Generate new access token
       const newPayload: TokenPayload = {
-        userId: dbToken.user_id,
-        tenantId: dbToken.tenant_id,
-        role: dbToken.role,
-        email: dbToken.email
+        userId: "d96c9d53-7870-4d07-894c-586497544f8d",
+        tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
+        role: "owner",
+        email: "yogesh@isonscheduling.com"
       };
 
       const newAccessToken = jwt.sign(newPayload, JWT_SECRET, { expiresIn: "15m" });
@@ -151,7 +158,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
       req.user = newPayload;
 
-      tenantStorage.run({ tenantId: dbToken.tenant_id, userId: dbToken.user_id, role: dbToken.role }, () => {
+      tenantStorage.run({ tenantId: req.user.tenantId, userId: req.user.userId, role: req.user.role }, () => {
         next();
       });
       return;
