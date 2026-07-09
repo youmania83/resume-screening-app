@@ -143,7 +143,6 @@ export default function Dashboard() {
     handleFolderChange,
     triggerFileSelect,
     triggerFolderSelect,
-    handleSimulatedIngestion,
     isIngesting,
     uploadProgress,
     screeningQueue,
@@ -316,7 +315,6 @@ export default function Dashboard() {
               handleSaveJD={handleSaveJD}
               jdFileInputRef={jdFileInputRef}
               isIngesting={isIngesting}
-              handleSimulatedIngestion={handleSimulatedIngestion}
               dragActive={dragActive}
               handleDrag={handleDrag}
               handleDrop={handleDrop}

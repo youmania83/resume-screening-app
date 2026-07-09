@@ -1,6 +1,6 @@
 // src/components/dashboard/screening/ResumeIngestCard.tsx
 import React from "react";
-import { Activity, Building2, FileText, Link2, UploadCloud, Clock, ChevronRight, X, AlertCircle } from "lucide-react";
+import { UploadCloud, Clock, ChevronRight, X, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Badge } from "../../ui/badge";
@@ -11,7 +11,6 @@ import { Candidate, StructuredJD } from "../../../types/index";
 interface ResumeIngestCardProps {
   isIngesting: boolean;
   activeJD: StructuredJD | null;
-  handleSimulatedIngestion: (source: string) => void;
   dragActive: boolean;
   handleDrag: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent) => void;
@@ -32,7 +31,6 @@ interface ResumeIngestCardProps {
 export function ResumeIngestCard({
   isIngesting,
   activeJD,
-  handleSimulatedIngestion,
   dragActive,
   handleDrag,
   handleDrop,
@@ -51,42 +49,6 @@ export function ResumeIngestCard({
 }: ResumeIngestCardProps) {
   return (
     <div className="lg:col-span-5 space-y-6">
-      {/* Resume Ingestion Source Simulator */}
-      <Card className="shadow-sm border-border bg-card">
-        <CardHeader className="pb-3 border-b border-border">
-          <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-            <Activity className="h-3.5 w-3.5 text-indigo-500" />
-            Resume Collection Engine (Simulator)
-          </CardTitle>
-          <CardDescription className="text-[10px] text-muted-foreground">
-            Automatically pulls resumes from candidate application streams.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { name: "Keka HRMS", icon: Building2, color: "text-emerald-500" },
-              { name: "Careers Email", icon: FileText, color: "text-sky-500" },
-              { name: "Careers Page", icon: Link2, color: "text-amber-500" }
-            ].map(source => {
-              const Icon = source.icon;
-              return (
-                <Button
-                  key={source.name}
-                  variant="outline"
-                  size="sm"
-                  disabled={isIngesting || !activeJD}
-                  onClick={() => handleSimulatedIngestion(source.name)}
-                  className="text-[10px] font-semibold py-1.5 h-auto flex flex-col items-center gap-1 border-border text-foreground/90 hover:bg-secondary/40"
-                >
-                  <Icon className={`h-4 w-4 ${source.color}`} />
-                  {source.name}
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Resume Upload Area */}
       <Card className="shadow-sm border-border bg-card">

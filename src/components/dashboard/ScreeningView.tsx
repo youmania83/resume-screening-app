@@ -25,7 +25,6 @@ interface ScreeningViewProps {
   jdFileInputRef: React.RefObject<HTMLInputElement | null>;
 
   isIngesting: boolean;
-  handleSimulatedIngestion: (source: string) => void;
   dragActive: boolean;
   handleDrag: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent) => void;
@@ -88,7 +87,6 @@ export function ScreeningView(props: ScreeningViewProps) {
         <ResumeIngestCard
           isIngesting={props.isIngesting}
           activeJD={props.activeJD}
-          handleSimulatedIngestion={props.handleSimulatedIngestion}
           dragActive={props.dragActive}
           handleDrag={props.handleDrag}
           handleDrop={props.handleDrop}

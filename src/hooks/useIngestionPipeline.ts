@@ -332,48 +332,6 @@ export function useIngestionPipeline({
     }
   };
 
-  const handleSimulatedIngestion = async (source: string) => {
-    if (!activeJD) {
-      toast.error("Please import or save a Job Description profile before screening candidates.");
-      return;
-    }
-
-    setIsIngesting(true);
-    toast.loading(`Simulating collection from ${source}...`, { id: "ingestion-loader" });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    let name = "Rohan Sharma";
-    let filename = "rohan_sharma_scm.pdf";
-    let mockText = `ROH Sharma SCM Procurement expert. SAP systems.`;
-
-    const activeJDTitle = activeJD.title.toLowerCase();
-    if (activeJDTitle.includes("frontend") || activeJDTitle.includes("react") || activeJDTitle.includes("web")) {
-      name = "Neha Gupta";
-      filename = "neha_gupta_frontend.pdf";
-      mockText = `NEHA GUPTA React Next.js TypeScript Frontend Specialist.`;
-    } else if (activeJDTitle.includes("devops") || activeJDTitle.includes("cloud") || activeJDTitle.includes("infrastructure")) {
-      name = "Alex Mercer";
-      filename = "alex_mercer_devops.pdf";
-      mockText = `ALEX MERCER DevOps AWS Terraform Kubernetes.`;
-    }
-
-    const file = new File([mockText], filename, { type: "text/plain" });
-    const queueItemId = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    const newQueueItem = {
-      id: queueItemId,
-      name: name,
-      fileName: filename,
-      progress: 10,
-      status: "parsing"
-    };
-
-    setScreeningQueue(prev => [newQueueItem, ...prev]);
-    toast.success(`Resume retrieved from ${source}! Added to live screening queue.`, { id: "ingestion-loader" });
-    setIsIngesting(false);
-
-    runEvaluationPipelineWithSource(newQueueItem, file, source);
-  };
-
   const dismissQueueItem = (id: string) => {
     setScreeningQueue(prev => prev.filter(item => item.id !== id));
   };
@@ -391,7 +349,6 @@ export function useIngestionPipeline({
     handleFolderChange,
     triggerFileSelect,
     triggerFolderSelect,
-    handleSimulatedIngestion,
     dismissQueueItem
   };
 }
