@@ -83,38 +83,41 @@ export class ZohoProvider implements IEmailProvider {
       const lock = await client.getMailboxLock("INBOX");
       try {
         const searchResults = await client.search({ seen: false });
-        console.log(`[Zoho Integration] Found ${searchResults.length} unread messages.`);
+        const resultsCount = Array.isArray(searchResults) ? searchResults.length : 0;
+        console.log(`[Zoho Integration] Found ${resultsCount} unread messages.`);
 
-        for (const seq of searchResults) {
-          try {
-            const message = await client.fetchOne(seq, { source: true });
-            if (message && message.source) {
-              const parsed = await simpleParser(message.source);
-              const attachments: EmailAttachment[] = [];
+        if (Array.isArray(searchResults)) {
+          for (const seq of searchResults) {
+            try {
+              const message = await client.fetchOne(seq, { source: true });
+              if (message && message.source) {
+                const parsed = await simpleParser(message.source);
+                const attachments: EmailAttachment[] = [];
 
-              if (parsed.attachments && parsed.attachments.length > 0) {
-                for (const att of parsed.attachments) {
-                  attachments.push({
-                    fileName: att.filename || "attachment",
-                    mimeType: att.contentType,
-                    content: att.content,
-                  });
+                if (parsed.attachments && parsed.attachments.length > 0) {
+                  for (const att of parsed.attachments) {
+                    attachments.push({
+                      fileName: att.filename || "attachment",
+                      mimeType: att.contentType,
+                      content: att.content,
+                    });
+                  }
                 }
-              }
 
-              const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
-              emails.push({
-                id: seq.toString(),
-                sender,
-                subject: parsed.subject || "",
-                bodyText: parsed.text || "",
-                bodyHtml: parsed.html || "",
-                receivedAt: parsed.date || new Date(),
-                attachments,
-              });
+                const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
+                emails.push({
+                  id: seq.toString(),
+                  sender,
+                  subject: parsed.subject || "",
+                  bodyText: parsed.text || "",
+                  bodyHtml: parsed.html || "",
+                  receivedAt: parsed.date || new Date(),
+                  attachments,
+                });
+              }
+            } catch (fetchErr) {
+              console.error(`[Zoho Integration] Failed to parse message sequence ${seq}:`, fetchErr);
             }
-          } catch (fetchErr) {
-            console.error(`[Zoho Integration] Failed to parse message sequence ${seq}:`, fetchErr);
           }
         }
       } finally {
