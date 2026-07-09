@@ -19,8 +19,9 @@ async function runSync() {
       [TARGET_TENANT_ID]
     );
 
-    console.log(`\n📋 Recent Items in Resume Inbox (Total: ${res.rowCount}):`);
-    if (res.rowCount > 0) {
+    const rowCount = res.rowCount || 0;
+    console.log(`\n📋 Recent Items in Resume Inbox (Total: ${rowCount}):`);
+    if (rowCount > 0) {
       res.rows.forEach((row, idx) => {
         console.log(`  [${idx + 1}] File: ${row.file_name}`);
         console.log(`      Status: ${row.status}`);
