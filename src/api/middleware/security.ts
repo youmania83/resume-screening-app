@@ -146,6 +146,11 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  // Bypass CSRF for Zoho diagnostic endpoints (called directly from Settings UI)
+  if (req.path === "/api/email/zoho-status" || req.path === "/api/email/zoho-test") {
+    return next();
+  }
+
   const isAuthorized = origin && (
     origin.startsWith(expectedDomain) ||
     origin.startsWith("http://localhost:3000") ||
