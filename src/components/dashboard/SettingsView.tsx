@@ -28,6 +28,11 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [smtpFromName, setSmtpFromName] = useState("");
   const [smtpReplyTo, setSmtpReplyTo] = useState("");
 
+  // Zoho Live Status State
+  const [zohoStatus, setZohoStatus] = useState<{enabled:boolean;configured:boolean;smtpUser:string;smtpHost:string;smtpPort:string;senderName:string} | null>(null);
+  const [testEmailTo, setTestEmailTo] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+
   // Incoming Email Sync State
   const [incomingSyncEnabled, setIncomingSyncEnabled] = useState(false);
   const [incomingProvider, setIncomingProvider] = useState("mock");
@@ -85,6 +90,12 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const loadSettingsData = async () => {
     setLoading(true);
     try {
+      // 0. Fetch Zoho live status
+      fetch(`${apiBase}/email/zoho-status`)
+        .then(r => r.json())
+        .then(d => { if (d.success) setZohoStatus(d.zoho); })
+        .catch(() => {});
+
       // 1. Fetch Email and Branding Settings
       const settingsResp = await fetch(`${apiBase}/email/settings`);
       if (settingsResp.ok) {
@@ -910,6 +921,67 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
 
       {/* SMTP & Branding Tab */}
       {activeTab === "smtp" && (
+        <div className="space-y-6">
+
+          {/* ── Zoho Live Status Banner ── */}
+          {zohoStatus && (
+            <div className={`rounded-xl border p-4 flex items-start gap-4 ${
+              zohoStatus.configured
+                ? "bg-emerald-950/30 border-emerald-700/50"
+                : "bg-amber-950/30 border-amber-700/50"
+            }`}>
+              <div className={`mt-0.5 h-3 w-3 rounded-full flex-shrink-0 ${
+                zohoStatus.configured ? "bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" : "bg-amber-400"
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-bold uppercase tracking-wider ${
+                  zohoStatus.configured ? "text-emerald-400" : "text-amber-400"
+                }`}>
+                  {zohoStatus.configured ? "Zoho Mail SMTP — Active & Connected" : "Zoho Mail SMTP — Not Configured"}
+                </p>
+                {zohoStatus.configured && (
+                  <div className="mt-2 grid grid-cols-3 gap-3 text-[11px]">
+                    <div><span className="block text-muted-foreground font-semibold">SMTP Host</span><span className="font-bold text-foreground">{zohoStatus.smtpHost}</span></div>
+                    <div><span className="block text-muted-foreground font-semibold">Port</span><span className="font-bold text-foreground">{zohoStatus.smtpPort} (STARTTLS)</span></div>
+                    <div><span className="block text-muted-foreground font-semibold">Sender</span><span className="font-bold text-foreground truncate block">{zohoStatus.smtpUser}</span></div>
+                    {zohoStatus.senderName && <div className="col-span-3"><span className="text-muted-foreground font-semibold">Display Name: </span><span className="font-bold text-foreground">{zohoStatus.senderName}</span></div>}
+                  </div>
+                )}
+              </div>
+              {zohoStatus.configured && (
+                <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                  <input
+                    type="email"
+                    placeholder="Send test to email..."
+                    value={testEmailTo}
+                    onChange={e => setTestEmailTo(e.target.value)}
+                    className="text-[11px] bg-secondary/50 border border-border rounded px-2.5 py-1.5 outline-none w-48 font-semibold"
+                  />
+                  <button
+                    disabled={sendingTest || !testEmailTo.trim()}
+                    onClick={async () => {
+                      setSendingTest(true);
+                      try {
+                        const r = await fetch(`${apiBase}/email/zoho-test`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ to: testEmailTo })
+                        });
+                        const d = await r.json();
+                        if (d.success) { (window as any).toast?.success?.("Test email sent! Check your inbox."); alert("✅ Test email sent to " + testEmailTo); }
+                        else alert("❌ " + d.error);
+                      } catch { alert("Connection error."); }
+                      finally { setSendingTest(false); }
+                    }}
+                    className="text-[11px] font-bold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded disabled:opacity-50 transition-colors cursor-pointer w-full"
+                  >
+                    {sendingTest ? "Sending..." : "Send Test Email"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {/* SMTP Config */}
           <Card className="shadow-sm border-border bg-card">
@@ -1068,6 +1140,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
               >
                 <Save className="h-3.5 w-3.5" /> Save Configuration Settings
               </Button>
+              </div>
             </div>
           </div>
         </div>

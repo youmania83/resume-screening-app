@@ -166,6 +166,85 @@ async function seedDefaultTemplates() {
 }
 
 /**
+ * GET /api/email/zoho-status
+ * Returns the live Zoho SMTP configuration status from environment variables.
+ */
+router.get("/zoho-status", (req: any, res: any) => {
+  const enabled = process.env.ZOHO_MAIL_ENABLED === "true";
+  const smtpUser = process.env.ZOHO_SMTP_USER || "";
+  const smtpHost = process.env.ZOHO_SMTP_HOST || "smtp.zoho.com";
+  const smtpPort = process.env.ZOHO_SMTP_PORT || "587";
+  const senderName = process.env.ZOHO_SMTP_SENDER_NAME || "";
+  const configured = enabled && !!smtpUser;
+
+  res.json({
+    success: true,
+    zoho: {
+      enabled,
+      configured,
+      smtpUser,
+      smtpHost,
+      smtpPort,
+      senderName,
+    }
+  });
+});
+
+/**
+ * POST /api/email/zoho-test
+ * Sends a test email via the live Zoho SMTP adapter to verify connectivity.
+ */
+router.post("/zoho-test", async (req: any, res: any) => {
+  try {
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ success: false, error: "Recipient email (to) is required." });
+
+    const smtpUser = process.env.ZOHO_SMTP_USER || "";
+    const smtpPassword = process.env.ZOHO_SMTP_PASSWORD || "";
+    const smtpHost = process.env.ZOHO_SMTP_HOST || "smtp.zoho.com";
+    const smtpPort = Number(process.env.ZOHO_SMTP_PORT) || 587;
+    const senderName = process.env.ZOHO_SMTP_SENDER_NAME || "Rison HR";
+
+    if (!smtpUser || !smtpPassword) {
+      return res.status(400).json({ success: false, error: "Zoho SMTP credentials are not configured in environment variables." });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPassword },
+      connectionTimeout: 10000,
+      socketTimeout: 10000,
+      tls: { servername: smtpHost, rejectUnauthorized: false }
+    } as any);
+
+    await transporter.verify();
+    await transporter.sendMail({
+      from: senderName ? `"${senderName}" <${smtpUser}>` : smtpUser,
+      to,
+      subject: "✅ Zoho Mail SMTP Test — IRA Recruitment Platform",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:40px auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;">
+          <h2 style="color:#0f172a;margin-top:0;">Zoho SMTP Test Successful ✅</h2>
+          <p style="color:#475569;font-size:14px;">This test email confirms that your Zoho Mail SMTP integration is <strong>active and working correctly</strong> on the IRA AI Resume Screening platform.</p>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:16px;">
+            <tr><td style="padding:6px 0;color:#64748b;font-weight:600;">SMTP Host</td><td style="color:#0f172a;font-weight:700;">${smtpHost}</td></tr>
+            <tr><td style="padding:6px 0;color:#64748b;font-weight:600;">Port</td><td style="color:#0f172a;font-weight:700;">${smtpPort} (STARTTLS)</td></tr>
+            <tr><td style="padding:6px 0;color:#64748b;font-weight:600;">Sender</td><td style="color:#0f172a;font-weight:700;">${smtpUser}</td></tr>
+          </table>
+          <p style="color:#94a3b8;font-size:11px;margin-top:24px;">Sent at ${new Date().toISOString()} · Powered by IRA from Rison Ai Tech</p>
+        </div>`
+    });
+
+    res.json({ success: true, message: `Test email sent to ${to} via ${smtpHost}:${smtpPort}` });
+  } catch (err: any) {
+    console.error("[Zoho Test]", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/email/settings
  * Retrieves email and white-label settings for the current tenant.
  */
