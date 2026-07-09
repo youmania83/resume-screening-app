@@ -16,7 +16,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "inbox-sync" | "smtp" | "templates" | "support">("general");
 
   // Calendar Settings State
-  const [calendarProvider, setCalendarProvider] = useState("mock");
+  const [calendarProvider, setCalendarProvider] = useState("calcom");
   const [calendarCalLink, setCalendarCalLink] = useState("");
 
   // SMTP Settings State
@@ -133,7 +133,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
           const calData = await calResp.json();
           if (calData.success) {
             const calCfg = calData.settings || {};
-            setCalendarProvider(calCfg.provider || "mock");
+            setCalendarProvider(calCfg.provider && calCfg.provider !== "mock" ? calCfg.provider : "calcom");
             setCalendarCalLink(calCfg.calLink || "");
           }
         }
@@ -585,62 +585,50 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
 
           {/* Cal.com Scheduling Integration Card */}
           <Card className="shadow-sm border-border bg-card">
-            <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Cal.com Scheduling Integration</CardTitle>
+            <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Cal.com Scheduling Integration</CardTitle>
+                <CardDescription className="text-[10px] mt-0.5">Automate interview booking link generation and sync bookings back to the recruiter workspace.</CardDescription>
+              </div>
+              <Badge variant="success" className="text-[9px] font-bold uppercase tracking-wider bg-emerald-950/40 border-emerald-800 text-emerald-400">Active</Badge>
             </CardHeader>
             <CardContent className="pt-4 space-y-4 text-xs">
               <div className="space-y-1 pb-3 border-b border-border">
-                <span className="block text-[10px] uppercase font-bold text-muted-foreground">Active Calendar Provider</span>
-                <select
-                  value={calendarProvider}
-                  onChange={(e) => setCalendarProvider(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-semibold outline-none text-[11px] text-foreground"
-                >
-                  <option value="mock">Mock Scheduling (No live connection)</option>
-                  <option value="calcom">Cal.com Scheduling Embed</option>
-                </select>
+                <span className="block text-[10px] uppercase font-bold text-muted-foreground">Global Fallback Cal.com Booking Link</span>
+                <input
+                  type="text"
+                  placeholder="e.g. acme-hr/interview"
+                  value={calendarCalLink}
+                  onChange={(e) => setCalendarCalLink(e.target.value)}
+                  className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
+                />
+                <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
+                  Input your Cal.com username/event-slug (e.g. `acme-hr/interview`). Individual jobs can override this link.
+                </span>
               </div>
 
-              {calendarProvider === "calcom" && (
-                <>
-                  <div className="space-y-1 pb-3 border-b border-border">
-                    <span className="block text-[10px] uppercase font-bold text-muted-foreground">Global Fallback Cal.com Booking Link</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. acme-hr/interview"
-                      value={calendarCalLink}
-                      onChange={(e) => setCalendarCalLink(e.target.value)}
-                      className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
-                    />
-                    <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
-                      Input your Cal.com username/event-slug (e.g. `acme-hr/interview`). Individual jobs can override this link.
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 p-3 rounded-lg border border-border bg-secondary/20 leading-normal">
-                    <span className="block text-[10px] uppercase font-bold text-amber-500">Webhook Connection Setup</span>
-                    <span className="text-[10px] text-slate-300 block">
-                      To sync interviews back to the platform, configure a webhook in your **Cal.com account**:
-                    </span>
-                    <div className="flex gap-2 items-center mt-1">
-                      <input
-                        type="text"
-                        readOnly
-                        value={
-                          typeof window !== "undefined"
-                            ? `${window.location.origin.replace("3000", "4000")}/api/webhooks/calcom`
-                            : "https://your-api-domain.com/api/webhooks/calcom"
-                        }
-                        className="w-full bg-card border border-border rounded px-2 py-1 font-mono text-[9px] text-slate-400"
-                      />
-                    </div>
-                    <span className="text-[9px] text-slate-400 block mt-1">
-                      1. Go to Cal.com {"->"} Settings {"->"} Webhooks. <br/>
-                      2. Add Webhook, paste the URL above, and select the **Booking Created**, **Booking Rescheduled**, and **Booking Cancelled** triggers.
-                    </span>
-                  </div>
-                </>
-              )}
+              <div className="space-y-1.5 p-3 rounded-lg border border-border bg-secondary/20 leading-normal">
+                <span className="block text-[10px] uppercase font-bold text-amber-500">Webhook Connection Setup</span>
+                <span className="text-[10px] text-slate-300 block">
+                  To sync interviews back to the platform, configure a webhook in your **Cal.com account**:
+                </span>
+                <div className="flex gap-2 items-center mt-1">
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin.replace("3000", "4000")}/api/webhooks/calcom`
+                        : "https://your-api-domain.com/api/webhooks/calcom"
+                    }
+                    className="w-full bg-card border border-border rounded px-2 py-1 font-mono text-[9px] text-slate-400"
+                  />
+                </div>
+                <span className="text-[9px] text-slate-400 block mt-1">
+                  1. Go to Cal.com {"->"} Settings {"->"} Webhooks. <br/>
+                  2. Add Webhook, paste the URL above, and select the **Booking Created**, **Booking Rescheduled**, and **Booking Cancelled** triggers.
+                </span>
+              </div>
 
               <div className="flex justify-end pt-2">
                 <Button
@@ -658,9 +646,9 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
 
       {/* Email Inbox Sync Tab */}
       {activeTab === "inbox-sync" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        <div className="max-w-2xl mx-auto space-y-6">
           {/* Rules Editor */}
-          <div className="md:col-span-2 space-y-6">
+          <div className="space-y-6">
             <Card className="shadow-sm border-border bg-card">
               <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
                 <div>
@@ -690,10 +678,9 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                       onChange={(e) => setIncomingProvider(e.target.value)}
                       className="w-full bg-secondary border border-border rounded px-2.5 py-1.5 font-semibold outline-none text-[11px] text-foreground"
                     >
-                      <option value="mock">Mock Sync Provider (Testing feed)</option>
+                      <option value="zoho">Zoho Mail API</option>
                       <option value="gmail">Gmail API Sync (OAuth)</option>
                       <option value="outlook">Outlook Microsoft Graph Sync</option>
-                      <option value="zoho">Zoho Mail API</option>
                       <option value="imap">IMAP Protocol server</option>
                     </select>
                   </div>
@@ -704,89 +691,95 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                       type="text"
                       value={incomingFolder}
                       onChange={(e) => setIncomingFolder(e.target.value)}
-                      placeholder="e.g. INBOX"
-                      className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none"
+                      className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1 pt-3 border-t border-border">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">HR Manager Email (for Interview Alerts)</span>
+                <div className="space-y-1.5 pt-1 border-t border-border/40">
+                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">HR Manager Email (For Interview Alerts)</span>
                   <input
                     type="email"
+                    placeholder="e.g. hr@yourcompany.com"
                     value={hrManagerEmail}
                     onChange={(e) => setHrManagerEmail(e.target.value)}
-                    placeholder="e.g. hr@yourcompany.com"
-                    className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none text-xs"
+                    className="w-full bg-secondary/40 border border-border rounded px-2.5 py-1.5 font-sans text-[11px] text-foreground outline-none focus:ring-1 focus:ring-ring font-semibold"
                   />
-                  <span className="text-[9px] text-muted-foreground block">When a candidate passes the assessment, the HR interview invite will be sent to this email alongside the candidate notification.</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5 leading-normal">
+                    When a candidate passes the assessment, the HR interview invite will be sent to this email alongside the candidate notification.
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card className="shadow-sm border-border bg-card">
-              <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Routing Rules & Regex Patterns</CardTitle>
-                  <CardDescription className="text-[10px] mt-0.5">Rules are evaluated sequentially. First match handles classification and job mapping.</CardDescription>
+                <div className="pt-3 border-t border-border flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="block text-[10px] uppercase font-bold text-foreground">Routing Rules & Regex Patterns</span>
+                    <span className="text-[9px] text-slate-400 block">Rules are evaluated sequentially. First match handles classification and job mapping.</span>
+                  </div>
+                  <Button
+                    onClick={addRule}
+                    size="sm"
+                    variant="outline"
+                    className="text-[10px] h-7 px-2.5 font-bold flex gap-1 items-center"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Rule
+                  </Button>
                 </div>
-                <Button onClick={addRule} size="sm" variant="outline" className="text-[10px] gap-1 font-bold">
-                  <Plus className="h-3 w-3" /> Add Rule
-                </Button>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4 text-xs">
+
                 {rules.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground font-semibold text-[11px]">
-                    No custom routing rules defined. System will use default patterns.
+                  <div className="text-center py-6 text-muted-foreground bg-secondary/15 rounded border border-dashed border-border">
+                    No custom routing rules defined. Default regex matches will apply.
                   </div>
                 ) : (
                   rules.map((rule, idx) => (
-                    <div key={idx} className="p-3 bg-secondary/20 rounded border border-border space-y-3 relative">
-                      <div className="flex items-center justify-between">
-                        <input
-                          type="text"
-                          value={rule.name}
-                          onChange={(e) => updateRule(idx, "name", e.target.value)}
-                          placeholder="Rule Name"
-                          className="font-bold text-foreground bg-transparent border-b border-transparent hover:border-border/60 focus:border-foreground outline-none text-xs w-2/3"
-                        />
-                        <div className="flex items-center gap-2">
+                    <div key={idx} className="p-3 border border-border bg-secondary/15 rounded-lg space-y-3 relative group">
+                      <button
+                        onClick={() => removeRule(idx)}
+                        className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+
+                      <div className="flex gap-4 items-center pr-8">
+                        <div className="flex-1 space-y-1">
+                          <span className="block text-[10px] uppercase font-bold text-slate-400">Rule Display Name</span>
+                          <input
+                            type="text"
+                            placeholder="e.g. Resume Applications"
+                            value={rule.name || ""}
+                            onChange={(e) => updateRule(idx, "name", e.target.value)}
+                            className="w-full bg-card border border-border rounded px-2 py-1 font-semibold text-[11px] text-foreground"
+                          />
+                        </div>
+                        <div className="w-1/3 space-y-1">
+                          <span className="block text-[10px] uppercase font-bold text-slate-400">Classification</span>
                           <select
                             value={rule.type}
                             onChange={(e) => updateRule(idx, "type", e.target.value)}
-                            className="bg-secondary text-[9px] border border-border rounded px-1 py-0.5 font-bold uppercase"
+                            className="w-full bg-card border border-border rounded px-2 py-1 font-semibold text-[11px] text-foreground"
                           >
                             <option value="resume">Resume App</option>
                             <option value="jd">JD Ingest</option>
                           </select>
-                          <button
-                            onClick={() => removeRule(idx)}
-                            className="text-muted-foreground hover:text-destructive cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-border/40">
                         <div className="space-y-1">
-                          <span className="block text-[9px] uppercase font-bold text-muted-foreground">Subject Line Match Regex</span>
+                          <span className="block text-[10px] uppercase font-bold text-muted-foreground">Subject Line Match Regex</span>
                           <input
                             type="text"
-                            value={rule.subjectRegex}
+                            value={rule.subjectRegex || ""}
                             onChange={(e) => updateRule(idx, "subjectRegex", e.target.value)}
-                            placeholder="e.g. (?i)applying\s*for"
-                            className="w-full bg-card border border-border rounded px-2 py-1 outline-none font-mono text-[10px]"
+                            className="w-full bg-card border border-border rounded px-2 py-1 font-mono text-[10px] text-foreground"
                           />
                         </div>
                         <div className="space-y-1">
-                          <span className="block text-[9px] uppercase font-bold text-muted-foreground">Title Extraction Regex</span>
+                          <span className="block text-[10px] uppercase font-bold text-muted-foreground">Title Extraction Regex</span>
                           <input
                             type="text"
-                            value={rule.titleRegex}
+                            value={rule.titleRegex || ""}
                             onChange={(e) => updateRule(idx, "titleRegex", e.target.value)}
-                            placeholder="e.g. (?i)applying\s*for\s*(.+)"
-                            className="w-full bg-card border border-border rounded px-2 py-1 outline-none font-mono text-[10px]"
+                            className="w-full bg-card border border-border rounded px-2 py-1 font-mono text-[10px] text-foreground"
                           />
                         </div>
                       </div>
@@ -811,108 +804,6 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                     <Save className="h-3.5 w-3.5" /> Save Sync Settings
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sandbox & Help */}
-          <div className="md:col-span-1 space-y-6">
-            <Card className="shadow-sm border-border bg-card">
-              <CardHeader className="pb-3 border-b border-border">
-                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Interactive Routing Sandbox</CardTitle>
-                <CardDescription className="text-[10px] mt-0.5">Test how incoming subject lines get classified and routed by current active rules.</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-3.5 text-xs">
-                <div className="space-y-1">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Sample Subject Line</span>
-                  <input
-                    type="text"
-                    value={testSubject}
-                    onChange={(e) => setTestSubject(e.target.value)}
-                    placeholder="e.g. Applying for React Developer - John Doe"
-                    className="w-full bg-secondary/30 border border-border rounded px-2.5 py-1.5 font-sans font-semibold outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">Sample Email Body (Optional)</span>
-                  <textarea
-                    rows={4}
-                    value={testBody}
-                    onChange={(e) => setTestBody(e.target.value)}
-                    placeholder="Cloud resume URL, description, etc."
-                    className="w-full bg-secondary/30 border border-border rounded p-2 outline-none font-sans resize-none font-semibold"
-                  />
-                </div>
-
-                <Button
-                  onClick={handleTestRoute}
-                  disabled={testingRoute || !testSubject}
-                  className="w-full text-xs font-bold"
-                >
-                  {testingRoute ? "Testing..." : "Evaluate Routing"}
-                </Button>
-
-                {testResult && (
-                  <div className="pt-3 border-t border-border space-y-2 leading-relaxed">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Evaluation Report</span>
-                    <div className="p-3 rounded border border-border bg-secondary/10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-foreground">Match Status:</span>
-                        <Badge variant={testResult.matched ? "success" : "destructive"} className="text-[9px] font-bold">
-                          {testResult.matched ? "MATCHED" : "NO MATCH"}
-                        </Badge>
-                      </div>
-
-                      {testResult.matched && (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="font-semibold text-slate-400">Classification:</span>
-                            <span className="font-bold uppercase text-foreground text-[10px]">{testResult.classification}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-semibold text-slate-400">Job Title Match:</span>
-                            <span className="font-bold text-amber-500">{testResult.jobTitleExtracted || "Not Found"}</span>
-                          </div>
-                        </>
-                      )}
-
-                      {testResult.extractedLinks?.length > 0 && (
-                        <div>
-                          <span className="font-semibold text-slate-400 block mb-0.5">Resume Links Extracted:</span>
-                          {testResult.extractedLinks.map((link: string, i: number) => (
-                            <code key={i} className="text-[9px] text-sky-400 block truncate font-mono bg-card p-1 rounded border border-border/40 mt-1">{link}</code>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="pt-2 border-t border-border/40 text-[10px] flex gap-1.5 items-start">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <strong className="text-foreground block">Action to Take:</strong>
-                          <span className="text-slate-400 font-semibold block mt-0.5">{testResult.actionToTake}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm border-border bg-card">
-              <CardHeader className="pb-3 border-b border-border">
-                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">Quick Syntax Help</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-2.5 text-[10px] text-slate-400 font-semibold leading-normal">
-                <p>
-                  <strong>(?i) Modifier:</strong> Use <code>(?i)</code> at the beginning of the regex pattern to trigger case-insensitive matching.
-                </p>
-                <p>
-                  <strong>Capture Groups <code>(...)</code>:</strong> Place parentheses around the section of the subject regex representing the Job Title to extract it.
-                </p>
-                <p>
-                  <strong>Matching Jobs:</strong> The system will try to find a Job profile matching the extracted Title using a SQL partial ILIKE match. If it finds one, candidate resumes are matched to it automatically.
-                </p>
               </CardContent>
             </Card>
           </div>
