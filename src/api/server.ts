@@ -236,11 +236,31 @@ cron.schedule("*/5 * * * *", () => {
       console.error("🚨 [Cron] Zoho Mail sync failed:", err.message || err);
     }
   });
+});// Techsol Engineers Keka Careers active jobs sync runs every 3 hours (Lock TTL = 1 hour)
+cron.schedule("0 */3 * * *", () => {
+  runWithLock("cron:keka-careers-active-sync", 3600, async () => {
+    try {
+      const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
+      console.log("⏰ [Cron] Starting Keka Careers active jobs sync...");
+      const result = await KekaCareersSyncService.syncActiveJobs();
+      console.log(`✅ [Cron] Keka Careers sync complete. Synced: ${result.syncedCount}, Errors: ${result.errors.length}`);
+    } catch (err: any) {
+      console.error("🚨 [Cron] Keka Careers sync failed:", err.message || err);
+    }
+  });
 });
 
-
-
-
+// Trigger initial sync at startup
+setTimeout(async () => {
+  try {
+    const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
+    console.log("⏰ [Startup] Triggering initial Keka Careers active jobs sync...");
+    const result = await KekaCareersSyncService.syncActiveJobs();
+    console.log(`✅ [Startup] Initial Keka Careers sync complete. Synced: ${result.syncedCount}, Errors: ${result.errors.length}`);
+  } catch (err: any) {
+    console.error("🚨 [Startup] Initial Keka Careers sync failed:", err.message || err);
+  }
+}, 5000);
 
 // Boot inline BullMQ Resume Worker — processes queue items automatically
 try {
