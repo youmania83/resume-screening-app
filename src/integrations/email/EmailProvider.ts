@@ -1,3 +1,6 @@
+import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
+
 // src/integrations/email/EmailProvider.ts
 export interface EmailAttachment {
   fileName: string;
@@ -50,17 +53,114 @@ export class OutlookProvider implements IEmailProvider {
   }
 }
 
-// 3. Zoho Provider (Simulated API sync integration)
+// 3. Zoho Provider (Real IMAP integration)
 export class ZohoProvider implements IEmailProvider {
   name = "Zoho";
 
   async fetchUnreadEmails(): Promise<NormalizedEmail[]> {
-    console.log("[Zoho Integration] Syncing Zoho Mail Inbox...");
-    return [];
+    const user = process.env.ZOHO_SMTP_USER;
+    const pass = process.env.ZOHO_SMTP_PASSWORD;
+    if (!user || !pass) {
+      console.warn("[Zoho Integration] SMTP credentials are not configured in env variables. Skipping incoming sync.");
+      return [];
+    }
+
+    console.log(`[Zoho Integration] Fetching unread emails from Zoho IMAP for ${user}...`);
+
+    const client = new ImapFlow({
+      host: "imap.zoho.com",
+      port: 993,
+      secure: true,
+      auth: { user, pass },
+      logger: false,
+      tls: { rejectUnauthorized: false }
+    });
+
+    const emails: NormalizedEmail[] = [];
+
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const searchResults = await client.search({ seen: false });
+        console.log(`[Zoho Integration] Found ${searchResults.length} unread messages.`);
+
+        for (const seq of searchResults) {
+          try {
+            const message = await client.fetchOne(seq, { source: true });
+            if (message && message.source) {
+              const parsed = await simpleParser(message.source);
+              const attachments: EmailAttachment[] = [];
+
+              if (parsed.attachments && parsed.attachments.length > 0) {
+                for (const att of parsed.attachments) {
+                  attachments.push({
+                    fileName: att.filename || "attachment",
+                    mimeType: att.contentType,
+                    content: att.content,
+                  });
+                }
+              }
+
+              const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
+              emails.push({
+                id: seq.toString(),
+                sender,
+                subject: parsed.subject || "",
+                bodyText: parsed.text || "",
+                bodyHtml: parsed.html || "",
+                receivedAt: parsed.date || new Date(),
+                attachments,
+              });
+            }
+          } catch (fetchErr) {
+            console.error(`[Zoho Integration] Failed to parse message sequence ${seq}:`, fetchErr);
+          }
+        }
+      } finally {
+        lock.release();
+      }
+      await client.logout();
+    } catch (err: any) {
+      console.error("[Zoho Integration] IMAP sync failed:", err.message);
+      try { await client.logout(); } catch {}
+      throw err;
+    }
+
+    return emails;
   }
 
   async markAsRead(emailId: string): Promise<void> {
-    console.log(`[Zoho Integration] Marking message ${emailId} as read.`);
+    const user = process.env.ZOHO_SMTP_USER;
+    const pass = process.env.ZOHO_SMTP_PASSWORD;
+    if (!user || !pass) return;
+
+    const client = new ImapFlow({
+      host: "imap.zoho.com",
+      port: 993,
+      secure: true,
+      auth: { user, pass },
+      logger: false,
+      tls: { rejectUnauthorized: false }
+    });
+
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const seq = parseInt(emailId, 10);
+        if (!isNaN(seq)) {
+          await client.messageFlagsAdd({ seq }, ["\\Seen"]);
+          console.log(`[Zoho Integration] Marked email sequence ${emailId} as read (Seen).`);
+        }
+      } finally {
+        lock.release();
+      }
+      await client.logout();
+    } catch (err: any) {
+      console.error(`[Zoho Integration] Failed to mark email ${emailId} as read:`, err.message);
+      try { await client.logout(); } catch {}
+    }
   }
 }
 

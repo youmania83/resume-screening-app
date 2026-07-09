@@ -180,9 +180,9 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
 // 🤖 AUTONOMOUS PIPELINE: Email Sync (every 5 minutes) + Inline Resume Worker
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Email sync runs every 5 minutes for near-real-time ingestion (Lock TTL = 4 min)
-cron.schedule("*/5 * * * *", () => {
-  runWithLock("cron:email-sync-all-tenants", 240, async () => {
+// Email sync runs every 30 minutes for ingestion (Lock TTL = 28 min)
+cron.schedule("*/30 * * * *", () => {
+  runWithLock("cron:email-sync-all-tenants", 1700, async () => {
     try {
       const { queryGlobal } = await import("../lib/tenantDb.js");
       const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
