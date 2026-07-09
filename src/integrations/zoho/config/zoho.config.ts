@@ -15,6 +15,7 @@ export const zohoConfig = {
   smtpPort: Number(process.env.ZOHO_SMTP_PORT) || 465,
   smtpUser: process.env.ZOHO_SMTP_USER || "",
   smtpPassword: process.env.ZOHO_SMTP_PASSWORD || "",
+  senderName: process.env.ZOHO_SMTP_SENDER_NAME || "Rison HR Team",
   
   pollIntervalMs: Number(process.env.ZOHO_MAIL_INBOX_POLL_INTERVAL) || 60000
 };

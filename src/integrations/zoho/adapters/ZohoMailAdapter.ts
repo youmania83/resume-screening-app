@@ -17,6 +17,11 @@ export interface ZohoEmailMessage {
 }
 
 export interface ZohoMailAdapter {
-  sendEmail(to: string, subject: string, html: string): Promise<void>;
+  sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; content: Buffer; contentType: string }>
+  ): Promise<void>;
   fetchIncomingEmails(): Promise<ZohoEmailMessage[]>;
 }

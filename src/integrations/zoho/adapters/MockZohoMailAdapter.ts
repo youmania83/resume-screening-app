@@ -5,12 +5,18 @@ import { ZohoMailAdapter, ZohoEmailMessage } from "./ZohoMailAdapter";
 export class MockZohoMailAdapter implements ZohoMailAdapter {
   private sentEmails: any[] = [];
 
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
-    console.log(`✉️ [MockZohoMailAdapter] Mock sending email to: ${to}, subject: "${subject}"`);
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; content: Buffer; contentType: string }>
+  ): Promise<void> {
+    console.log(`✉️ [MockZohoMailAdapter] Mock sending email to: ${to}, subject: "${subject}" with ${attachments?.length || 0} attachments.`);
     this.sentEmails.push({
       to,
       subject,
       html,
+      attachments,
       sentAt: new Date()
     });
   }
