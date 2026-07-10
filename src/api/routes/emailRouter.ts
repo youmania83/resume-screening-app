@@ -276,7 +276,7 @@ router.get("/settings", async (req: any, res: any, next: any) => {
         user: "hr@techsolengineers.com",
         host: "smtp.zoho.com",
         port: 587,
-        fromName: "Techsole Engineers HR",
+        fromName: "Techsol Engineers HR",
         replyTo: "hr@techsolengineers.com",
         incomingProvider: "zoho",
         incomingSyncEnabled: true,
@@ -517,7 +517,7 @@ router.post("/send", async (req: any, res: any, next: any) => {
 
     const candidate = candRes.rows[0];
     const jobTitle = candidate.job_title || "Position";
-    const companyName = candidate.company_name || "Techsole Engineers";
+    const companyName = candidate.company_name || "Techsol Engineers";
 
     // Map internal API type to seeded template name
     let templateName = emailType;
@@ -657,7 +657,7 @@ router.post("/send", async (req: any, res: any, next: any) => {
       const user = process.env.SMTP_USER;
       const pass = process.env.SMTP_PASS;
 
-      const fromAddress = process.env.SMTP_FROM || `"Techsole Engineers" <recruiting@techsoleengineers.com>`;
+      const fromAddress = process.env.SMTP_FROM || `"Techsol Engineers" <recruiting@techsolengineers.com>`;
       sentFrom = fromAddress;
 
       if (host && user && pass) {

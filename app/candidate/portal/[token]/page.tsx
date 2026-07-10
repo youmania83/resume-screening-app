@@ -357,7 +357,7 @@ export default function CandidatePortalPage() {
             </div>
           )}
           <div>
-            <span className="font-bold text-sm tracking-tight text-white">{branding?.companyName || "Techsole Engineers"}</span>
+            <span className="font-bold text-sm tracking-tight text-white">{branding?.companyName || "Techsol Engineers"}</span>
             <span className="block text-[9px] text-slate-400 font-bold tracking-wider leading-none">CANDIDATE WORKSPACE</span>
           </div>
         </div>

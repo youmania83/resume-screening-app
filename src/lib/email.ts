@@ -52,7 +52,7 @@ const getTransporter = async () => {
   }
 };
 
-const FROM_EMAIL = process.env.SMTP_FROM || '"Techsole Engineers Recruitment" <recruiting@techsoleengineers.com>';
+const FROM_EMAIL = process.env.SMTP_FROM || '"Techsol Engineers Recruitment" <recruiting@techsolengineers.com>';
 
 // Ensure logs directory exists for email fallbacks
 const ensureLogsDir = () => {
@@ -97,7 +97,7 @@ function escapeHtml(text: string): string {
 
 async function resolveTransporter(tenantId?: string): Promise<{ transporter: any; fromEmail: string }> {
   const resolvedTenantId = tenantId || getTenantContext()?.tenantId;
-  const FROM_EMAIL = process.env.SMTP_FROM || '"Techsole Engineers Recruitment" <recruiting@techsoleengineers.com>';
+  const FROM_EMAIL = process.env.SMTP_FROM || '"Techsol Engineers Recruitment" <recruiting@techsolengineers.com>';
 
   if (resolvedTenantId) {
     try {
@@ -115,7 +115,7 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
             config.user = "hr@techsolengineers.com";
             config.host = "smtp.zoho.com";
             config.port = 587;
-            config.fromName = "Techsole Engineers HR";
+            config.fromName = "Techsol Engineers HR";
             config.replyTo = "hr@techsolengineers.com";
             config.password = process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP";
             config.pass = process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP";
@@ -124,7 +124,7 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
           const decryptedPass = config.username === "hr@techsolengineers.com" 
             ? (process.env.ZOHO_SMTP_PASSWORD || "sQL2EaDr3RPP")
             : decrypt(config.password || config.pass || "");
-          const fromName = config.fromName || "Techsole Engineers HR";
+          const fromName = config.fromName || "Techsol Engineers HR";
           const fromEmail = `"${fromName}" <${config.username}>`;
 
           if (config.provider === "resend") {
@@ -254,7 +254,7 @@ export async function sendCandidateDecisionEmail(params: {
     headerBg = "linear-gradient(135deg, #059669 0%, #047857 100%)";
     headerSubtitle = "Candidate Selection Notification";
     greeting = `Congratulations, ${safeName}!`;
-    bodyMessage = `We are delighted to inform you that you have been <strong>selected</strong> for the <strong>${safeJob}</strong> position at Techsole Engineers. Our HR team will contact you shortly with the next steps regarding your onboarding process.`;
+    bodyMessage = `We are delighted to inform you that you have been <strong>selected</strong> for the <strong>${safeJob}</strong> position at Techsol Engineers. Our HR team will contact you shortly with the next steps regarding your onboarding process.`;
   } else if (decisionLower === "rejected") {
     headerBg = "linear-gradient(135deg, #64748b 0%, #475569 100%)";
     headerSubtitle = "Application Status Update";
@@ -297,10 +297,10 @@ export async function sendCandidateDecisionEmail(params: {
   }
 
   const subject = decisionLower === "selected" || decisionLower === "hired"
-    ? `Selection Notification: ${safeJob} - Techsole Engineers`
+    ? `Selection Notification: ${safeJob} - Techsol Engineers`
     : decisionLower === "rejected"
-    ? `Application Status: ${safeJob} - Techsole Engineers`
-    : `Application Status Update: ${safeJob} - Techsole Engineers`;
+    ? `Application Status: ${safeJob} - Techsol Engineers`
+    : `Application Status Update: ${safeJob} - Techsol Engineers`;
 
   const html = `
     <!DOCTYPE html>
@@ -324,7 +324,7 @@ export async function sendCandidateDecisionEmail(params: {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Techsole Engineers</h1>
+          <h1>Techsol Engineers</h1>
           <p>${headerSubtitle}</p>
         </div>
         <div class="content">
@@ -334,7 +334,7 @@ export async function sendCandidateDecisionEmail(params: {
           <p class="message" style="font-size: 13px; color: #94a3b8; margin-top: 28px;">If you have any questions, please reach out to our recruitment team.</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
           <p style="font-size: 10px; color: #94a3b8; margin-top: 6px;">Powered by IRA from Rison Ai Tech</p>
         </div>
       </div>
@@ -389,7 +389,7 @@ export async function sendAssessmentInviteEmail(params: {
     minute: "2-digit",
   });
 
-  const subject = `Assessment Invitation: ${safeJobTitle} Role - Techsole Engineers`;
+  const subject = `Assessment Invitation: ${safeJobTitle} Role - Techsol Engineers`;
   
   const html = `
     <!DOCTYPE html>
@@ -421,7 +421,7 @@ export async function sendAssessmentInviteEmail(params: {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Techsole Engineers</h1>
+          <h1>Techsol Engineers</h1>
           <p>Candidate Assessment Portal</p>
         </div>
         <div class="content">
@@ -452,7 +452,7 @@ export async function sendAssessmentInviteEmail(params: {
           <p class="message" style="font-size: 12px; color: #64748b; text-align: center;">If the button above does not work, copy and paste this URL into your browser:<br>${assessmentLink}</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
           <p>This is an automated message. Please do not reply directly to this email.</p>
         </div>
       </div>
@@ -511,7 +511,7 @@ export async function sendInterviewScheduleEmail(params: {
     timeZoneName: "short",
   });
 
-  const candidateSubject = `HR Interview Scheduled: ${safeJobTitle} Role - Techsole Engineers`;
+  const candidateSubject = `HR Interview Scheduled: ${safeJobTitle} Role - Techsol Engineers`;
   const hrSubject = `[ALERT] Qualified Candidate: HR Interview Scheduled for ${safeCandidateName}`;
 
   // 1. HTML Email for Candidate
@@ -543,7 +543,7 @@ export async function sendInterviewScheduleEmail(params: {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Techsole Engineers</h1>
+          <h1>Techsol Engineers</h1>
           <p>Interview Scheduling Automation</p>
         </div>
         <div class="content">
@@ -569,10 +569,10 @@ export async function sendInterviewScheduleEmail(params: {
             </div>
           </div>
           
-          <p class="message">Our HR team will reach out with calendar link details shortly. If this slot does not work for you, please contact us at support@techsoleengineers.com to reschedule.</p>
+          <p class="message">Our HR team will reach out with calendar link details shortly. If this slot does not work for you, please contact us at support@techsolengineers.com to reschedule.</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -643,7 +643,7 @@ export async function sendInterviewScheduleEmail(params: {
           <p class="message">No actions are required at this stage. The candidate record has been marked as <strong>interviewing</strong>, and details are logged in the assessment dashboard.</p>
         </div>
         <div class="footer">
-          <p>&copy; 2026 Techsole Engineers. All rights reserved.</p>
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -720,7 +720,7 @@ export async function sendSupportTicketNotification(params: {
 
     // Default system support fallback if no specific tenant emails found
     if (recipientEmails.length === 0) {
-      recipientEmails = [process.env.SMTP_USER || "support@techsoleengineers.com"];
+      recipientEmails = [process.env.SMTP_USER || "support@techsolengineers.com"];
     }
 
     const { transporter, fromEmail } = await resolveTransporter(tenantId || undefined);

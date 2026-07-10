@@ -377,7 +377,7 @@ export default function ExamInterface({
 
       {/* C. FOOTER */}
       <footer className="bg-secondary border-t border-border py-3.5 text-center text-[10px] text-muted-foreground space-y-1">
-        <div>🛡️ Techsole Engineers Secure Proctor System (Powered by IRA from Rison Ai Tech). Text selection, copy, paste, and right-clicks are disabled. Avoid exiting fullscreen mode.</div>
+        <div>🛡️ Techsol Engineers Secure Proctor System (Powered by IRA from Rison Ai Tech). Text selection, copy, paste, and right-clicks are disabled. Avoid exiting fullscreen mode.</div>
         <div className="text-[9px] text-slate-400 font-normal max-w-lg mx-auto">
           Apple, App Store, and Google Play are trademarks of their respective owners. No endorsement or affiliation is implied.
         </div>

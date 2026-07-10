@@ -125,7 +125,7 @@ router.get("/:token", async (req: any, res: any, next: any) => {
       interviews,
       documents: docRes.rows,
       branding: {
-        companyName: tenantInfo?.name || "Techsole Engineers",
+        companyName: tenantInfo?.name || "Techsol Engineers",
         logoUrl: tenantInfo?.logo_url || "",
         primaryColor: tenantInfo?.primary_color || "#0f172a",
         emailFooter: tenantInfo?.email_footer || "",

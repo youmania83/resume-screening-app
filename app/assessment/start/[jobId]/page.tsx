@@ -149,7 +149,7 @@ export default function PublicAssessmentRegistrationPage() {
           <div className="h-12 w-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg">
             <Lock className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Techsole Engineers Screening</h1>
+          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Techsol Engineers Screening</h1>
           <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Candidate Assessment Portal</p>
         </div>
 

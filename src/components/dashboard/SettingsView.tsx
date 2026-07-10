@@ -25,7 +25,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [smtpPort, setSmtpPort] = useState(587);
   const [smtpUser, setSmtpUser] = useState("hr@techsolengineers.com");
   const [smtpPassword, setSmtpPassword] = useState("");
-  const [smtpFromName, setSmtpFromName] = useState("Techsole Engineers HR");
+  const [smtpFromName, setSmtpFromName] = useState("Techsol Engineers HR");
   const [smtpReplyTo, setSmtpReplyTo] = useState("hr@techsolengineers.com");
 
   // Zoho Live Status State

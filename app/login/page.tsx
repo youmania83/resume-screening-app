@@ -151,7 +151,7 @@ export default function LoginPage() {
             <Sparkles className="h-5 w-5" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-2 text-foreground font-sans">
-            Sign in to Techsole Engineers
+            Sign in to Techsol Engineers
           </h1>
           <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
             Enterprise Recruiting Platform

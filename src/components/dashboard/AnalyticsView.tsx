@@ -146,7 +146,7 @@ export function AnalyticsView({ candidates }: AnalyticsViewProps) {
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Recruitment Analytics</h2>
         <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">
-          Performance metrics for Techsole Engineers recruitment funnel
+          Performance metrics for Techsol Engineers recruitment funnel
         </p>
       </div>
 

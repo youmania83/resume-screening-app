@@ -7,7 +7,7 @@ import Script from "next/script";
 import type { Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Techsole Engineers — Enterprise Resume Screening Workstation",
+  title: "Techsol Engineers — Enterprise Resume Screening Workstation",
   description: "Next-gen candidate evaluation and AI-powered screening workspace.",
 };
 
