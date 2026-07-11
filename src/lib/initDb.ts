@@ -450,6 +450,30 @@ async function init() {
       );
     `);
 
+    // Create email_logs table for email sending queue and event tracking
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_logs (
+        id VARCHAR PRIMARY KEY,
+        candidate_id VARCHAR REFERENCES candidates(id) ON DELETE SET NULL,
+        recipient VARCHAR NOT NULL,
+        subject VARCHAR NOT NULL,
+        template VARCHAR NOT NULL,
+        sent_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        delivery_status VARCHAR NOT NULL DEFAULT 'pending',
+        error_message TEXT,
+        retry_count INT DEFAULT 0,
+        opened_at TIMESTAMPTZ,
+        clicked_at TIMESTAMPTZ,
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_logs_candidate ON email_logs(candidate_id);
+      CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(delivery_status);
+    `);
+
     console.log("Altering columns to TIMESTAMPTZ for timezone compatibility...");
     await client.query(`
       ALTER TABLE candidates ALTER COLUMN assessment_completed_at TYPE TIMESTAMPTZ;
@@ -719,30 +743,6 @@ async function init() {
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_support_tickets_tenant_id ON support_tickets(tenant_id);
-    `);
-
-    // Create email_logs table for email sending queue and event tracking
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS email_logs (
-        id VARCHAR PRIMARY KEY,
-        candidate_id VARCHAR REFERENCES candidates(id) ON DELETE SET NULL,
-        recipient VARCHAR NOT NULL,
-        subject VARCHAR NOT NULL,
-        template VARCHAR NOT NULL,
-        sent_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        delivery_status VARCHAR NOT NULL DEFAULT 'pending',
-        error_message TEXT,
-        retry_count INT DEFAULT 0,
-        opened_at TIMESTAMPTZ,
-        clicked_at TIMESTAMPTZ,
-        started_at TIMESTAMPTZ,
-        completed_at TIMESTAMPTZ
-      );
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_email_logs_candidate ON email_logs(candidate_id);
-      CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(delivery_status);
     `);
 
     // Ensure critical indexes are created for performance and security

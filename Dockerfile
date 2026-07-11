@@ -1,36 +1,45 @@
-# --- BASE STAGE ---
-FROM node:20-alpine AS base
+# Stage 1: Build Next.js frontend
+FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-
-# --- FRONTEND BUILD STAGE ---
-FROM base AS frontend-builder
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# --- FRONTEND RUNNER ---
-FROM node:20-alpine AS frontend
+# Stage 2: Production runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache curl
+
+# Create directory for logs
+RUN mkdir -p logs && chown -R node:node logs
+
+# Copy package config and install all dependencies
+# We keep development dependencies since backend & worker run directly via tsx/typescript in production
 COPY package*.json ./
-RUN npm ci --omit=dev
-COPY --from=frontend-builder /app/.next ./.next
-COPY --from=frontend-builder /app/public ./public
-COPY --from=frontend-builder /app/styles ./styles
-COPY --from=frontend-builder /app/app ./app
-COPY --from=frontend-builder /app/next.config.js ./next.config.js
-COPY --from=frontend-builder /app/next.config.ts ./next.config.ts
+RUN npm ci
+
+# Copy built Next.js application
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+# Copy next config files
+COPY next.config.js ./
+COPY postcss.config.mjs ./
+COPY tailwind.config.js ./
+
+# Copy backend & worker source code
+COPY tsconfig.json ./
+COPY src ./src
+COPY sql ./sql
+COPY supabase ./supabase
+COPY ecosystem.config.cjs ./
+
+# Expose ports for next server (3000) and express backend (4000)
 EXPOSE 3000
-CMD ["npm", "run", "start"]
-
-# --- BACKEND RUNNER ---
-FROM base AS backend
-ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["npx", "tsx", "src/api/server.ts"]
 
-# --- WORKER RUNNER ---
-FROM base AS worker
-ENV NODE_ENV=production
-CMD ["npx", "tsx", "src/worker/resumeWorker.ts"]
+# Default entry command runs the Express API server
+CMD ["npx", "tsx", "src/api/server.ts"]

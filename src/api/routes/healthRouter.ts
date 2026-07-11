@@ -7,11 +7,110 @@ import { authMiddleware, requireRole } from "../middleware/authMiddleware.js";
 import { StorageManager } from "../../lib/storage/StorageProvider.js";
 import nodemailer from "nodemailer";
 
+import { isRedisConnected } from "../middleware/security.js";
+import fs from "fs";
+
 const router = Router();
 
 // Basic health check (public)
 router.get("/", (req, res) => {
   res.json({ status: "ok", timestamp: Date.now() });
+});
+
+// Liveness probe (public) - verify the node process is alive and responsive
+router.get("/liveness", (req, res) => {
+  res.json({ status: "alive", timestamp: Date.now() });
+});
+
+// Readiness probe (public) - checks database, redis, and system dependencies
+router.get("/readiness", async (req, res) => {
+  const checks: any = {
+    database: "offline",
+    redis: "offline",
+    disk: "unknown",
+    memory: "unknown",
+    bullmq: "offline",
+    smtp: "offline",
+    storage: "unknown"
+  };
+  let isReady = true;
+
+  // 1. Check Database
+  try {
+    const start = Date.now();
+    await queryGlobal("SELECT 1;");
+    checks.database = `online (${Date.now() - start}ms)`;
+  } catch (err: any) {
+    checks.database = `error: ${err.message || err}`;
+    isReady = false;
+  }
+
+  // 2. Check Redis
+  if (isRedisConnected) {
+    checks.redis = "online";
+  } else {
+    checks.redis = "offline";
+    isReady = false;
+  }
+
+  // 3. Check Disk Space
+  try {
+    const stats = fs.statfsSync(process.cwd());
+    const freeSpaceGb = (stats.bavail * stats.bsize) / (1024 * 1024 * 1024);
+    checks.disk = `${freeSpaceGb.toFixed(2)} GB free`;
+    if (freeSpaceGb < 1) { // Alert if less than 1GB free
+      checks.disk = `WARNING: low disk space (${checks.disk})`;
+    }
+  } catch (err: any) {
+    checks.disk = `error: ${err.message || err}`;
+  }
+
+  // 4. Check Memory Usage
+  try {
+    const memUsage = process.memoryUsage();
+    checks.memory = `${(memUsage.heapUsed / 1024 / 1024).toFixed(2)} MB heap used`;
+  } catch (err: any) {
+    checks.memory = `error: ${err.message || err}`;
+  }
+
+  // 5. Check BullMQ
+  try {
+    const stats = await IngestQueue.getQueueStats();
+    checks.bullmq = stats.isRedisConnected ? "online" : "offline";
+  } catch (err: any) {
+    checks.bullmq = `error: ${err.message || err}`;
+  }
+
+  // 6. Check SMTP
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    checks.smtp = "configured";
+  } else {
+    checks.smtp = "unconfigured";
+  }
+
+  // 7. Check Storage Manager
+  try {
+    const provider = StorageManager.getProvider();
+    checks.storage = `configured (${process.env.STORAGE_PROVIDER || "local"})`;
+  } catch (err: any) {
+    checks.storage = `error: ${err.message || err}`;
+  }
+
+  if (isReady) {
+    res.json({
+      success: true,
+      status: "ready",
+      checks,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    res.status(503).json({
+      success: false,
+      status: "not_ready",
+      checks,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Admin-only Platform Health Diagnostics

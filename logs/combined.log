@@ -1,3 +1,10 @@
 [2026-07-11T16:26:08.787Z] [INFO] Test Info: Logging system initialized successfully.
 [2026-07-11T16:26:08.788Z] [WARN] Test Warn: High memory utilization detected (mock).
 [2026-07-11T16:26:08.788Z] [ERROR] Test Error: Database connection timeout (mock). | Metadata: {"message":"Connection failed","stack":"Error: Connection failed\n    at <anonymous> (/Users/yogeshkumarwadhwa/IRA AI RESUME SCREENING SAAS/resume-screening-app/src/test-logger.ts:7:65)\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)"}
+[2026-07-11T16:37:52.401Z] [INFO] [HTTP] GET /api/health/liveness - 200 (2ms)
+[2026-07-11T16:37:53.229Z] [INFO] [HTTP] GET /api/health/readiness - 200 (820ms)
+[2026-07-11T16:37:54.078Z] [ERROR] Failed to generate Prometheus metrics: | Metadata: {"message":"relation \"email_logs\" does not exist","stack":"error: relation \"email_logs\" does not exist\n    at /Users/yogeshkumarwadhwa/IRA AI RESUME SCREENING SAAS/resume-screening-app/node_modules/pg/lib/client.js:646:17\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async query (/Users/yogeshkumarwadhwa/IRA AI RESUME SCREENING SAAS/resume-screening-app/src/lib/db.ts:30:17)\n    at async <anonymous> (/Users/yogeshkumarwadhwa/IRA AI RESUME SCREENING SAAS/resume-screening-app/src/api/routes/metricsRouter.ts:22:27)","length":109,"name":"error","severity":"ERROR","code":"42P01","position":"31","file":"parse_relation.c","line":"1449","routine":"parserOpenTable"}
+[2026-07-11T16:37:54.079Z] [INFO] [HTTP] GET /api/metrics - 500 (841ms)
+[2026-07-11T16:39:10.166Z] [INFO] [HTTP] GET /api/health/readiness - 200 (692ms)
+[2026-07-11T16:39:11.492Z] [INFO] [HTTP] GET /api/metrics - 200 (1313ms)
+[2026-07-11T16:39:11.491Z] [WARN] Failed to get BullMQ queue metrics directly from Redis, falling back to database count: | Metadata: "ERR max requests limit exceeded. Limit: 500000, Usage: 500001. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details"

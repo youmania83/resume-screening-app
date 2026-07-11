@@ -33,6 +33,7 @@ import kekaRouter from "../integrations/keka/routes/keka.routes.js";
 import zohoRouter from "../integrations/zoho/routes/zoho.routes.js";
 import supportTicketRouter from "./routes/supportTicketRouter.js";
 import adminLogsRouter from "./routes/adminLogsRouter.js";
+import metricsRouter, { metricsState } from "./routes/metricsRouter.js";
 import { logger } from "../lib/logger.js";
 import "../lib/initDb.js";
 import cron from "node-cron";
@@ -117,10 +118,11 @@ app.use(urlencoded({ extended: true, limit: "10mb" }));
 
 // Request logging middleware
 app.use((req, res, next) => {
+  metricsState.apiRequestsTotal++;
   const start = Date.now();
   res.on("finish", () => {
-    // Skip logging logs or health check routes to avoid log pollution
-    if (req.path.startsWith("/api/admin/logs") || req.path === "/api/health") return;
+    // Skip logging logs, metrics or health check routes to avoid log pollution
+    if (req.path.startsWith("/api/admin/logs") || req.path.startsWith("/api/metrics") || req.path === "/api/health") return;
     const duration = Date.now() - start;
     logger.info(`[HTTP] ${req.method} ${req.originalUrl || req.url} - ${res.statusCode} (${duration}ms)`);
   });
@@ -150,6 +152,7 @@ app.use("/api/email", emailRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/support-tickets", supportTicketRouter);
 app.use("/api/admin/logs", adminLogsRouter);
+app.use("/api/metrics", metricsRouter);
 app.use("/api", webhookRouter);
 app.use("/api", kekaRouter);
 app.use("/api", zohoRouter);

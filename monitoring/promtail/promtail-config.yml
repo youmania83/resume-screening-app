@@ -1,0 +1,28 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://rison-loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Scraping VPS system logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/*log
+
+  # Scraping Application event logs
+  - job_name: rison-app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: rison-app-logs
+          __path__: /var/log/rison/*.log

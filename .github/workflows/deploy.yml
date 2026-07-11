@@ -1,0 +1,82 @@
+name: Rison AI Hire - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Build Next.js & Server
+        run: npm run build
+
+  deploy:
+    name: Deploy to Linux VPS
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Connection & Run Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USERNAME }}
+          password: ${{ secrets.VPS_SSH_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script: |
+            echo "🚀 Starting deployment to VPS..."
+            cd /var/www/resume-screening-app
+
+            # 1. Capture current Git commit hash for potential rollback
+            PREVIOUS_COMMIT=$(git rev-parse HEAD)
+            echo "Current active commit: $PREVIOUS_COMMIT"
+
+            # 2. Pull latest code changes
+            git pull origin main
+
+            # 3. Install dependencies and build Next.js
+            npm ci
+            npm run build
+
+            # 4. Restart server and worker services under PM2
+            echo "🔄 Restarting services..."
+            pm2 restart ecosystem.config.cjs --env production
+
+            # 5. Automated Health Check & Verification Loop
+            echo "🧪 Verifying service readiness..."
+            
+            # Wait for backend to boot (e.g. 8 seconds)
+            sleep 8
+            
+            # Check readiness endpoint
+            if curl -f http://127.0.0.1:4000/api/health/readiness; then
+              echo "✅ Deployment successful and verified healthy!"
+            else
+              echo "🚨 Health check failed! Initiating rollback to commit $PREVIOUS_COMMIT..."
+              git reset --hard $PREVIOUS_COMMIT
+              npm ci
+              npm run build
+              pm2 restart ecosystem.config.cjs --env production
+              echo "❌ Rollback complete. Previous stable release restored."
+              exit 1
+            fi
