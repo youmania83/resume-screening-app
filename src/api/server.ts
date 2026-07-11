@@ -32,6 +32,8 @@ import webhookRouter from "./routes/webhookRouter.js";
 import kekaRouter from "../integrations/keka/routes/keka.routes.js";
 import zohoRouter from "../integrations/zoho/routes/zoho.routes.js";
 import supportTicketRouter from "./routes/supportTicketRouter.js";
+import adminLogsRouter from "./routes/adminLogsRouter.js";
+import { logger } from "../lib/logger.js";
 import "../lib/initDb.js";
 import cron from "node-cron";
 import { Worker, Job } from "bullmq";
@@ -112,6 +114,19 @@ app.use(cors({
 app.use(cookieParser());
 app.use(json({ limit: "10mb" }));
 app.use(urlencoded({ extended: true, limit: "10mb" }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    // Skip logging logs or health check routes to avoid log pollution
+    if (req.path.startsWith("/api/admin/logs") || req.path === "/api/health") return;
+    const duration = Date.now() - start;
+    logger.info(`[HTTP] ${req.method} ${req.originalUrl || req.url} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
 app.use(csrfGuard);
 
 // Apply Auth Middleware Globally for API Scoping
@@ -134,13 +149,14 @@ app.use("/api/candidate-portal", candidatePortalRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/support-tickets", supportTicketRouter);
+app.use("/api/admin/logs", adminLogsRouter);
 app.use("/api", webhookRouter);
 app.use("/api", kekaRouter);
 app.use("/api", zohoRouter);
 
 // 4. Global Express Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("🔥 Express Global Error caught:", err.stack || err);
+  logger.error(`🔥 Express Global Error caught on ${req.method} ${req.url}:`, err);
   res.status(err.status || 500).json({
     success: false,
     error: err.message || "Internal Server Error",
@@ -305,12 +321,12 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 // 5. Node Process Crash-Guards for Asynchronous Background Workflows
-process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
-  console.error("🚨 Unhandled Promise Rejection at:", promise, "reason:", reason?.stack || reason);
+process.on("unhandledRejection", (reason: any) => {
+  logger.error("🚨 Unhandled Promise Rejection:", reason);
 });
 
 process.on("uncaughtException", (error: Error) => {
-  console.error("🚨 Uncaught Exception thrown in backend process:", error.stack || error);
+  logger.error("🚨 Uncaught Exception thrown in backend process:", error);
   // Node.js is in an undefined state after uncaught exceptions — must exit
   process.exit(1);
 });

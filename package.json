@@ -11,7 +11,9 @@
     "lint": "eslint",
     "worker": "tsx src/worker/resumeWorker.ts",
     "backend": "tsx src/api/server.ts",
-    "init-db": "tsx src/lib/initDb.ts"
+    "init-db": "tsx src/lib/initDb.ts",
+    "logs:tail": "tail -n 100 -f logs/combined.log",
+    "logs:tail-error": "tail -n 100 -f logs/error.log"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.16",

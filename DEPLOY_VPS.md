@@ -168,14 +168,86 @@ sudo certbot --nginx -d app.yourdomain.com -d api.yourdomain.com
 
 ---
 
-## 📊 Management & Maintenance Commands
+## 📊 Logs Management, Monitoring & Rotation
 
-### PM2 Logs & Process Checks:
-* View logs: `pm2 logs`
+The application is equipped with a dual logging system on the VPS:
+1. **Application-Level Event logs**: Written into `./logs/combined.log` (all events) and `./logs/error.log` (errors only) relative to the project directory.
+2. **PM2 Process Console logs**: Output logs from stdout/stderr redirected to service-specific logs:
+   - `./logs/pm2-frontend-out.log` / `./logs/pm2-frontend-error.log`
+   - `./logs/pm2-backend-out.log` / `./logs/pm2-backend-error.log`
+   - `./logs/pm2-worker-out.log` / `./logs/pm2-worker-error.log`
+
+---
+
+### 1. View Logs on the VPS Command Line
+
+You can view application logs directly on the VPS terminal using:
+```bash
+# View last 100 lines and stream new combined logs
+npm run logs:tail
+
+# View last 100 lines and stream new error logs
+npm run logs:tail-error
+```
+
+To view default PM2 logs:
+```bash
+# View log streams of all PM2 managed processes
+pm2 logs
+
+# View logs of specific process only
+pm2 logs rison-backend
+```
+
+---
+
+### 2. View Logs via Admin API Endpoint (Secure)
+
+You can view error logs securely from a frontend client dashboard or API client without needing to SSH into the VPS.
+* **Endpoint**: `/api/admin/logs`
+* **Method**: `GET`
+* **Authentication**: Requires session authentication cookies and a user account with the `"owner"` role.
+* **Parameters**:
+  - `level` (optional): `"error"` (default, reads `error.log`) or `"combined"` (reads `combined.log`)
+  - `lines` (optional): Number of recent lines to read. Default is `100` (max `500`).
+* **Example curl Request**:
+  ```bash
+  curl -b cookies.txt https://your-domain.com/api/admin/logs?level=error&lines=50
+  ```
+
+---
+
+### 3. Log Rotation (CRITICAL for Production VPS)
+
+By default, PM2 logs can grow indefinitely and consume all available disk space, causing VPS server crashes. Setting up `pm2-logrotate` is highly recommended:
+
+```bash
+# Install the logrotate module into PM2
+pm2 install pm2-logrotate
+
+# Configure maximum size of a single log file to 10 Megabytes (rotates if exceeded)
+pm2 set pm2-logrotate:max_size 10M
+
+# Keep a maximum of 10 rotated log files per service (deletes older ones)
+pm2 set pm2-logrotate:retain 10
+
+# Enable compression of rotated log files to save space
+pm2 set pm2-logrotate:compress true
+
+# Set how frequently (in seconds) the worker checks file sizes (e.g., 3600 = 1 hour)
+pm2 set pm2-logrotate:workerInterval 3600
+```
+
+---
+
+## 🛠️ Management & Maintenance Commands
+
+### PM2 Process Checks:
 * Check status: `pm2 status`
 * Restart all apps: `pm2 restart ecosystem.config.cjs`
+* Save active list: `pm2 save`
 
-### Docker Logs & Container Checks:
+### Docker Logs & Container Checks (If using Option 2):
 * View container logs: `docker compose logs -f`
 * Check running containers: `docker ps`
 * Stop services: `docker compose down`
