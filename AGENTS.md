@@ -20,3 +20,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Live Production Environments
 * **Vercel URL (Frontend Client):** https://resume-screening-app-sage.vercel.app
 * **Railway URL (Backend API & Worker):** https://resume-screening-app-databaseurl.up.railway.app
+* **Linux VPS Host IP:** 129.121.97.152 (SSH user: `root`, password: `Yogesh@8865`)
