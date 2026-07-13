@@ -1,7 +1,7 @@
 // app/candidate/portal/[token]/page.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -10,16 +10,11 @@ import {
   UploadCloud, 
   FileText, 
   CheckCircle2, 
-  Clock, 
   AlertCircle, 
-  ChevronRight, 
-  User, 
-  Briefcase,
   MapPin,
   Building,
   Check,
   X,
-  FileCheck2,
   RefreshCw,
   LifeBuoy
 } from "lucide-react";
@@ -127,7 +122,7 @@ export default function CandidatePortalPage() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
-  const loadPortalData = async () => {
+  const loadPortalData = useCallback(async () => {
     try {
       const resp = await fetch(`${apiBase}/candidate-portal/${token}`);
       if (!resp.ok) {
@@ -141,13 +136,13 @@ export default function CandidatePortalPage() {
       setError(err.message || "An unexpected error occurred.");
       setLoading(false);
     }
-  };
+  }, [token, apiBase]);
 
   useEffect(() => {
     if (token) {
       loadPortalData();
     }
-  }, [token]);
+  }, [token, loadPortalData]);
 
   // Initialize Cal.com scheduling widget
   useEffect(() => {
@@ -171,11 +166,11 @@ export default function CandidatePortalPage() {
       };
 
       if (!(window as any).Cal) {
-        (function (C, A, L) {
-          let p = function (a: any, ar: any) { a.q.push(ar); };
-          C.Cal = C.Cal || function () { let a = arguments; p(C.Cal, a); };
+        (function (C) {
+          const p = function (a: any, ar: any) { a.q.push(ar); };
+          C.Cal = C.Cal || function (...args: any[]) { p(C.Cal, args); };
           C.Cal.q = C.Cal.q || [];
-        })(window as any, window.document, "cal");
+        })(window as any);
         
         const script = document.createElement("script");
         script.src = "https://embed.cal.com/embed/parent.js";
