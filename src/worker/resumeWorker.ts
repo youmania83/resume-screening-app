@@ -296,6 +296,119 @@ export async function parseAndEvalResume(
         }
       }
 
+      // Check active jobs
+      const jobsCountRes = await queryGlobal("SELECT COUNT(*) FROM jobs WHERE tenant_id = $1 LIMIT 1;", [tenantId]);
+      const activeJobsCount = parseInt(jobsCountRes.rows[0]?.count || "0", 10);
+      const noActiveJobsExist = activeJobsCount === 0;
+
+      if (noActiveJobsExist) {
+        let candidateScore = parsedData.skillsScore;
+        if (candidateScore === undefined || candidateScore === null) {
+          let baseScore = 65;
+          baseScore += Math.min(parsedData.experienceYears * 3, 20);
+          baseScore += Math.min((parsedData.skills || []).length * 1.5, 15);
+          candidateScore = Math.min(baseScore, 100);
+        }
+
+        if (candidateScore >= 80) {
+          candidateId = crypto.randomUUID();
+          const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";
+          
+          await queryGlobal(
+            `INSERT INTO candidates (
+              id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
+              skills, certifications, education, linkedin_url, github_url, recommendation,
+              first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
+              requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'talent_pool', 'Manual Upload', CURRENT_DATE::text
+            );`,
+            [
+              candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
+              "General Applicant",
+              candidateScore, candidateScore, parsedData.experienceYears,
+              parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
+              parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
+              parsedData.city, parsedData.state, parsedData.country,
+              parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
+              parsedData.requiresSponsorship, parsedData.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills
+            ]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+             VALUES ($1, 'talent_pool', $2, $3);`,
+            [candidateId, `Candidate added to the Talent Pool (Score ${candidateScore}% >= 80%).`, tenantId]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+             VALUES ($1, $2, $3, 'Stage Changed', 'Talent Pool', 'Candidate automatically placed in the Talent Pool with score: ' || $4 || '/100.');`,
+            [crypto.randomUUID(), tenantId, candidateId, candidateScore]
+          );
+
+          await queryGlobal(
+            `INSERT INTO candidate_documents (id, tenant_id, candidate_id, title, file_url, document_type)
+             VALUES ($1, $2, $3, $4, (SELECT file_url FROM resume_inbox WHERE id = $5), 'Resume');`,
+            [crypto.randomUUID(), tenantId, candidateId, inboxRecord.file_name, inboxId]
+          );
+
+          await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
+
+          await queryGlobal(
+            `UPDATE resume_inbox SET 
+              status = 'Matched', 
+              candidate_id = $1, 
+              overall_confidence = $2, 
+              email_confidence = $3, 
+              phone_confidence = $4, 
+              skills_confidence = $5, 
+              updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $6;`,
+            [
+              candidateId,
+              parsedData.overallConfidence, parsedData.emailConfidence,
+              parsedData.phoneConfidence, parsedData.skillsConfidence,
+              inboxId
+            ]
+          );
+          
+          await logProcessingStep(tenantId, inboxId, candidateId, "Matching", "Success", providerName, Date.now() - startTime);
+          console.log(`[Talent Pool] Saved candidate ${candidateId} to Talent Pool (Score: ${candidateScore}%)`);
+        } else {
+          // Discard profile!
+          await queryGlobal(
+            `UPDATE resume_inbox SET 
+              status = 'Failed', 
+              error_message = $1, 
+              overall_confidence = $2, 
+              email_confidence = $3, 
+              phone_confidence = $4, 
+              skills_confidence = $5, 
+              updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $6;`,
+            [
+              `Discarded: Profile score (${candidateScore}%) is below 80% threshold with no active jobs.`,
+              parsedData.overallConfidence, parsedData.emailConfidence,
+              parsedData.phoneConfidence, parsedData.skillsConfidence,
+              inboxId
+            ]
+          );
+
+          if (fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch (err) {
+              console.warn("Could not delete discarded resume file:", err);
+            }
+          }
+
+          await logProcessingStep(tenantId, inboxId, null, "Matching", "Failed", providerName, Date.now() - startTime);
+          console.log(`[Talent Pool] Discarded candidate profile because score: ${candidateScore}% is below 80% threshold.`);
+        }
+        return; // Stop the workflow early!
+      }
+
       // 5. Create Candidate Record
       candidateId = crypto.randomUUID();
       const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";

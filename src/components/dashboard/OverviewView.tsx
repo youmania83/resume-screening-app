@@ -261,10 +261,12 @@ export function OverviewView({ candidates }: OverviewViewProps) {
                               ? "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-950/30 dark:bg-purple-950/20 dark:text-purple-400"
                               : c.status === "rejected" || c.status === "keka_rejected"
                               ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-950/30 dark:bg-rose-950/20 dark:text-rose-400"
+                              : c.status === "talent_pool"
+                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-950/30 dark:bg-blue-950/20 dark:text-blue-400"
                               : "border-border bg-secondary/40 text-muted-foreground"
                           }`}
                         >
-                          {c.status}
+                          {c.status === "talent_pool" ? "Talent Pool" : c.status}
                         </Badge>
                       </TableCell>
                     </TableRow>

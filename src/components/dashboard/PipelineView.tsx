@@ -24,7 +24,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
   const appliedList = filterByStatus(["applied"]);
   const shortlistedList = filterByStatus(["shortlisted"]);
   const interviewingList = filterByStatus(["interviewing"]);
-  const inactiveList = filterByStatus(["hold", "rejected"]);
+  const inactiveList = filterByStatus(["hold", "rejected", "talent_pool"]);
 
   return (
     <motion.div
@@ -65,7 +65,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
             <span className="text-xs font-bold uppercase text-emerald-600">Shortlisted ({shortlistedList.length})</span>
           </div>
           {shortlistedList.map(c => (
-            <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-450 bg-card" onClick={() => selectAndOpen(c)}>
+            <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-455 bg-card" onClick={() => selectAndOpen(c)}>
               <CardContent className="p-3 space-y-2 text-xs">
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
                 <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
@@ -100,7 +100,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
         {/* Hold / Rejected Column */}
         <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between border-b border-border pb-2">
-            <span className="text-xs font-bold uppercase text-rose-600">Hold / Rejected ({inactiveList.length})</span>
+            <span className="text-xs font-bold uppercase text-rose-600">Hold / Rejected / Pool ({inactiveList.length})</span>
           </div>
           {inactiveList.map(c => (
             <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-450 bg-card opacity-70" onClick={() => selectAndOpen(c)}>
@@ -108,7 +108,9 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
                 <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
                 <div className="flex items-center justify-between mt-2.5">
-                  <Badge variant={c.status === "hold" ? "warning" : "destructive"} className="text-[8px] px-1 py-0 uppercase">{c.status}</Badge>
+                  <Badge variant={c.status === "hold" ? "warning" : c.status === "talent_pool" ? "info" : "destructive"} className="text-[8px] px-1 py-0 uppercase">
+                    {c.status === "talent_pool" ? "Talent Pool" : c.status}
+                  </Badge>
                   <span className="text-xs font-bold text-slate-400">{c.score}%</span>
                 </div>
               </CardContent>
