@@ -161,32 +161,54 @@ export class LinkHandlerService {
     };
   }
 
-  /**
-   * Helper to download file directly using native fetch.
-   */
   private static async downloadDirectly(url: string, tempPath: string): Promise<boolean> {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(url, {
         method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/octet-stream, */*"
         }
       });
+      clearTimeout(timeout);
 
-      if (!response.ok) return false;
+      if (!response.ok) {
+        console.warn(`[LinkHandler] Direct fetch returned HTTP ${response.status} for ${url}`);
+        return false;
+      }
 
       const contentType = response.headers.get("content-type") || "";
+      // Reject if server returned an HTML page (login wall, Cloudflare challenge, etc.)
       if (contentType.includes("text/html")) {
-        // Likely redirected to login page or HTML dashboard preview
+        console.warn(`[LinkHandler] Direct fetch got text/html content-type (likely login/challenge page). URL: ${url}`);
         return false;
       }
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      // Sanity check: reject tiny responses (likely error pages)
+      if (buffer.length < 512) {
+        console.warn(`[LinkHandler] Direct fetch response too small (${buffer.length} bytes). Likely not a real file.`);
+        return false;
+      }
+
+      // Ensure parent directory exists
+      const dir = path.dirname(tempPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
       await fs.promises.writeFile(tempPath, buffer);
+      console.log(`[LinkHandler] Direct download succeeded. Saved ${buffer.length} bytes to ${tempPath}`);
       return true;
-    } catch (err) {
-      console.warn(`[LinkHandler] Direct fetch download failed:`, err);
+    } catch (err: any) {
+      console.warn(`[LinkHandler] Direct fetch download failed for ${url}:`, err.message || err);
       return false;
     }
   }

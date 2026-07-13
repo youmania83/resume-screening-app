@@ -33,10 +33,21 @@ export class ProviderDetectionService {
 
       // 1. Google Drive
       if (hostname.includes("drive.google.com") || hostname.includes("docs.google.com")) {
+        // Extract file ID and build direct export URL
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        let cleanUrl = url;
+        let isDirect = false;
+
+        if (fileIdMatch && fileIdMatch[1]) {
+          // Rewrite to Google Drive direct download endpoint
+          cleanUrl = `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+          isDirect = true;
+        }
+
         return {
           provider: "google_drive",
-          isDirect: false,
-          cleanUrl: url
+          isDirect,
+          cleanUrl
         };
       }
 
