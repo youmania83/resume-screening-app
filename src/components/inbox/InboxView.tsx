@@ -212,28 +212,28 @@ export default function InboxView() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-violet-900 to-indigo-900 border border-violet-850 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-750 border border-violet-100/15 dark:border-violet-850 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <Sparkles className="text-violet-400" />
+            <Sparkles className="text-violet-200" />
             Resume Ingestion Inbox
           </h1>
-          <p className="text-xs text-violet-300 mt-1">
+          <p className="text-xs text-violet-105 mt-1">
             Asynchronously parse, scan, validate, and match incoming candidate resumes.
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <label className="flex items-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer transition-all shadow-md">
-            <FileUp size={14} className="text-violet-400" />
+          <label className="flex items-center gap-2 bg-white/10 hover:bg-white/20 dark:bg-[#090d16] dark:hover:bg-secondary/30 text-white dark:text-foreground border border-white/20 dark:border-border rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer transition-all shadow-xs">
+            <FileUp size={14} className="text-violet-250 dark:text-indigo-400" />
             Upload File / ZIP
             <input type="file" multiple onChange={handleFileUpload} className="hidden" accept=".pdf,.docx,.doc,.txt,.zip" />
           </label>
           <button
-            onClick={() => handleSyncEmails("mock")}
+            onClick={() => handleSyncEmails("zoho")}
             disabled={syncingEmail}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-50 text-slate-200 border border-slate-800 rounded-lg px-4 py-2 text-xs font-semibold transition-all shadow-md"
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 dark:bg-[#090d16] dark:hover:bg-secondary/30 text-white dark:text-foreground border border-white/20 dark:border-border rounded-lg px-4 py-2 text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
           >
-            <Mail size={14} className="text-indigo-400" />
+            <Mail size={14} className="text-violet-250 dark:text-indigo-400" />
             Sync Mailbox
           </button>
         </div>
@@ -242,49 +242,49 @@ export default function InboxView() {
       {/* Analytics KPI Block */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex items-center gap-4">
-            <div className="bg-violet-950/40 border border-violet-800/40 p-2.5 rounded-lg text-violet-400">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex items-center gap-4">
+            <div className="bg-violet-50 dark:bg-violet-950/40 border border-violet-150 dark:border-violet-800/40 p-2.5 rounded-lg text-violet-600 dark:text-violet-400">
               <Clock size={20} />
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 font-bold uppercase">Queue Stack</div>
-              <div className="text-lg font-bold text-slate-200 mt-0.5">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase">Queue Stack</div>
+              <div className="text-lg font-bold text-foreground mt-0.5">
                 {stats.counts.queued || 0} Queued / {stats.counts.processing || 0} In Progress
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex items-center gap-4">
-            <div className="bg-emerald-950/40 border border-emerald-800/40 p-2.5 rounded-lg text-emerald-400">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex items-center gap-4">
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-150 dark:border-emerald-800/40 p-2.5 rounded-lg text-emerald-600 dark:text-emerald-450">
               <CheckCircle size={20} />
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 font-bold uppercase">Successfully Analyzed</div>
-              <div className="text-lg font-bold text-slate-200 mt-0.5">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase">Successfully Screened</div>
+              <div className="text-lg font-bold text-foreground mt-0.5">
                 {stats.counts.matched || 0} Matched
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex items-center gap-4">
-            <div className="bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-lg text-amber-400">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex items-center gap-4">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-150 dark:border-amber-800/40 p-2.5 rounded-lg text-amber-600 dark:text-amber-455">
               <GitMerge size={20} />
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 font-bold uppercase">Duplicate Detection</div>
-              <div className="text-lg font-bold text-slate-200 mt-0.5">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase">Duplicate Detection</div>
+              <div className="text-lg font-bold text-foreground mt-0.5">
                 {stats.counts.duplicate || 0} Duplicates
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex items-center gap-4">
-            <div className="bg-rose-950/40 border border-rose-800/40 p-2.5 rounded-lg text-rose-400">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex items-center gap-4">
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-150 dark:border-rose-800/40 p-2.5 rounded-lg text-rose-600 dark:text-rose-455">
               <HardDrive size={20} />
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 font-bold uppercase">SaaS Storage Usage</div>
-              <div className="text-lg font-bold text-slate-200 mt-0.5">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase">SaaS Storage Usage</div>
+              <div className="text-lg font-bold text-foreground mt-0.5">
                 {Math.round((stats.storage?.tenantStorageUsedBytes || 0) / 1024)} KB ({stats.storage?.tenantFiles || 0} files)
               </div>
             </div>
@@ -295,16 +295,16 @@ export default function InboxView() {
       {/* Grid split layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main List Column */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+        <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-xs space-y-6">
           <div className="flex flex-col md:flex-row justify-between gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 text-slate-500" size={16} />
+              <Search className="absolute left-3 top-2.5 text-muted-foreground" size={16} />
               <input
                 type="text"
                 placeholder="Search by candidate, email, or filename..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-10 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500 transition-colors"
+                className="w-full bg-secondary/30 dark:bg-slate-950 border border-border rounded-lg pl-10 pr-4 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:bg-card focus:border-violet-500 transition-all"
               />
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -314,8 +314,8 @@ export default function InboxView() {
                   onClick={() => { setStatusFilter(status); setPage(1); }}
                   className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                     statusFilter === status 
-                      ? "bg-violet-900/40 text-violet-400 border-violet-800" 
-                      : "bg-slate-950 text-slate-400 border-slate-850 hover:bg-slate-850"
+                      ? "bg-violet-50 dark:bg-violet-900/40 text-violet-650 dark:text-violet-400 border-violet-200 dark:border-violet-800" 
+                      : "bg-secondary/30 dark:bg-slate-950 text-muted-foreground border-border hover:bg-secondary dark:hover:bg-slate-850"
                   }`}
                 >
                   {status || "All"}
@@ -325,10 +325,10 @@ export default function InboxView() {
           </div>
 
           {/* Ingestion Table */}
-          <div className="overflow-x-auto border border-slate-850 rounded-lg">
+          <div className="overflow-x-auto border border-border rounded-lg">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-950 border-b border-slate-850 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                <tr className="bg-secondary/15 dark:bg-slate-950 border-b border-border text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                   <th className="p-4">File Name</th>
                   <th className="p-4">Candidate Profile</th>
                   <th className="p-4">Confidence</th>
@@ -336,56 +336,56 @@ export default function InboxView() {
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850 text-xs">
+              <tbody className="divide-y divide-border text-xs">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground italic">
                       Loading inbox...
                     </td>
                   </tr>
                 ) : inboxItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground italic">
                       No matching resumes found in the ingestion queue.
                     </td>
                   </tr>
                 ) : (
                   inboxItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-950/40 transition-colors text-slate-300">
-                      <td className="p-4 font-medium text-slate-100 max-w-xs truncate">{item.file_name}</td>
+                    <tr key={item.id} className="hover:bg-secondary/20 dark:hover:bg-slate-950/40 transition-colors text-foreground/85">
+                      <td className="p-4 font-bold text-foreground max-w-xs truncate">{item.file_name}</td>
                       <td className="p-4">
                         {item.candidate_name ? (
                           <div>
-                            <div className="font-semibold text-slate-200">{item.candidate_name}</div>
-                            <div className="text-[10px] text-slate-500">{item.candidate_email}</div>
+                            <div className="font-bold text-foreground/90">{item.candidate_name}</div>
+                            <div className="text-[10px] text-muted-foreground">{item.candidate_email}</div>
                           </div>
                         ) : (
-                          <span className="text-slate-500 italic">Unassigned</span>
+                          <span className="text-muted-foreground/60 italic">Unassigned</span>
                         )}
                       </td>
                       <td className="p-4">
                         {item.overall_confidence ? (
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-violet-400">{Math.round(item.overall_confidence * 100)}%</span>
-                            <span className="text-[10px] text-slate-500">(Skills: {Math.round(item.skills_confidence * 100)}%)</span>
+                            <span className="font-extrabold text-violet-650 dark:text-violet-400">{Math.round(item.overall_confidence * 100)}%</span>
+                            <span className="text-[10px] text-muted-foreground">(Skills: {Math.round(item.skills_confidence * 100)}%)</span>
                           </div>
                         ) : (
-                          <span className="text-slate-500">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                       <td className="p-4">
                         <span className={`inline-block px-2 py-0.5 rounded border text-[10px] font-bold ${
-                          item.status === "Matched" ? "bg-emerald-950/40 text-emerald-400 border-emerald-800/40" :
-                          item.status === "Processing" ? "bg-indigo-950/40 text-indigo-400 border-indigo-800/40 animate-pulse" :
-                          item.status === "Duplicate" ? "bg-amber-950/40 text-amber-400 border-amber-800/40" :
-                          item.status === "Needs Review" ? "bg-amber-950/40 text-amber-400 border-amber-800/40" :
-                          item.status === "Failed" ? "bg-rose-950/40 text-rose-400 border-rose-800/40" :
-                          "bg-slate-950 text-slate-400 border-slate-850"
+                          item.status === "Matched" ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-650 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-800/40" :
+                          item.status === "Processing" ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-655 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-800/40 animate-pulse" :
+                          item.status === "Duplicate" ? "bg-amber-50 dark:bg-amber-950/30 text-amber-650 dark:text-amber-400 border-amber-200/50 dark:border-amber-800/40" :
+                          item.status === "Needs Review" ? "bg-amber-50 dark:bg-amber-950/30 text-amber-650 dark:text-amber-455 border-amber-200/50 dark:border-amber-800/40" :
+                          item.status === "Failed" ? "bg-rose-50 dark:bg-rose-950/30 text-rose-655 dark:text-rose-450 border-rose-200/50 dark:border-rose-800/40" :
+                          "bg-secondary text-muted-foreground border-border"
                         }`}>
                           {item.status}
                         </span>
                         {item.error_message && (
-                          <div className="text-[10px] text-rose-400 mt-1 max-w-xs truncate flex items-center gap-1">
+                          <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1 max-w-xs truncate flex items-center gap-1">
                             <AlertCircle size={10} className="flex-shrink-0" />
                             {item.error_message}
                           </div>
@@ -395,7 +395,7 @@ export default function InboxView() {
                         {item.status === "Duplicate" && (
                           <button
                             onClick={() => openMergeReview(item)}
-                            className="p-1.5 text-amber-400 bg-amber-950/20 border border-amber-800/30 hover:bg-amber-950/50 rounded transition-colors"
+                            className="p-1.5 text-amber-600 dark:text-amber-455 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 rounded transition-colors"
                             title="Review & Merge Duplicate"
                           >
                             <GitMerge size={14} />
@@ -404,7 +404,7 @@ export default function InboxView() {
                         {(item.status === "Failed" || item.status === "Queued") && (
                           <button
                             onClick={() => handleRetry(item.id)}
-                            className="p-1.5 text-violet-400 bg-violet-950/20 border border-violet-800/30 hover:bg-violet-950/50 rounded transition-colors"
+                            className="p-1.5 text-violet-605 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800/30 hover:bg-violet-100 dark:hover:bg-violet-950/50 rounded transition-colors"
                             title="Retry Job"
                           >
                             <RefreshCw size={14} />
@@ -412,7 +412,7 @@ export default function InboxView() {
                         )}
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="p-1.5 text-rose-400 bg-rose-950/20 border border-rose-800/30 hover:bg-rose-950/50 rounded transition-colors"
+                          className="p-1.5 text-rose-600 dark:text-rose-455 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/30 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded transition-colors"
                           title="Delete record"
                         >
                           <Trash2 size={14} />
@@ -427,22 +427,22 @@ export default function InboxView() {
 
           {/* Pagination controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-850 pt-4 mt-4">
-              <span className="text-[11px] text-slate-500 font-semibold">
+            <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
+              <span className="text-[11px] text-muted-foreground font-semibold">
                 Page {page} of {totalPages}
               </span>
               <div className="flex gap-2">
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="px-3 py-1 bg-slate-950 hover:bg-slate-850 disabled:opacity-40 text-slate-200 border border-slate-850 rounded-lg text-xs font-semibold transition-all"
+                  className="px-3 py-1 bg-secondary/50 hover:bg-secondary disabled:opacity-40 text-foreground border border-border rounded-lg text-xs font-semibold transition-all"
                 >
                   Previous
                 </button>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1 bg-slate-950 hover:bg-slate-850 disabled:opacity-40 text-slate-200 border border-slate-850 rounded-lg text-xs font-semibold transition-all"
+                  className="px-3 py-1 bg-secondary/50 hover:bg-secondary disabled:opacity-40 text-foreground border border-border rounded-lg text-xs font-semibold transition-all"
                 >
                   Next
                 </button>
@@ -454,65 +454,83 @@ export default function InboxView() {
         {/* Sidebar Status Column */}
         <div className="space-y-6">
           {/* Email Sync Status Panel */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-850 pb-2.5">
-              <Mail size={16} className="text-violet-400" />
+          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2 border-b border-border pb-2.5">
+              <Mail size={16} className="text-violet-550 dark:text-violet-400" />
               Email Ingestion Sync Status
             </h3>
             <div className="space-y-3">
-              {emailHealth ? (
-                Object.keys(emailHealth).map((providerKey) => {
-                  const prov = emailHealth[providerKey];
+              {emailHealth && emailHealth.zoho ? (
+                (() => {
+                  const prov = emailHealth.zoho;
                   return (
-                    <div key={providerKey} className="flex items-center justify-between gap-3 p-2.5 bg-slate-950 rounded-lg border border-slate-850">
+                    <div className="flex items-center justify-between gap-3 p-2.5 bg-secondary/35 dark:bg-slate-950 rounded-lg border border-border">
                       <div>
-                        <span className="text-xs font-bold text-slate-200 uppercase">{providerKey} Connected</span>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
+                        <span className="text-xs font-bold text-foreground uppercase">Zoho Mail Connected</span>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
                           Last sync: {prov.lastSyncTime ? new Date(prov.lastSyncTime).toLocaleTimeString() : "Never"}
                         </div>
                         {prov.errorMessage && (
-                          <div className="text-[9px] text-rose-400 mt-0.5 truncate max-w-[150px]">{prov.errorMessage}</div>
+                          <div className="text-[9px] text-rose-500 mt-0.5 truncate max-w-[150px]">{prov.errorMessage}</div>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${prov.connected ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-slate-700"}`} />
+                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${prov.connected ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-slate-350 dark:bg-slate-700"}`} />
                         <button
-                          onClick={() => handleSyncEmails(providerKey)}
+                          onClick={() => handleSyncEmails("zoho")}
                           disabled={syncingEmail}
-                          className="p-1 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded border border-slate-800 transition-colors disabled:opacity-40"
-                          title={`Sync ${providerKey}`}
+                          className="p-1 text-muted-foreground hover:text-foreground bg-card hover:bg-secondary rounded border border-border transition-colors disabled:opacity-40"
+                          title="Sync Zoho Mailbox"
                         >
                           <RefreshCw size={11} className={syncingEmail ? "animate-spin" : ""} />
                         </button>
                       </div>
                     </div>
                   );
-                })
+                })()
               ) : (
-                <p className="text-slate-500 italic text-xs">Loading sync health...</p>
+                <div className="flex items-center justify-between gap-3 p-2.5 bg-secondary/35 dark:bg-slate-950 rounded-lg border border-border">
+                  <div>
+                    <span className="text-xs font-bold text-foreground uppercase">Zoho Mail Connected</span>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      Last sync: Never
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-350 dark:bg-slate-700" />
+                    <button
+                      onClick={() => handleSyncEmails("zoho")}
+                      disabled={syncingEmail}
+                      className="p-1 text-muted-foreground hover:text-foreground bg-card hover:bg-secondary rounded border border-border transition-colors disabled:opacity-40"
+                      title="Sync Zoho Mailbox"
+                    >
+                      <RefreshCw size={11} className={syncingEmail ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
           {/* Processing SLA Timings */}
           {stats && stats.sla && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-850 pb-2.5">
-                <Clock size={16} className="text-violet-400" />
+            <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2 border-b border-border pb-2.5">
+                <Clock size={16} className="text-violet-550 dark:text-violet-400" />
                 Ingestion SLA Monitor
               </h3>
               <div className="space-y-2 text-xs">
                 {stats.sla.length === 0 ? (
-                  <p className="text-slate-500 italic text-[11px]">No processing audit logs found.</p>
+                  <p className="text-muted-foreground italic text-[11px]">No processing audit logs found.</p>
                 ) : (
                   stats.sla.map((s: any) => (
                     <div key={s.step} className="flex justify-between items-center py-1">
-                      <span className="text-slate-400">{s.step}</span>
-                      <span className="font-bold text-slate-200">{s.avg_duration_ms ? `${s.avg_duration_ms}ms` : "0ms"}</span>
+                      <span className="text-muted-foreground">{s.step}</span>
+                      <span className="font-bold text-foreground">{s.avg_duration_ms ? `${s.avg_duration_ms}ms` : "0ms"}</span>
                     </div>
                   ))
                 )}
-                <div className="pt-2 border-t border-slate-850 mt-2 text-[10px] text-slate-500 flex items-center gap-1.5">
+                <div className="pt-2 border-t border-border mt-2 text-[10px] text-muted-foreground flex items-center gap-1.5">
                   <ShieldAlert size={12} className="text-amber-500" />
                   Alert triggers if overall process exceeds 5 mins.
                 </div>
@@ -522,26 +540,26 @@ export default function InboxView() {
 
           {/* Storage Cost Controls */}
           {stats && stats.storage && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-850 pb-2.5">
-                <Database size={16} className="text-violet-400" />
+            <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2 border-b border-border pb-2.5">
+                <Database size={16} className="text-violet-550 dark:text-violet-400" />
                 Storage Cost Controls
               </h3>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-slate-400">Tenant Files</span>
-                  <span className="font-bold text-slate-200">{stats.storage.tenantFiles}</span>
+                  <span className="text-muted-foreground">Tenant Files</span>
+                  <span className="font-bold text-foreground">{stats.storage.tenantFiles}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-slate-400">Tenant Storage</span>
-                  <span className="font-bold text-slate-200">{Math.round((stats.storage.tenantStorageUsedBytes || 0) / 1024 * 10) / 10} KB</span>
+                  <span className="text-muted-foreground">Tenant Storage</span>
+                  <span className="font-bold text-foreground">{Math.round((stats.storage.tenantStorageUsedBytes || 0) / 1024 * 10) / 10} KB</span>
                 </div>
-                <div className="pt-2 border-t border-slate-850 mt-2">
-                  <div className="flex justify-between py-0.5 text-[11px] text-slate-500">
+                <div className="pt-2 border-t border-border mt-2">
+                  <div className="flex justify-between py-0.5 text-[11px] text-muted-foreground/80">
                     <span>Total Platform Files</span>
                     <span>{stats.storage.totalFiles}</span>
                   </div>
-                  <div className="flex justify-between py-0.5 text-[11px] text-slate-500">
+                  <div className="flex justify-between py-0.5 text-[11px] text-muted-foreground/80">
                     <span>Total Platform Storage</span>
                     <span>{Math.round((stats.storage.totalStorageUsedBytes || 0) / 1024 * 10) / 10} KB</span>
                   </div>
@@ -554,38 +572,38 @@ export default function InboxView() {
 
       {/* Duplicate Candidate Merge Review Modal */}
       {selectedDuplicate && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-6">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <GitMerge className="text-amber-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl p-6 max-w-md w-full shadow-lg space-y-6">
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <GitMerge className="text-amber-500" />
               Duplicate Merge Review
             </h3>
             
-            <div className="bg-slate-950 p-4 rounded-lg border border-slate-850 space-y-3 text-xs">
+            <div className="bg-secondary/35 p-4 rounded-lg border border-border space-y-3 text-xs">
               <div>
-                <span className="text-slate-500 block">Uploaded File:</span>
-                <span className="font-semibold text-slate-200">{selectedDuplicate.file_name}</span>
+                <span className="text-muted-foreground block">Uploaded File:</span>
+                <span className="font-semibold text-foreground">{selectedDuplicate.file_name}</span>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-850">
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
                 <div>
-                  <span className="text-amber-400 font-bold block">New Upload Profile</span>
-                  <span className="text-slate-300 font-semibold">{selectedDuplicate.duplicate_name}</span>
-                  <span className="text-slate-500 block">{selectedDuplicate.duplicate_email}</span>
+                  <span className="text-amber-600 dark:text-amber-455 font-bold block">New Upload Profile</span>
+                  <span className="text-foreground/90 font-semibold">{selectedDuplicate.duplicate_name}</span>
+                  <span className="text-muted-foreground block">{selectedDuplicate.duplicate_email}</span>
                 </div>
                 <div>
-                  <span className="text-emerald-400 font-bold block">Primary Profile</span>
-                  <span className="text-slate-300 font-semibold">{selectedDuplicate.primary_name}</span>
-                  <span className="text-slate-500 block">{selectedDuplicate.primary_email}</span>
+                  <span className="text-emerald-600 dark:text-emerald-455 font-bold block">Primary Profile</span>
+                  <span className="text-foreground/90 font-semibold">{selectedDuplicate.primary_name}</span>
+                  <span className="text-muted-foreground block">{selectedDuplicate.primary_email}</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs text-slate-400 font-semibold">Merge Reason / Rationale</label>
+              <label className="text-xs text-muted-foreground font-semibold">Merge Reason / Rationale</label>
               <textarea
                 value={mergeReason}
                 onChange={(e) => setMergeReason(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-850 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500"
+                className="w-full bg-secondary/30 dark:bg-slate-950 border border-border rounded-lg p-2.5 text-xs text-foreground focus:outline-none focus:bg-card focus:border-violet-500"
                 rows={3}
               />
             </div>
@@ -593,7 +611,7 @@ export default function InboxView() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setSelectedDuplicate(null)}
-                className="px-4 py-2 bg-slate-950 border border-slate-850 rounded-lg text-xs font-semibold text-slate-450 hover:bg-slate-850 hover:text-slate-200"
+                className="px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -611,3 +629,5 @@ export default function InboxView() {
     </div>
   );
 }
+
+
