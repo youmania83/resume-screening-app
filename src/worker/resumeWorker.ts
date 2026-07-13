@@ -147,8 +147,8 @@ export async function parseAndEvalResume(
 
       let isCloudLink = false;
       let cloudLinkUrl = "";
-      let candidateEmail = "";
-      let candidateName = "";
+      let linkCandidateEmail = "";
+      let linkCandidateName = "";
 
       if (ext === ".txt") {
         const txtContent = fileBuffer.toString("utf-8");
@@ -159,8 +159,8 @@ export async function parseAndEvalResume(
           
           const senderMatch = txtContent.match(/Sender:\s*([^\n\r]+)/i);
           if (senderMatch) {
-            candidateEmail = senderMatch[1].trim();
-            candidateName = candidateEmail.split("@")[0];
+            linkCandidateEmail = senderMatch[1].trim();
+            linkCandidateName = linkCandidateEmail.split("@")[0];
           }
         }
       } else if (ext === ".url") {
@@ -175,8 +175,8 @@ export async function parseAndEvalResume(
           cloudLinkUrl,
           tenantId,
           inboxId,
-          candidateEmail || undefined,
-          candidateName || undefined
+          linkCandidateEmail || undefined,
+          linkCandidateName || undefined
         );
 
         if (!result.success || !result.text) {
