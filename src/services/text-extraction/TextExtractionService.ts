@@ -31,18 +31,30 @@ export class TextExtractionService {
     let text = "";
     try {
       const pdfParseModule = await import("pdf-parse");
-      let parseFn: any = pdfParseModule;
+      const PDFParseClass = (pdfParseModule as any).PDFParse;
       
-      if (typeof (pdfParseModule as any).default === "function") {
-        parseFn = (pdfParseModule as any).default;
-      } else if (typeof (pdfParseModule as any).default?.default === "function") {
-        parseFn = (pdfParseModule as any).default.default;
-      } else if (typeof pdfParseModule === "function") {
-        parseFn = pdfParseModule;
-      }
+      if (typeof PDFParseClass === "function") {
+        const parser = new PDFParseClass({ data: buffer });
+        const data = await parser.getText();
+        text = data.text || "";
+      } else {
+        let parseFn: any = pdfParseModule;
+        
+        if (typeof (pdfParseModule as any).default === "function") {
+          parseFn = (pdfParseModule as any).default;
+        } else if (typeof (pdfParseModule as any).default?.default === "function") {
+          parseFn = (pdfParseModule as any).default.default;
+        } else if (typeof pdfParseModule === "function") {
+          parseFn = pdfParseModule;
+        }
 
-      const data = await parseFn(buffer);
-      text = data.text || "";
+        if (typeof parseFn !== "function") {
+          throw new Error("Could not find a valid PDF parsing function or constructor.");
+        }
+
+        const data = await parseFn(buffer);
+        text = data.text || "";
+      }
     } catch (err: any) {
       throw new Error(`Failed parsing PDF document: ${err.message}`);
     }
