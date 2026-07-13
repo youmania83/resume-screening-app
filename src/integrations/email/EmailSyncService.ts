@@ -221,25 +221,39 @@ export class EmailSyncService {
             for (const link of links) {
               const inboxId = crypto.randomUUID();
               
-              await queryGlobal(
-                `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, error_message, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, 'Queued', $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
-                [
-                  inboxId, 
-                  tenantId, 
-                  `Cloud_Resume_${inboxId}.url`, 
-                  link, 
-                  "Cloud resume link detected in email body."
-                ]
-              );
+              // Attempt public download
+              const downloadRes = await EmailSyncService.tryDownloadPublicCloudFile(link, inboxId);
 
-              // Create a temp file containing the metadata + link, then enqueue
-              const ext = ".txt";
-              const textContent = `Resume Link: ${link}\nSender: ${email.sender}\nSubject: ${subject}\n\nEmail Body:\n${body}`;
-              const tempPath = path.resolve("uploads", `${inboxId}${ext}`);
-              await fs.promises.writeFile(tempPath, Buffer.from(textContent));
+              if (downloadRes.success && downloadRes.filePath && downloadRes.mimeType) {
+                await queryGlobal(
+                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+                  [inboxId, tenantId, downloadRes.fileName, link]
+                );
 
-              await IngestQueue.enqueue(tenantId, inboxId, tempPath, "text/plain", targetJobId);
+                await IngestQueue.enqueue(tenantId, inboxId, downloadRes.filePath, downloadRes.mimeType, targetJobId);
+              } else {
+                // Fallback to url record
+                await queryGlobal(
+                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, error_message, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, 'Queued', $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+                  [
+                    inboxId, 
+                    tenantId, 
+                    `Cloud_Resume_${inboxId}.url`, 
+                    link, 
+                    "Cloud resume link detected in email body."
+                  ]
+                );
+
+                const ext = ".txt";
+                const textContent = `Resume Link: ${link}\nSender: ${email.sender}\nSubject: ${subject}\n\nEmail Body:\n${body}`;
+                const tempPath = path.resolve("uploads", `${inboxId}${ext}`);
+                await fs.promises.writeFile(tempPath, Buffer.from(textContent));
+
+                await IngestQueue.enqueue(tenantId, inboxId, tempPath, "text/plain", targetJobId);
+              }
+
               processedAtLeastOneResume = true;
               ingestedCount++;
             }
@@ -261,6 +275,98 @@ export class EmailSyncService {
     }
 
     return ingestedCount;
+  }
+
+  private static async tryDownloadPublicCloudFile(
+    link: string, 
+    inboxId: string
+  ): Promise<{ success: boolean; filePath?: string; mimeType?: string; fileName?: string }> {
+    try {
+      let downloadUrl = "";
+      let ext = ".pdf";
+      let mimeType = "application/pdf";
+      let fileName = `Cloud_Resume_${inboxId}.pdf`;
+
+      // 1. Google Drive File
+      const gdMatch = link.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+      if (gdMatch) {
+        const fileId = gdMatch[1];
+        downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+
+      // 2. Google Docs
+      const gdocsMatch = link.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/i);
+      if (gdocsMatch) {
+        const docId = gdocsMatch[1];
+        downloadUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
+      }
+
+      // 3. Dropbox
+      if (link.includes("dropbox.com")) {
+        // Convert standard sharing link to direct download link
+        downloadUrl = link.replace("www.dropbox.com", "dl.dropboxusercontent.com");
+        // Remove dl=0 or similar query params
+        downloadUrl = downloadUrl.split("?")[0];
+        if (downloadUrl.toLowerCase().endsWith(".docx")) {
+          ext = ".docx";
+          mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+          fileName = `Cloud_Resume_${inboxId}.docx`;
+        }
+      }
+
+      if (!downloadUrl) {
+        return { success: false };
+      }
+
+      console.log(`[Email Sync] Attempting public download from: ${downloadUrl}`);
+      const response = await fetch(downloadUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+
+      if (!response.ok) {
+        console.log(`[Email Sync] Public download failed with status ${response.status}`);
+        return { success: false };
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      // If it's returning HTML, it probably redirected to a login/cookie wall page
+      if (contentType.includes("text/html")) {
+        console.log(`[Email Sync] Download url returned HTML, likely blocked by authentication wall`);
+        return { success: false };
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const tempPath = path.resolve("uploads", `${inboxId}${ext}`);
+      
+      // Ensure uploads directory exists
+      if (!fs.existsSync("uploads")) {
+        fs.mkdirSync("uploads");
+      }
+      
+      await fs.promises.writeFile(tempPath, buffer);
+
+      // Guess extension/mimetype from content-type if available
+      let resolvedMime = mimeType;
+      if (contentType.includes("pdf")) {
+        resolvedMime = "application/pdf";
+      } else if (contentType.includes("word") || contentType.includes("officedocument")) {
+        resolvedMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      }
+
+      return {
+        success: true,
+        filePath: tempPath,
+        mimeType: resolvedMime,
+        fileName
+      };
+    } catch (err) {
+      console.warn(`[Email Sync] Error downloading cloud resume file:`, err);
+      return { success: false };
+    }
   }
 
   private static async logAudit(
