@@ -2,7 +2,7 @@ import { Router } from "express";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { queryTenant } from "../../lib/tenantDb.js";
+import { queryTenant, queryGlobal } from "../../lib/tenantDb.js";
 import { IngestQueue } from "../../lib/queue/ingestQueue.js";
 import { EmailSyncService } from "../../integrations/email/EmailSyncService.js";
 
@@ -271,10 +271,18 @@ router.get("/email-health", async (_req: any, res: any, next: any) => {
 // POST /api/inbox/email-sync - Manually trigger an email ingestion sync
 router.post("/email-sync", async (req: any, res: any, next: any) => {
   try {
-    const provider = req.body.provider || "mock";
     const tenantId = req.headers["x-tenant-id"] || "default-tenant";
+    let provider = req.body.provider;
+    if (!provider) {
+      const tenantRes = await queryGlobal(
+        "SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;",
+        [tenantId]
+      );
+      const emailConfig = tenantRes.rows[0]?.email_config || {};
+      provider = emailConfig.incomingProvider || "mock";
+    }
     const ingestedCount = await EmailSyncService.syncMailbox(tenantId, provider);
-    res.json({ success: true, message: `Email sync complete. Ingested ${ingestedCount} resumes.` });
+    res.json({ success: true, message: `Email sync complete. Ingested ${ingestedCount} resumes.`, ingestedCount });
   } catch (err) {
     next(err);
   }

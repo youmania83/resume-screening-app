@@ -2,7 +2,7 @@
 "use client"
 import React, { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Briefcase, Users, Layers, Settings, Sparkles, FileCheck2, BarChart3, Activity, Award, UserCheck, Calendar } from "lucide-react"
+import { Briefcase, Users, Layers, Settings, Sparkles, FileCheck2, BarChart3, Activity, Award, UserCheck, Calendar, Mail } from "lucide-react"
 import { Badge } from "@/src/components/ui/badge"
 import { toast } from "sonner"
 import { useCandidates } from "@/src/hooks/useCandidates"
@@ -21,6 +21,7 @@ import { AnalyticsView } from "@/src/components/dashboard/AnalyticsView"
 import { SettingsView } from "@/src/components/dashboard/SettingsView"
 import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthView"
 import { HRInterviewDashboard } from "@/src/components/dashboard/HRInterviewDashboard"
+import InboxView from "@/src/components/inbox/InboxView"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -167,6 +168,35 @@ export default function Dashboard() {
     }
   }
 
+  const [isSyncingEmail, setIsSyncingEmail] = useState(false)
+  const handleEmailFetch = async () => {
+    setIsSyncingEmail(true)
+    const toastId = toast.loading("Checking email inbox for fresh resumes...")
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+      const resp = await fetch(`${apiBase}/inbox/email-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": "default-tenant"
+        }
+      })
+      if (resp.ok) {
+        const data = await resp.json()
+        const count = data.ingestedCount || 0
+        toast.success(`Mailbox sync pass complete. Ingested ${count} new resumes!`, { id: toastId })
+        await loadCandidates()
+      } else {
+        toast.error("Failed to fetch fresh resumes from email.", { id: toastId })
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error("Connection error running email sync.", { id: toastId })
+    } finally {
+      setIsSyncingEmail(false)
+    }
+  }
+
   if (!mounted || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
@@ -196,6 +226,7 @@ export default function Dashboard() {
           <nav className="p-3 space-y-1">
             {[
               { id: "screening", label: "Resume Screening", icon: FileCheck2 },
+              { id: "inbox", label: "Ingestion Inbox", icon: Mail },
               { id: "dashboard", label: "Dashboard", icon: Layers },
               { id: "jobs", label: "Active Jobs", icon: Briefcase },
               { id: "candidates", label: "Candidates DB", icon: Users },
@@ -342,8 +373,12 @@ export default function Dashboard() {
               isOnboardingSubmitting={isOnboardingSubmitting}
               handleOnboardSubmit={handleOnboardSubmit}
               handleDecision={handleDecision}
+              handleEmailFetch={handleEmailFetch}
+              isSyncingEmail={isSyncingEmail}
             />
           )}
+
+          {activeTab === "inbox" && <InboxView />}
 
           {activeTab === "dashboard" && <OverviewView candidates={candidates} />}
           {activeTab === "jobs" && <JobsView jobs={jobs} setActiveTab={setActiveTab} setImportTab={setImportTab} setActiveJD={setActiveJD} />}

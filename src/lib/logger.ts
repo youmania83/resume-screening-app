@@ -57,9 +57,9 @@ export const logger = {
     let errorDetails = error;
     if (error instanceof Error) {
       errorDetails = {
-        message: error.message,
         stack: error.stack,
-        ...error
+        ...error,
+        message: error.message
       };
     }
     

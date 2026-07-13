@@ -7,6 +7,7 @@ import {
 import { toast } from "sonner";
 
 export default function InboxView() {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
   const [inboxItems, setInboxItems] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [emailHealth, setEmailHealth] = useState<any>(null);
@@ -31,7 +32,7 @@ export default function InboxView() {
         status: statusFilter,
         search
       });
-      const res = await fetch(`/api/inbox?${q}`);
+      const res = await fetch(`${apiBase}/inbox?${q}`);
       const data = await res.json();
       if (data.success) {
         setInboxItems(data.data);
@@ -46,7 +47,7 @@ export default function InboxView() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/inbox/stats");
+      const res = await fetch(`${apiBase}/inbox/stats`);
       const data = await res.json();
       if (data.success) {
         setStats(data);
@@ -58,7 +59,7 @@ export default function InboxView() {
 
   const fetchEmailHealth = useCallback(async () => {
     try {
-      const res = await fetch("/api/inbox/email-health");
+      const res = await fetch(`${apiBase}/inbox/email-health`);
       const data = await res.json();
       if (data.success) {
         setEmailHealth(data.health);
@@ -83,7 +84,7 @@ export default function InboxView() {
 
     const uploadToast = toast.loading("Ingesting files...");
     try {
-      const res = await fetch("/api/resumes/upload", {
+      const res = await fetch(`${apiBase}/resumes/upload`, {
         method: "POST",
         body: formData
       });
@@ -104,7 +105,7 @@ export default function InboxView() {
     setSyncingEmail(true);
     const syncToast = toast.loading(`Syncing ${provider} inbox...`);
     try {
-      const res = await fetch("/api/inbox/email-sync", {
+      const res = await fetch(`${apiBase}/inbox/email-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider })
@@ -127,7 +128,7 @@ export default function InboxView() {
 
   const handleRetry = async (id: string) => {
     try {
-      const res = await fetch(`/api/inbox/retry/${id}`, { method: "POST" });
+      const res = await fetch(`${apiBase}/inbox/retry/${id}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
         toast.success("Job re-queued successfully.");
@@ -142,7 +143,7 @@ export default function InboxView() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this inbox item?")) return;
     try {
-      const res = await fetch(`/api/inbox/delete/${id}`, { method: "POST" });
+      const res = await fetch(`${apiBase}/inbox/delete/${id}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
         toast.success("Inbox item deleted.");
@@ -158,7 +159,7 @@ export default function InboxView() {
     if (!selectedDuplicate) return;
     setMerging(true);
     try {
-      const res = await fetch("/api/inbox/merge", {
+      const res = await fetch(`${apiBase}/inbox/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,11 +186,11 @@ export default function InboxView() {
 
   const openMergeReview = async (item: any) => {
     try {
-      const res = await fetch(`/api/candidates/${item.candidate_id}`);
+      const res = await fetch(`${apiBase}/candidates/${item.candidate_id}`);
       const candData = await res.json();
       if (candData.success) {
         // Fetch candidate duplicate relation details
-        const dupCheck = await fetch(`/api/candidates?search=${candData.candidate.email}`);
+        const dupCheck = await fetch(`${apiBase}/candidates?search=${candData.candidate.email}`);
         const dupData = await dupCheck.json();
         const primary = dupData.candidates?.find((c: any) => c.id !== item.candidate_id);
         

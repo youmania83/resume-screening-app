@@ -26,6 +26,8 @@ interface ResumeIngestCardProps {
   selectedCandidate: Candidate | null;
   setSelectedCandidate: (candidate: Candidate | null) => void;
   dismissQueueItem: (id: string) => void;
+  handleEmailFetch: () => void;
+  isSyncingEmail: boolean;
 }
 
 export function ResumeIngestCard({
@@ -45,7 +47,9 @@ export function ResumeIngestCard({
   candidates,
   selectedCandidate,
   setSelectedCandidate,
-  dismissQueueItem
+  dismissQueueItem,
+  handleEmailFetch,
+  isSyncingEmail
 }: ResumeIngestCardProps) {
   return (
     <div className="lg:col-span-5 space-y-6">
@@ -115,6 +119,18 @@ export function ResumeIngestCard({
                   className="hover:underline cursor-pointer bg-transparent border-0 outline-none p-0 text-indigo-500 font-bold"
                 >
                   Upload Folder
+                </button>
+                <span className="text-muted-foreground/30">|</span>
+                <button
+                  type="button"
+                  disabled={isSyncingEmail}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEmailFetch();
+                  }}
+                  className="hover:underline cursor-pointer bg-transparent border-0 outline-none p-0 text-indigo-500 font-bold disabled:opacity-50"
+                >
+                  {isSyncingEmail ? "Fetching..." : "Fetch from Email"}
                 </button>
               </div>
             </div>

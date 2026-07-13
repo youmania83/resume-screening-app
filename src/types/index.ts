@@ -62,5 +62,7 @@ export interface JobListItem {
   status: "Active" | "Closed";
   jd: StructuredJD;
   jobCode?: string;
+  lastSyncedAt?: string;
+  syncStatus?: string;
 }
 

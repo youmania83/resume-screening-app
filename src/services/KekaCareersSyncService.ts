@@ -164,9 +164,9 @@ ${plainDescription}`;
             );
 
             if (checkRes.rowCount !== null && checkRes.rowCount > 0) {
-              console.log(`[Keka Careers Sync] Job "${rawJob.title}" (ID ${rawJob.id}) already exists for tenant ${tenantId}. Updating job code.`);
+              console.log(`[Keka Careers Sync] Job "${rawJob.title}" (ID ${rawJob.id}) already exists for tenant ${tenantId}. Updating job code and sync status.`);
               await query(
-                "UPDATE jobs SET job_code = $1 WHERE external_id = $2 AND tenant_id = $3;",
+                "UPDATE jobs SET job_code = $1, last_synced_at = NOW(), sync_status = 'synced' WHERE external_id = $2 AND tenant_id = $3;",
                 [rawJob.jobNumber, rawJob.id.toString(), tenantId]
               );
               continue;

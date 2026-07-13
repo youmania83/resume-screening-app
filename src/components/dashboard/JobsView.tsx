@@ -68,6 +68,15 @@ export function JobsView({ jobs, setActiveTab, setImportTab, setActiveJD }: Jobs
                 <span>Candidates Evaluated:</span>
                 <span className="font-bold text-foreground">{job.candidates}</span>
               </div>
+              {job.lastSyncedAt && (
+                <div className="flex justify-between text-[11px] text-muted-foreground font-semibold items-center">
+                  <span>Last Auto-Sync:</span>
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {new Date(job.lastSyncedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="pb-4 pt-0 flex justify-between gap-2 border-t border-border/60 mt-3">
               <Button

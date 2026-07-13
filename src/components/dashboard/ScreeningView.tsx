@@ -53,6 +53,8 @@ interface ScreeningViewProps {
   isOnboardingSubmitting: boolean;
   handleOnboardSubmit: (id: string) => void;
   handleDecision: (id: string, status: any) => void;
+  handleEmailFetch: () => void;
+  isSyncingEmail: boolean;
 }
 
 export function ScreeningView(props: ScreeningViewProps) {
@@ -102,6 +104,8 @@ export function ScreeningView(props: ScreeningViewProps) {
           selectedCandidate={props.selectedCandidate}
           setSelectedCandidate={props.setSelectedCandidate}
           dismissQueueItem={props.dismissQueueItem}
+          handleEmailFetch={props.handleEmailFetch}
+          isSyncingEmail={props.isSyncingEmail}
         />
 
         <AiScreeningConsole

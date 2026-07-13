@@ -37,6 +37,8 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
               candidates: j.candidates_count || 0,
               status: j.status || "Active",
               jobCode: j.job_code || undefined,
+              lastSyncedAt: j.last_synced_at || undefined,
+              syncStatus: j.sync_status || undefined,
               jd: parsedJd || {
                 title: j.title,
                 experience: j.experience_required || j.experience || "Not Specified",
