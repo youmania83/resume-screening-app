@@ -772,3 +772,49 @@ ${message}
   }
 }
 
+/**
+ * Sends a restricted cloud link notification email to candidates.
+ */
+export async function sendRestrictedLinkEmail(params: {
+  tenantId: string;
+  candidateEmail: string;
+  candidateName: string;
+}): Promise<void> {
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+  const subject = "Urgent: We couldn't access your resume link";
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #1e293b;">
+      <h2 style="color: #0f172a;">Hi ${escapeHtml(params.candidateName)},</h2>
+      <p>We received your application, but we couldn't access your resume because the shared link is restricted or requires login.</p>
+      <div style="background-color: #f1f5f9; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin: 15px 0;">
+        <p style="margin: 0; font-weight: 500;">
+          "We couldn't access your resume because the shared link is restricted or requires login. 
+          Please upload the PDF or DOCX directly or update the sharing permission to 'Anyone with the link can view.'"
+        </p>
+      </div>
+      <p>Please update the sharing permissions on your link, or respond directly to this email attaching your resume in PDF/DOCX format.</p>
+      <br/>
+      <p>Best regards,<br/>Recruitment Team</p>
+    </div>
+  `;
+
+  if (!transporter) {
+    logEmailFallback(params.candidateEmail, subject, html);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: fromEmail,
+      to: params.candidateEmail,
+      subject,
+      html
+    });
+    console.log(`✉️ Link failure alert email successfully sent to: ${params.candidateEmail}`);
+  } catch (err) {
+    console.error("Failed to dispatch restricted link notification email:", err);
+    logEmailFallback(params.candidateEmail, subject, html);
+  }
+}
+
+

@@ -145,33 +145,80 @@ export async function parseAndEvalResume(
       let rawText = "";
       const fileBuffer = fs.readFileSync(filePath);
 
-      if (ext === ".pdf") {
-        const pdfParse = await import("pdf-parse");
-        let parsedText = "";
-        if (typeof pdfParse === 'function') {
-          const data = await (pdfParse as any)(fileBuffer);
-          parsedText = data.text;
-        } else if (typeof (pdfParse as any).default === 'function') {
-          const data = await (pdfParse as any).default(fileBuffer);
-          parsedText = data.text;
-        } else if (typeof (pdfParse as any).PDFParse === 'function') {
-          const parser = new (pdfParse as any).PDFParse({ data: fileBuffer });
-          const data = await parser.getText();
-          parsedText = data.text;
-        } else {
-          throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+      let isCloudLink = false;
+      let cloudLinkUrl = "";
+      let candidateEmail = "";
+      let candidateName = "";
+
+      if (ext === ".txt") {
+        const txtContent = fileBuffer.toString("utf-8");
+        const linkMatch = txtContent.match(/Resume Link:\s*([^\n\r]+)/i);
+        if (linkMatch) {
+          isCloudLink = true;
+          cloudLinkUrl = linkMatch[1].trim();
+          
+          const senderMatch = txtContent.match(/Sender:\s*([^\n\r]+)/i);
+          if (senderMatch) {
+            candidateEmail = senderMatch[1].trim();
+            candidateName = candidateEmail.split("@")[0];
+          }
         }
-        rawText = parsedText;
-      } else if (ext === ".docx") {
-        const mammoth = await import("mammoth");
-        let parseFn: any = mammoth;
-        if (typeof mammoth.default === 'object' && mammoth.default !== null) {
-          parseFn = mammoth.default;
+      } else if (ext === ".url") {
+        isCloudLink = true;
+        cloudLinkUrl = fileBuffer.toString("utf-8").trim();
+      }
+
+      if (isCloudLink && cloudLinkUrl) {
+        console.log(`[Worker] Intercepted cloud resume URL: ${cloudLinkUrl}`);
+        const { LinkHandlerService } = await import("../services/link-handler/LinkHandlerService.js");
+        const result = await LinkHandlerService.process(
+          cloudLinkUrl,
+          tenantId,
+          inboxId,
+          candidateEmail || undefined,
+          candidateName || undefined
+        );
+
+        if (!result.success || !result.text) {
+          await queryGlobal(
+            `UPDATE resume_inbox 
+             SET status = 'Failed', error_message = $1, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2;`,
+            [result.message || "Failed to retrieve resume from cloud link.", inboxId]
+          );
+          throw new Error(result.message || "Failed to retrieve resume from cloud link.");
         }
-        const result = await parseFn.extractRawText({ buffer: fileBuffer });
-        rawText = result.value;
+
+        rawText = result.text;
       } else {
-        rawText = fileBuffer.toString("utf-8");
+        if (ext === ".pdf") {
+          const pdfParse = await import("pdf-parse");
+          let parsedText = "";
+          if (typeof pdfParse === 'function') {
+            const data = await (pdfParse as any)(fileBuffer);
+            parsedText = data.text;
+          } else if (typeof (pdfParse as any).default === 'function') {
+            const data = await (pdfParse as any).default(fileBuffer);
+            parsedText = data.text;
+          } else if (typeof (pdfParse as any).PDFParse === 'function') {
+            const parser = new (pdfParse as any).PDFParse({ data: fileBuffer });
+            const data = await parser.getText();
+            parsedText = data.text;
+          } else {
+            throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+          }
+          rawText = parsedText;
+        } else if (ext === ".docx") {
+          const mammoth = await import("mammoth");
+          let parseFn: any = mammoth;
+          if (typeof mammoth.default === 'object' && mammoth.default !== null) {
+            parseFn = mammoth.default;
+          }
+          const result = await parseFn.extractRawText({ buffer: fileBuffer });
+          rawText = result.value;
+        } else {
+          rawText = fileBuffer.toString("utf-8");
+        }
       }
 
       // Check text readability
