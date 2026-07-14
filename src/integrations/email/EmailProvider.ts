@@ -16,12 +16,13 @@ export interface NormalizedEmail {
   bodyHtml?: string;
   receivedAt: Date;
   attachments: EmailAttachment[];
+  folder?: string;
 }
 
 export interface IEmailProvider {
   name: string;
   fetchUnreadEmails(): Promise<NormalizedEmail[]>;
-  markAsRead(emailId: string): Promise<void>;
+  markAsRead(emailId: string, folder?: string): Promise<void>;
 }
 
 // 1. Gmail Provider (Simulated API sync integration)
@@ -34,7 +35,7 @@ export class GmailProvider implements IEmailProvider {
     return [];
   }
 
-  async markAsRead(emailId: string): Promise<void> {
+  async markAsRead(emailId: string, folder?: string): Promise<void> {
     console.log(`[Gmail Integration] Marking message ${emailId} as read.`);
   }
 }
@@ -48,7 +49,7 @@ export class OutlookProvider implements IEmailProvider {
     return [];
   }
 
-  async markAsRead(emailId: string): Promise<void> {
+  async markAsRead(emailId: string, folder?: string): Promise<void> {
     console.log(`[Outlook Integration] Marking message ${emailId} as read.`);
   }
 }
@@ -77,59 +78,68 @@ export class ZohoProvider implements IEmailProvider {
     });
 
     const emails: NormalizedEmail[] = [];
+    const folders = ["INBOX", "Inbox/HR Dump", "Inbox/Recruitment"];
 
     try {
       await client.connect();
-      const lock = await client.getMailboxLock("INBOX");
-      try {
-        // Fetch all unread emails, plus any read/unread emails since July 10, 2026
-        const unreadResults = await client.search({ seen: false }) || [];
-        const recentResults = await client.search({ since: new Date("2026-07-10") }) || [];
-        
-        // Merge and deduplicate sequence numbers
-        const searchResults = Array.from(new Set([
-          ...(Array.isArray(unreadResults) ? unreadResults : []),
-          ...(Array.isArray(recentResults) ? recentResults : [])
-        ]));
-        const resultsCount = Array.isArray(searchResults) ? searchResults.length : 0;
-        console.log(`[Zoho Integration] Found ${resultsCount} unread messages.`);
+      for (const folderPath of folders) {
+        console.log(`[Zoho Integration] Selecting folder "${folderPath}"...`);
+        try {
+          const lock = await client.getMailboxLock(folderPath);
+          try {
+            // Fetch all unread emails, plus any read/unread emails since July 10, 2026
+            const unreadResults = await client.search({ seen: false }) || [];
+            const recentResults = await client.search({ since: new Date("2026-07-10") }) || [];
+            
+            // Merge and deduplicate sequence numbers
+            const searchResults = Array.from(new Set([
+              ...(Array.isArray(unreadResults) ? unreadResults : []),
+              ...(Array.isArray(recentResults) ? recentResults : [])
+            ]));
+            const resultsCount = searchResults.length;
+            console.log(`[Zoho Integration] Found ${resultsCount} messages to process in folder "${folderPath}".`);
 
-        if (Array.isArray(searchResults)) {
-          for (const seq of searchResults) {
-            try {
-              const message = await client.fetchOne(seq, { source: true });
-              if (message && message.source) {
-                const parsed = await simpleParser(message.source);
-                const attachments: EmailAttachment[] = [];
+            if (resultsCount > 0) {
+              for (const seq of searchResults) {
+                try {
+                  const message = await client.fetchOne(seq, { source: true });
+                  if (message && message.source) {
+                    const parsed = await simpleParser(message.source);
+                    const attachments: EmailAttachment[] = [];
 
-                if (parsed.attachments && parsed.attachments.length > 0) {
-                  for (const att of parsed.attachments) {
-                    attachments.push({
-                      fileName: att.filename || "attachment",
-                      mimeType: att.contentType,
-                      content: att.content,
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                      for (const att of parsed.attachments) {
+                        attachments.push({
+                          fileName: att.filename || "attachment",
+                          mimeType: att.contentType,
+                          content: att.content,
+                        });
+                      }
+                    }
+
+                    const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
+                    emails.push({
+                      id: seq.toString(),
+                      sender,
+                      subject: parsed.subject || "",
+                      bodyText: parsed.text || "",
+                      bodyHtml: parsed.html || "",
+                      receivedAt: parsed.date || new Date(),
+                      attachments,
+                      folder: folderPath
                     });
                   }
+                } catch (fetchErr) {
+                  console.error(`[Zoho Integration] Failed to parse message sequence ${seq} in folder "${folderPath}":`, fetchErr);
                 }
-
-                const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
-                emails.push({
-                  id: seq.toString(),
-                  sender,
-                  subject: parsed.subject || "",
-                  bodyText: parsed.text || "",
-                  bodyHtml: parsed.html || "",
-                  receivedAt: parsed.date || new Date(),
-                  attachments,
-                });
               }
-            } catch (fetchErr) {
-              console.error(`[Zoho Integration] Failed to parse message sequence ${seq}:`, fetchErr);
             }
+          } finally {
+            lock.release();
           }
+        } catch (folderErr: any) {
+          console.warn(`[Zoho Integration] Skipping folder "${folderPath}" due to error:`, folderErr.message);
         }
-      } finally {
-        lock.release();
       }
       await client.logout();
     } catch (err: any) {
@@ -141,7 +151,7 @@ export class ZohoProvider implements IEmailProvider {
     return emails;
   }
 
-  async markAsRead(emailId: string): Promise<void> {
+  async markAsRead(emailId: string, folder: string = "INBOX"): Promise<void> {
     const user = process.env.ZOHO_SMTP_USER;
     const pass = process.env.ZOHO_SMTP_PASSWORD;
     if (!user || !pass) return;
@@ -157,19 +167,19 @@ export class ZohoProvider implements IEmailProvider {
 
     try {
       await client.connect();
-      const lock = await client.getMailboxLock("INBOX");
+      const lock = await client.getMailboxLock(folder);
       try {
         const seq = parseInt(emailId, 10);
         if (!isNaN(seq)) {
           await client.messageFlagsAdd({ seq }, ["\\Seen"]);
-          console.log(`[Zoho Integration] Marked email sequence ${emailId} as read (Seen).`);
+          console.log(`[Zoho Integration] Marked email sequence ${emailId} in folder "${folder}" as read (Seen).`);
         }
       } finally {
         lock.release();
       }
       await client.logout();
     } catch (err: any) {
-      console.error(`[Zoho Integration] Failed to mark email ${emailId} as read:`, err.message);
+      console.error(`[Zoho Integration] Failed to mark email ${emailId} in folder "${folder}" as read:`, err.message);
       try { await client.logout(); } catch {}
     }
   }
@@ -184,8 +194,8 @@ export class IMAPProvider implements IEmailProvider {
     return [];
   }
 
-  async markAsRead(emailId: string): Promise<void> {
-    console.log(`[IMAP Fallback] Marking message ${emailId} as read.`);
+  async markAsRead(emailId: string, folder?: string): Promise<void> {
+    console.log(`[IMAP Fallback] Marking message ${emailId} in folder ${folder} as read.`);
   }
 }
 
@@ -274,8 +284,8 @@ Bruce Wayne`,
     return emails;
   }
 
-  async markAsRead(emailId: string): Promise<void> {
-    console.log(`[Mock Email Sync] Marked mock message ${emailId} as sync read.`);
+  async markAsRead(emailId: string, folder?: string): Promise<void> {
+    console.log(`[Mock Email Sync] Marked mock message ${emailId} in folder ${folder} as sync read.`);
     this.readLogs.add(emailId);
   }
 }

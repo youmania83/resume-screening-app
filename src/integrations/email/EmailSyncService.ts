@@ -143,7 +143,7 @@ export class EmailSyncService {
           );
 
           await TenantUsageService.incrementMetric(tenantId, "active_jobs", 1);
-          await provider.markAsRead(email.id);
+          await provider.markAsRead(email.id, email.folder);
           ingestedCount++;
           console.log(`[Email Sync] Job Ingest Success: "${jdExtract.title}" (ID: ${jobId})`);
           continue;
@@ -290,7 +290,7 @@ export class EmailSyncService {
 
         // Mark email as read if any resume enqueued or JD created
         if (processedAtLeastOneResume) {
-          await provider.markAsRead(email.id);
+          await provider.markAsRead(email.id, email.folder);
         }
       }
     } catch (err: any) {
