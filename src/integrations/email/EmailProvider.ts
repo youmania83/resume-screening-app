@@ -80,6 +80,31 @@ export class ZohoProvider implements IEmailProvider {
     const emails: NormalizedEmail[] = [];
     const folders = ["INBOX", "Inbox/HR Dump", "Inbox/Recruitment"];
 
+    // Helper to recursively detect resume files in message bodyStructure
+    const hasResumeAttachment = (part: any): boolean => {
+      if (!part) return false;
+      const fileName = part.parameters?.name || part.dispositionParameters?.filename || "";
+      if (fileName) {
+        const ext = fileName.split(".").pop()?.toLowerCase();
+        if (ext && ["pdf", "docx", "doc", "txt"].includes(ext)) {
+          if (part.type?.startsWith("image/")) return false;
+          return true;
+        }
+      }
+      if (part.type) {
+        const lowerType = part.type.toLowerCase();
+        if (lowerType === "application/pdf" || lowerType.includes("word") || lowerType.includes("officedocument")) {
+          return true;
+        }
+      }
+      if (part.childNodes && Array.isArray(part.childNodes)) {
+        for (const child of part.childNodes) {
+          if (hasResumeAttachment(child)) return true;
+        }
+      }
+      return false;
+    };
+
     try {
       await client.connect();
       for (const folderPath of folders) {
@@ -97,40 +122,54 @@ export class ZohoProvider implements IEmailProvider {
               ...(Array.isArray(recentResults) ? recentResults : [])
             ]));
             const resultsCount = searchResults.length;
-            console.log(`[Zoho Integration] Found ${resultsCount} messages to process in folder "${folderPath}".`);
+            console.log(`[Zoho Integration] Found ${resultsCount} messages in folder "${folderPath}".`);
 
             if (resultsCount > 0) {
-              for (const seq of searchResults) {
-                try {
-                  const message = await client.fetchOne(seq, { source: true });
-                  if (message && message.source) {
-                    const parsed = await simpleParser(message.source);
-                    const attachments: EmailAttachment[] = [];
+              const messages = client.fetch(searchResults, { envelope: true, bodyStructure: true });
+              for await (const msg of messages) {
+                const subject = msg.envelope?.subject || "";
+                const sender = msg.envelope?.from?.[0]?.address || "unknown@sender.com";
+                const date = msg.envelope?.date || new Date();
 
-                    if (parsed.attachments && parsed.attachments.length > 0) {
-                      for (const att of parsed.attachments) {
-                        attachments.push({
-                          fileName: att.filename || "attachment",
-                          mimeType: att.contentType,
-                          content: att.content,
-                        });
+                // 1. Subject keyword match check
+                const isSubjectMatch = /applying|application|resume|cv|job|hiring/i.test(subject);
+                
+                // 2. Attachment check
+                const isAttachmentMatch = hasResumeAttachment(msg.bodyStructure);
+
+                // Only download the full message source if it looks like a candidate application/JD
+                if (isSubjectMatch || isAttachmentMatch) {
+                  try {
+                    console.log(`[Zoho Integration] Downloading full message source for matched email: "${subject}" (Seq: ${msg.seq})`);
+                    const fullMsg = await client.fetchOne(msg.seq, { source: true });
+                    if (fullMsg && fullMsg.source) {
+                      const parsed = await simpleParser(fullMsg.source);
+                      const attachments: EmailAttachment[] = [];
+
+                      if (parsed.attachments && parsed.attachments.length > 0) {
+                        for (const att of parsed.attachments) {
+                          attachments.push({
+                            fileName: att.filename || "attachment",
+                            mimeType: att.contentType,
+                            content: att.content,
+                          });
+                        }
                       }
-                    }
 
-                    const sender = parsed.from?.value?.[0]?.address || parsed.from?.text || "unknown@sender.com";
-                    emails.push({
-                      id: seq.toString(),
-                      sender,
-                      subject: parsed.subject || "",
-                      bodyText: parsed.text || "",
-                      bodyHtml: parsed.html || "",
-                      receivedAt: parsed.date || new Date(),
-                      attachments,
-                      folder: folderPath
-                    });
+                      emails.push({
+                        id: msg.seq.toString(),
+                        sender,
+                        subject,
+                        bodyText: parsed.text || "",
+                        bodyHtml: parsed.html || "",
+                        receivedAt: date,
+                        attachments,
+                        folder: folderPath
+                      });
+                    }
+                  } catch (fetchErr) {
+                    console.error(`[Zoho Integration] Failed to parse message sequence ${msg.seq} in folder "${folderPath}":`, fetchErr);
                   }
-                } catch (fetchErr) {
-                  console.error(`[Zoho Integration] Failed to parse message sequence ${seq} in folder "${folderPath}":`, fetchErr);
                 }
               }
             }
