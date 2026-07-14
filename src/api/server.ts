@@ -241,15 +241,50 @@ cron.schedule("*/30 * * * *", () => {
 });
 
 // Zoho Mail sync runs every 5 minutes if enabled (Lock TTL = 4 min)
+// Uses OAuth2 API when credentials are available, falls back to IMAP with app password
 cron.schedule("*/5 * * * *", () => {
   runWithLock("cron:zoho-mail-sync", 240, async () => {
     try {
       const { zohoConfig } = await import("../integrations/zoho/config/zoho.config.js");
       if (zohoConfig.enabled) {
-        const { zohoMailService } = await import("../integrations/zoho/services/zohoMail.service.js");
-        console.log("⏰ [Cron] Starting automatic Zoho Mail sync...");
-        const result = await zohoMailService.syncInbox();
-        console.log(`✅ [Cron] Zoho Mail sync complete. Synced: ${result.syncedCandidatesCount}, Errors: ${result.errors.length}`);
+        // Check if OAuth2 API credentials are available
+        const hasOAuthCreds = !!zohoConfig.clientId && !!zohoConfig.clientSecret && !!zohoConfig.refreshToken;
+        
+        if (hasOAuthCreds) {
+          // Use Zoho Mail REST API with OAuth2
+          const { zohoMailService } = await import("../integrations/zoho/services/zohoMail.service.js");
+          console.log("⏰ [Cron] Starting automatic Zoho Mail sync (OAuth2 API)...");
+          const result = await zohoMailService.syncInbox();
+          console.log(`✅ [Cron] Zoho Mail sync complete. Synced: ${result.syncedCandidatesCount}, Errors: ${result.errors.length}`);
+        } else if (zohoConfig.smtpUser && zohoConfig.smtpPassword) {
+          // Fallback: Use IMAP with SMTP/app password credentials
+          const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
+          const { queryGlobal } = await import("../lib/tenantDb.js");
+          
+          console.log("⏰ [Cron] Starting automatic Zoho Mail sync (IMAP fallback — no OAuth2 credentials)...");
+          
+          // Find all tenants that use Zoho
+          const tenantsRes = await queryGlobal(
+            "SELECT id, email_config FROM tenants WHERE email_config IS NOT NULL;"
+          );
+          
+          let totalSynced = 0;
+          for (const tenant of tenantsRes.rows) {
+            try {
+              const count = await EmailSyncService.syncMailbox(tenant.id, "zoho");
+              totalSynced += count;
+              if (count > 0) {
+                console.log(`✉️ [Cron IMAP] Ingested ${count} item(s) for tenant ${tenant.id} via Zoho IMAP`);
+              }
+            } catch (tenantErr: any) {
+              console.error(`🚨 [Cron IMAP] Tenant ${tenant.id} sync failed:`, tenantErr.message || tenantErr);
+            }
+          }
+          
+          console.log(`✅ [Cron] Zoho Mail IMAP sync complete. Total ingested: ${totalSynced}`);
+        } else {
+          console.warn("⚠️ [Cron] Zoho Mail is enabled but no credentials (OAuth2 or SMTP) are configured. Skipping sync.");
+        }
       }
     } catch (err: any) {
       console.error("🚨 [Cron] Zoho Mail sync failed:", err.message || err);
@@ -280,6 +315,40 @@ setTimeout(async () => {
     console.error("🚨 [Startup] Initial Keka Careers sync failed:", err.message || err);
   }
 }, 5000);
+
+// Trigger initial Zoho Mail IMAP sync at startup (10s delay to let DB connections settle)
+setTimeout(async () => {
+  try {
+    const zohoEnabled = process.env.ZOHO_MAIL_ENABLED === "true";
+    const smtpUser = process.env.ZOHO_SMTP_USER;
+    const smtpPass = process.env.ZOHO_SMTP_PASSWORD;
+    
+    if (zohoEnabled && smtpUser && smtpPass) {
+      const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
+      const { queryGlobal } = await import("../lib/tenantDb.js");
+      
+      console.log("📥 [Startup] Triggering initial Zoho Mail inbox sync (IMAP)...");
+      
+      const tenantsRes = await queryGlobal(
+        "SELECT id FROM tenants WHERE email_config IS NOT NULL LIMIT 10;"
+      );
+      
+      let totalSynced = 0;
+      for (const tenant of tenantsRes.rows) {
+        try {
+          const count = await EmailSyncService.syncMailbox(tenant.id, "zoho");
+          totalSynced += count;
+        } catch (tenantErr: any) {
+          console.error(`🚨 [Startup IMAP] Tenant ${tenant.id} sync failed:`, tenantErr.message || tenantErr);
+        }
+      }
+      
+      console.log(`✅ [Startup] Initial Zoho Mail IMAP sync complete. Total ingested: ${totalSynced}`);
+    }
+  } catch (err: any) {
+    console.error("🚨 [Startup] Initial Zoho Mail sync failed:", err.message || err);
+  }
+}, 10000);
 
 // Boot inline BullMQ Resume Worker — processes queue items automatically
 try {
