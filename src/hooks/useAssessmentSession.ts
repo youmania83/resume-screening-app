@@ -41,7 +41,7 @@ export function useAssessmentSession(token: string) {
   const [testSubmitted, setTestSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  const [remainingSeconds, setRemainingSeconds] = useState(10 * 60);
+  const [remainingSeconds, setRemainingSeconds] = useState(15 * 60);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
@@ -208,7 +208,7 @@ export function useAssessmentSession(token: string) {
       } catch {}
 
       try {
-        const timeTakenSec = 10 * 60 - remainingSeconds;
+        const timeTakenSec = 15 * 60 - remainingSeconds;
         const resData = await api.submitAnswers(token, answers, sessionId, timeTakenSec);
         setResult(resData);
         setTestSubmitted(true);

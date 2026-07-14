@@ -245,7 +245,7 @@ router.get("/:token", async (req: any, res: any) => {
       topic: q.topic
     }));
 
-    const TOTAL_TEST_TIME_SEC = 10 * 60; // 10 minutes
+    const TOTAL_TEST_TIME_SEC = 15 * 60; // 15 minutes
 
     if (!attemptRes.rowCount || attemptRes.rowCount === 0) {
       // Use the session ID passed by the frontend to prevent race conditions during double-fetch
@@ -591,7 +591,7 @@ router.post("/submit", async (req: any, res: any) => {
       }
     });
 
-    const totalQuestions = questionsRes.rowCount || 10;
+    const totalQuestions = questionsRes.rowCount || 15;
     const assessmentScore = Math.round((correctCount / totalQuestions) * 100);
 
     // Save completed attempt
@@ -908,7 +908,9 @@ router.get("/results/get", async (req: any, res: any) => {
       resumeScore: candidate.score,
       assessmentScore: candidate.assessment_score,
       finalScore: Number(candidate.final_score),
-      totalQuestions: 10,
+      totalQuestions: attempt.correct_answers !== null && attempt.incorrect_answers !== null
+        ? (attempt.correct_answers + attempt.incorrect_answers)
+        : 15,
       correctAnswers: attempt.correct_answers,
       incorrectAnswers: attempt.incorrect_answers,
       timeTaken: attempt.time_taken,

@@ -6,12 +6,116 @@ export interface Question {
   options: string[];
   correctAnswer: string;
   difficulty: "easy" | "medium" | "hard";
-  topic: "technical" | "practical" | "role-specific" | "industry";
+  topic: "iq" | "technical" | "behavioral" | "self-introduction" | string;
 }
 
-// Fallback questions for SCM Executive
-const FALLBACK_SCM_QUESTIONS: Question[] = [
-  // Easy
+// Common IQ Questions (3 questions)
+const COMMON_IQ_QUESTIONS: Question[] = [
+  {
+    questionText: "If a machine takes 5 minutes to package 5 items, how long does it take 100 machines to package 100 items?",
+    options: ["100 minutes", "20 minutes", "5 minutes", "50 minutes"],
+    correctAnswer: "5 minutes",
+    difficulty: "medium",
+    topic: "iq"
+  },
+  {
+    questionText: "Which number should come next in the pattern: 3, 5, 8, 12, 17, ...?",
+    options: ["21", "22", "23", "24"],
+    correctAnswer: "23",
+    difficulty: "medium",
+    topic: "iq"
+  },
+  {
+    questionText: "If all Bloops are Razzies and all Razzies are Lazzies, which of the following statements must be true?",
+    options: ["All Bloops are Lazzies", "All Lazzies are Bloops", "No Bloops are Lazzies", "Some Razzies are not Lazzies"],
+    correctAnswer: "All Bloops are Lazzies",
+    difficulty: "hard",
+    topic: "iq"
+  }
+];
+
+// Common Behavioral Questions (3 questions)
+const COMMON_BEHAVIORAL_QUESTIONS: Question[] = [
+  {
+    questionText: "You are working on a critical project with a tight deadline, and a colleague who is responsible for a key deliverable is unresponsive. How do you handle this?",
+    options: [
+      "Report them immediately to senior management and request a replacement",
+      "Attempt to contact them through multiple channels, explain the impact on the timeline, and offer support or escalate if they remain unresponsive",
+      "Do their work yourself without informing anyone to ensure the deadline is met",
+      "Wait until the deadline passes and explain that the delay was entirely their fault"
+    ],
+    correctAnswer: "Attempt to contact them through multiple channels, explain the impact on the timeline, and offer support or escalate if they remain unresponsive",
+    difficulty: "medium",
+    topic: "behavioral"
+  },
+  {
+    questionText: "A client or internal stakeholder is unhappy with the project's progress and expresses their frustration in a meeting. What is your first step?",
+    options: [
+      "Defend your team's timeline and explain the technical difficulties",
+      "Listen actively, validate their concerns, investigate the root cause, and propose a clear remediation plan",
+      "Promise an immediate solution without checking with the team",
+      "Suggest rescheduling the meeting when they are calmer"
+    ],
+    correctAnswer: "Listen actively, validate their concerns, investigate the root cause, and propose a clear remediation plan",
+    difficulty: "medium",
+    topic: "behavioral"
+  },
+  {
+    questionText: "You disagree with a decision made by your manager or lead regarding a project's implementation. What is the best way to handle the situation?",
+    options: [
+      "Voice your disagreement publicly in front of the client or entire team",
+      "Discuss the matter privately, present data/alternative solutions, and align on a decision even if you disagree",
+      "Ignore their decision and implement it your own way",
+      "Complain to their peers or subordinates to gain support"
+    ],
+    correctAnswer: "Discuss the matter privately, present data/alternative solutions, and align on a decision even if you disagree",
+    difficulty: "hard",
+    topic: "behavioral"
+  }
+];
+
+// Common Self-introduction Questions (3 questions)
+const COMMON_SELF_INTRO_QUESTIONS: Question[] = [
+  {
+    questionText: "Which of the following statements best describes your core professional background and focus?",
+    options: [
+      "I am a specialist focused on optimizing systems, solving complex domain problems, and collaborating with cross-functional teams",
+      "I prefer to work strictly under direct supervision and perform repetitive, routine tasks",
+      "I am looking for a placeholder job with minimal duties and no learning curve",
+      "I specialize in working in total isolation without interacting with other departments"
+    ],
+    correctAnswer: "I am a specialist focused on optimizing systems, solving complex domain problems, and collaborating with cross-functional teams",
+    difficulty: "easy",
+    topic: "self-introduction"
+  },
+  {
+    questionText: "When starting a new role, how do you typically approach your first 30 days to ensure a successful integration?",
+    options: [
+      "Focus on learning the domain, understanding the team processes, and identifying quick wins to deliver value",
+      "Wait for instructions and only perform assigned tasks",
+      "Immediately propose major changes to the existing architecture or workflow",
+      "Work in isolation to avoid distracting others"
+    ],
+    correctAnswer: "Focus on learning the domain, understanding the team processes, and identifying quick wins to deliver value",
+    difficulty: "easy",
+    topic: "self-introduction"
+  },
+  {
+    questionText: "What is your primary motivation when choosing to apply for a new career opportunity?",
+    options: [
+      "Solving challenging problems and growing my domain expertise",
+      "Minimizing work hours and avoiding responsibility",
+      "Sticking strictly to routine tasks",
+      "Working in isolation without team collaboration"
+    ],
+    correctAnswer: "Solving challenging problems and growing my domain expertise",
+    difficulty: "easy",
+    topic: "self-introduction"
+  }
+];
+
+// Fallback technical questions for SCM Executive (6 questions)
+const SCM_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "Which of the following is the primary objective of strategic procurement?",
     options: [
@@ -29,16 +133,8 @@ const FALLBACK_SCM_QUESTIONS: Question[] = [
     options: ["Purchase Order", "Procurement Officer", "Payment Option", "Production Output"],
     correctAnswer: "Purchase Order",
     difficulty: "easy",
-    topic: "role-specific"
+    topic: "technical"
   },
-  {
-    questionText: "Which document is created by the buyer to authorize a transaction with a vendor?",
-    options: ["Invoice", "Sales Receipt", "Purchase Order", "Bill of Lading"],
-    correctAnswer: "Purchase Order",
-    difficulty: "easy",
-    topic: "industry"
-  },
-  // Medium
   {
     questionText: "When assessing vendor risk, which of the following is considered a key operational risk factor?",
     options: [
@@ -49,7 +145,7 @@ const FALLBACK_SCM_QUESTIONS: Question[] = [
     ],
     correctAnswer: "High geographical distance combined with single-sourcing",
     difficulty: "medium",
-    topic: "practical"
+    topic: "technical"
   },
   {
     questionText: "In SAP ERP, which module is primarily used for Materials Management and purchasing activities?",
@@ -68,21 +164,8 @@ const FALLBACK_SCM_QUESTIONS: Question[] = [
     ],
     correctAnswer: "It minimizes holding costs by keeping inventory levels low",
     difficulty: "medium",
-    topic: "industry"
+    topic: "technical"
   },
-  {
-    questionText: "Which of the following represents a best practice for resolving a shipping delay from a critical vendor?",
-    options: [
-      "Immediately cancel the contract without contact",
-      "Communicate with the vendor, check the buffer stock, and look for secondary suppliers if needed",
-      "Wait indefinitely without checking internal inventory",
-      "Withhold payments for past unrelated shipments immediately"
-    ],
-    correctAnswer: "Communicate with the vendor, check the buffer stock, and look for secondary suppliers if needed",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  // Hard
   {
     questionText: "Which formula is commonly used to calculate the Economic Order Quantity (EOQ)?",
     options: [
@@ -94,31 +177,11 @@ const FALLBACK_SCM_QUESTIONS: Question[] = [
     correctAnswer: "Square root of ((2 * Demand * Ordering Cost) / Holding Cost)",
     difficulty: "hard",
     topic: "technical"
-  },
-  {
-    questionText: "Under GST regulations in India, what is the primary consequence of a vendor failing to file their GSTR-1 on time?",
-    options: [
-      "The buyer cannot claim Input Tax Credit (ITC) for that purchase",
-      "The buyer's import license is immediately suspended",
-      "The vendor is banned from selling goods in all states",
-      "The buyer has to pay double tax on the purchase"
-    ],
-    correctAnswer: "The buyer cannot claim Input Tax Credit (ITC) for that purchase",
-    difficulty: "hard",
-    topic: "industry"
-  },
-  {
-    questionText: "If a company has an annual demand of 12,000 units, ordering cost of $50/order, and holding cost of $3/unit/year, what is the approximate EOQ?",
-    options: ["200 units", "400 units", "600 units", "632 units"],
-    correctAnswer: "632 units",
-    difficulty: "hard",
-    topic: "practical"
   }
 ];
 
-// Fallback questions for Frontend
-const FALLBACK_FRONTEND_QUESTIONS: Question[] = [
-  // Easy
+// Fallback technical questions for Frontend (6 questions)
+const FRONTEND_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "Which hook should be used in React to perform side effects?",
     options: ["useState", "useContext", "useEffect", "useReducer"],
@@ -131,21 +194,8 @@ const FALLBACK_FRONTEND_QUESTIONS: Question[] = [
     options: ["CSS Grid", "Flexbox", "Floats", "Absolute positioning"],
     correctAnswer: "Flexbox",
     difficulty: "easy",
-    topic: "role-specific"
-  },
-  {
-    questionText: "What is the primary benefit of TypeScript over JavaScript?",
-    options: [
-      "TypeScript compiles faster",
-      "TypeScript provides static typing and catch errors at compile-time",
-      "TypeScript executes faster in the browser",
-      "TypeScript has no strict mode"
-    ],
-    correctAnswer: "TypeScript provides static typing and catch errors at compile-time",
-    difficulty: "easy",
     topic: "technical"
   },
-  // Medium
   {
     questionText: "In React 18/19, what is the primary purpose of the 'Suspense' component?",
     options: [
@@ -168,28 +218,8 @@ const FALLBACK_FRONTEND_QUESTIONS: Question[] = [
     ],
     correctAnswer: "Add a 'fetchpriority=\"high\"' attribute to the image tag",
     difficulty: "medium",
-    topic: "practical"
+    topic: "technical"
   },
-  {
-    questionText: "Which attribute should you add to script tags to download them asynchronously without blocking HTML parsing?",
-    options: ["defer", "async", "preload", "prefetch"],
-    correctAnswer: "defer",
-    difficulty: "medium",
-    topic: "industry"
-  },
-  {
-    questionText: "What is the primary visual symptom of a layout shift that would negatively impact Cumulative Layout Shift (CLS)?",
-    options: [
-      "A button shifts downwards when an image above it loads without explicit width/height dimensions",
-      "The page background color changes suddenly on load",
-      "A popup modal displays instantly in the center of the screen",
-      "The font color transitions smoothly from black to gray"
-    ],
-    correctAnswer: "A button shifts downwards when an image above it loads without explicit width/height dimensions",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  // Hard
   {
     questionText: "Under what condition would React.memo() fail to prevent a re-render of a child component?",
     options: [
@@ -212,20 +242,12 @@ const FALLBACK_FRONTEND_QUESTIONS: Question[] = [
     ],
     correctAnswer: "Server Actions are called directly as asynchronous JavaScript functions in client components, abstracting the fetch layer",
     difficulty: "hard",
-    topic: "role-specific"
-  },
-  {
-    questionText: "Which of the following Web APIs is used to observe changes to the size of an element's content box?",
-    options: ["MutationObserver", "ResizeObserver", "IntersectionObserver", "PerformanceObserver"],
-    correctAnswer: "ResizeObserver",
-    difficulty: "hard",
     topic: "technical"
   }
 ];
 
-// Fallback questions for DevOps
-const FALLBACK_DEVOPS_QUESTIONS: Question[] = [
-  // Easy
+// Fallback technical questions for DevOps (6 questions)
+const DEVOPS_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "What is the primary benefit of infrastructure as code (IaC)?",
     options: [
@@ -243,16 +265,8 @@ const FALLBACK_DEVOPS_QUESTIONS: Question[] = [
     options: ["Docker", "Kubernetes", "VirtualBox", "Terraform"],
     correctAnswer: "Docker",
     difficulty: "easy",
-    topic: "role-specific"
+    topic: "technical"
   },
-  {
-    questionText: "In git, which command is used to record changes to the local repository?",
-    options: ["git push", "git commit", "git pull", "git status"],
-    correctAnswer: "git commit",
-    difficulty: "easy",
-    topic: "industry"
-  },
-  // Medium
   {
     questionText: "In Terraform, what is the purpose of the state file (terraform.tfstate)?",
     options: [
@@ -275,46 +289,14 @@ const FALLBACK_DEVOPS_QUESTIONS: Question[] = [
     ],
     correctAnswer: "To automate the building, testing, and deployment of code changes",
     difficulty: "medium",
-    topic: "role-specific"
-  },
-  {
-    questionText: "When planning a disaster recovery strategy, what is the difference between RTO (Recovery Time Objective) and RPO (Recovery Point Objective)?",
-    options: [
-      "RTO is the maximum tolerable downtime, while RPO is the maximum tolerable data loss duration since the last backup",
-      "RTO refers to network latency, while RPO refers to database write speed",
-      "RTO measures server hardware lifespan, while RPO measures application code bugs",
-      "RTO and RPO are identical metrics used interchangeably"
-    ],
-    correctAnswer: "RTO is the maximum tolerable downtime, while RPO is the maximum tolerable data loss duration since the last backup",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  {
-    questionText: "Which AWS service is designed to distribute incoming application traffic across multiple targets like EC2 instances?",
-    options: ["Amazon Route 53", "AWS Elastic Load Balancing (ELB)", "Amazon S3", "AWS IAM"],
-    correctAnswer: "AWS Elastic Load Balancing (ELB)",
-    difficulty: "medium",
     topic: "technical"
   },
-  // Hard
   {
     questionText: "In Kubernetes, which component is responsible for maintaining network rules on nodes, allowing communication to your Pods?",
     options: ["kube-apiserver", "kube-proxy", "kube-scheduler", "etcd"],
     correctAnswer: "kube-proxy",
     difficulty: "hard",
     topic: "technical"
-  },
-  {
-    questionText: "What is a major security risk when using wildcards (*) in AWS IAM Policy Resource elements?",
-    options: [
-      "It causes IAM API requests to time out",
-      "It grants permissions to all resources of that type, violating the principle of least privilege",
-      "It locks everyone out of the console",
-      "It makes the IAM policy incompatible with Terraform"
-    ],
-    correctAnswer: "It grants permissions to all resources of that type, violating the principle of least privilege",
-    difficulty: "hard",
-    topic: "practical"
   },
   {
     questionText: "In a GitOps workflow utilizing ArgoCD, what happens when a manual change is made directly to a live Kubernetes cluster resource via kubectl?",
@@ -326,13 +308,88 @@ const FALLBACK_DEVOPS_QUESTIONS: Question[] = [
     ],
     correctAnswer: "ArgoCD will detect a 'OutOfSync' state and, if self-healing is enabled, automatically revert the change to match the Git repository",
     difficulty: "hard",
-    topic: "role-specific"
+    topic: "technical"
   }
 ];
 
-// Fallback questions for General Roles
-const FALLBACK_GENERIC_QUESTIONS: Question[] = [
-  // Easy
+// Fallback technical questions for Sales/Business (6 questions)
+const SALES_TECHNICAL_QUESTIONS: Question[] = [
+  {
+    questionText: "What is the primary goal of a sales pipeline?",
+    options: [
+      "To track and manage potential customers at various stages of the buying process",
+      "To build the company website",
+      "To manage employee attendance records",
+      "To calculate monthly server costs"
+    ],
+    correctAnswer: "To track and manage potential customers at various stages of the buying process",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "Which of the following is a key element of a strong customer value proposition?",
+    options: [
+      "Clearly articulating how your product solves a specific customer pain point",
+      "Listing all company office addresses in the brochure",
+      "Providing the longest product warranty in the market",
+      "Offering the lowest price regardless of value delivered"
+    ],
+    correctAnswer: "Clearly articulating how your product solves a specific customer pain point",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "A customer objects to your product's price during a negotiation. What is the most effective response?",
+    options: [
+      "Immediately offer a discount to close the deal",
+      "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
+      "Ignore their objection and continue the product demonstration",
+      "Tell the customer that the price is non-negotiable and end the meeting"
+    ],
+    correctAnswer: "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "Which metric best measures sales team efficiency in converting leads to paying customers?",
+    options: [
+      "Website traffic volume",
+      "Lead-to-Customer Conversion Rate",
+      "Number of emails sent per day",
+      "Social media follower count"
+    ],
+    correctAnswer: "Lead-to-Customer Conversion Rate",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "A key account representing 25% of your quarterly revenue is threatening to switch to a competitor. What is the most strategic approach?",
+    options: [
+      "Match the competitor's price immediately regardless of margin impact",
+      "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
+      "Let the account go because no single customer should hold that much leverage",
+      "Offer free products for 6 months to retain the account"
+    ],
+    correctAnswer: "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
+    difficulty: "hard",
+    topic: "technical"
+  },
+  {
+    questionText: "What is the primary difference between 'consultative selling' and 'transactional selling'?",
+    options: [
+      "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
+      "Transactional selling involves more paperwork than consultative selling",
+      "Consultative selling is only used in B2C markets",
+      "There is no difference; they are the same approach"
+    ],
+    correctAnswer: "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
+    difficulty: "hard",
+    topic: "technical"
+  }
+];
+
+// Fallback technical questions for Generic Roles (6 questions)
+const GENERIC_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "What is the primary role of a firewall in a network security system?",
     options: [
@@ -355,16 +412,8 @@ const FALLBACK_GENERIC_QUESTIONS: Question[] = [
     ],
     correctAnswer: "Using a password manager to generate and store unique, complex passwords",
     difficulty: "easy",
-    topic: "practical"
+    topic: "technical"
   },
-  {
-    questionText: "In a professional business context, what does the term 'SaaS' stand for?",
-    options: ["Software as a Service", "System and Application Software", "Structured Assessment and Scoring", "Security Alert and Auditing System"],
-    correctAnswer: "Software as a Service",
-    difficulty: "easy",
-    topic: "industry"
-  },
-  // Medium
   {
     questionText: "What is the primary purpose of version control systems like Git?",
     options: [
@@ -378,37 +427,12 @@ const FALLBACK_GENERIC_QUESTIONS: Question[] = [
     topic: "technical"
   },
   {
-    questionText: "Which of the following describes a 'Phishing' attack?",
-    options: [
-      "An attacker physical stealing a company laptop",
-      "An attacker sending fraudulent messages designed to trick individuals into revealing sensitive information",
-      "A server overloading due to too many network requests",
-      "A software bug causing data to delete unexpectedly"
-    ],
-    correctAnswer: "An attacker sending fraudulent messages designed to trick individuals into revealing sensitive information",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  {
-    questionText: "In project management, what is the significance of the 'Critical Path'?",
-    options: [
-      "The list of non-essential features that can be cut",
-      "The longest sequence of dependent tasks that must be completed to deliver the project on time",
-      "The budget allocation for server hosting",
-      "The folder path where source code is stored"
-    ],
-    correctAnswer: "The longest sequence of dependent tasks that must be completed to deliver the project on time",
-    difficulty: "medium",
-    topic: "role-specific"
-  },
-  {
     questionText: "Which of the following SQL statements is used to fetch data from a database?",
     options: ["UPDATE", "INSERT", "SELECT", "DELETE"],
     correctAnswer: "SELECT",
     difficulty: "medium",
     topic: "technical"
   },
-  // Hard
   {
     questionText: "What is the primary difference between symmetric and asymmetric encryption?",
     options: [
@@ -426,19 +450,7 @@ const FALLBACK_GENERIC_QUESTIONS: Question[] = [
     options: ["CAC (Customer Acquisition Cost)", "MRR (Monthly Recurring Revenue)", "LTV (Customer Lifetime Value)", "NPS (Net Promoter Score)"],
     correctAnswer: "MRR (Monthly Recurring Revenue)",
     difficulty: "hard",
-    topic: "industry"
-  },
-  {
-    questionText: "Under GDPR regulations, what is meant by 'the Right to be Forgotten'?",
-    options: [
-      "An employer can fire an employee without cause",
-      "Individuals have the right to request that a business delete their personal data from all records under certain conditions",
-      "The website is allowed to clear browser cookies daily",
-      "The AI model is retrained and forgets all weights weekly"
-    ],
-    correctAnswer: "Individuals have the right to request that a business delete their personal data from all records under certain conditions",
-    difficulty: "hard",
-    topic: "practical"
+    topic: "technical"
   }
 ];
 
@@ -454,29 +466,30 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
     return selectFallbackQuestions(jobTitle);
   }
 
-  const prompt = `You are a senior psychometrician and domain expert designing a rigorous, elite hiring assessment. Analyze the following Job Description and generate 10 highly challenging, scenario-based Multiple Choice Questions (MCQs). The assessment should target senior-level domain expertise.
+  const prompt = `You are a senior psychometrician and domain expert designing a rigorous, elite hiring assessment. Analyze the following Job Description and generate exactly 15 highly challenging Multiple Choice Questions (MCQs). The assessment should target candidate expertise for this role.
 
 Job Title: ${jobTitle}
 Job Description:
 ${jobDescription}
 
-Generate exactly 10 questions meeting these requirements:
+Generate exactly 15 questions meeting these requirements:
 - Options: Exactly 4 options per question.
 - Correct Answer: One single correct answer that MUST match one of the 4 options EXACTLY.
-- Core coverage:
-  * Technical knowledge (3 questions)
-  * Practical situations/problem solving (3 questions)
-  * Role-specific skills (2 questions)
-  * Industry knowledge (2 questions)
+- Core coverage (topics mapping):
+  * IQ (Cognitive, logical reasoning, and pattern recognition) (3 questions, topic: 'iq')
+  * Technical (Role-based core competencies and knowledge) (6 questions, topic: 'technical')
+  * Behavioral (Situational judgment, communication, and interpersonal skills) (3 questions, topic: 'behavioral')
+  * Self-introduction (Professional profile matching, background introduction, career motivation/goals) (3 questions, topic: 'self-introduction')
 - Difficulty distribution:
-  * Medium (4 questions)
-  * Hard/Expert (6 questions) (Do not generate 'Easy' questions)
+  * Easy (3 questions, mostly for self-introduction and simple IQ/behavioral scenarios)
+  * Medium (6 questions)
+  * Hard/Expert (6 questions)
 
 CRITICAL RULES FOR QUESTION & OPTION QUALITY (MOST IMPORTANT):
-1. NO TRIVIAL OR DEFINITIONAL QUESTIONS: Forbid simple questions like 'What is the definition of X?' or 'What does Y stand for?'. Instead, design complex, real-world troubleshooting scenarios, architectural trade-off evaluations, or debugging/diagnostic situations.
-2. DISTRACTORS MUST BE EXTREMELY PLAUSIBLE: Wrong answers must represent common industry mistakes, subtle misconceptions, or syntactically valid but logically flawed options. A candidate without deep expertise must find all 4 options equally convincing.
+1. NO TRIVIAL OR DEFINITIONAL QUESTIONS: For technical and IQ questions, design complex, real-world troubleshooting scenarios, architectural trade-off evaluations, or debugging/diagnostic/logical situations.
+2. DISTRACTORS MUST BE EXTREMELY PLAUSIBLE: Wrong answers must represent common industry mistakes, subtle misconceptions, or logical fallacies. A candidate without deep expertise must find all 4 options equally convincing.
 3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure, detail level, and length. The correct answer must NOT be longer or more detailed than the distractors.
-4. INCORRECT OPTIONS MUST BE REAL TERMS: Never use made-up words or joke choices. Wrong answers should be real concepts in the domain used incorrectly in this specific scenario.
+4. INCORRECT OPTIONS MUST BE REAL TERMS/CONCEPTS: Never use made-up words or joke choices.
 5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D) across questions.
 6. NO GIVEAWAY PATTERNS: Do not use words like 'never', 'always', 'all of the above', or 'none of the above' in wrong answers.
 
@@ -500,7 +513,7 @@ JSON Structure:
 Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging, and professionally written.`;
 
   try {
-    const rawResponse = await callDeepSeek(prompt, { maxTokens: 3072, temperature: 0.35 });
+    const rawResponse = await callDeepSeek(prompt, { maxTokens: 3500, temperature: 0.35 });
     let cleaned = rawResponse.trim();
     
     // Clean up code block wraps if any
@@ -516,11 +529,11 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
     cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
 
     const parsed = JSON.parse(cleaned) as { questions: Question[] };
-    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length === 10) {
+    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length === 15) {
       // Basic validation of keys
       const validated = parsed.questions.map(q => {
         const difficulty = ["easy", "medium", "hard"].includes(q.difficulty) ? q.difficulty : "medium";
-        const topic = ["technical", "practical", "role-specific", "industry"].includes(q.topic) ? q.topic : "technical";
+        const topic = ["iq", "technical", "behavioral", "self-introduction"].includes(q.topic) ? q.topic : "technical";
         
         // Ensure options list has exactly 4 items
         let options = q.options;
@@ -551,7 +564,7 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
       });
       return validated;
     } else {
-      throw new Error(`AI generated ${parsed?.questions?.length || 0} questions instead of 10`);
+      throw new Error(`AI generated ${parsed?.questions?.length || 0} questions instead of 15`);
     }
   } catch (err: any) {
     console.error("❌ DeepSeek question generation failed, falling back to mock questions:", err.message);
@@ -559,151 +572,38 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
   }
 }
 
-// Fallback questions for Sales, Marketing, Business, Automobile, and non-tech roles
-const FALLBACK_SALES_BUSINESS_QUESTIONS: Question[] = [
-  // Easy
-  {
-    questionText: "What is the primary goal of a sales pipeline?",
-    options: [
-      "To track and manage potential customers at various stages of the buying process",
-      "To build the company website",
-      "To manage employee attendance records",
-      "To calculate monthly server costs"
-    ],
-    correctAnswer: "To track and manage potential customers at various stages of the buying process",
-    difficulty: "easy",
-    topic: "technical"
-  },
-  {
-    questionText: "Which of the following is a key element of a strong customer value proposition?",
-    options: [
-      "Clearly articulating how your product solves a specific customer pain point",
-      "Listing all company office addresses in the brochure",
-      "Providing the longest product warranty in the market",
-      "Offering the lowest price regardless of value delivered"
-    ],
-    correctAnswer: "Clearly articulating how your product solves a specific customer pain point",
-    difficulty: "easy",
-    topic: "role-specific"
-  },
-  {
-    questionText: "What does 'CRM' stand for in a business context?",
-    options: ["Customer Relationship Management", "Corporate Revenue Model", "Client Reporting Module", "Commercial Rate Monitor"],
-    correctAnswer: "Customer Relationship Management",
-    difficulty: "easy",
-    topic: "industry"
-  },
-  // Medium
-  {
-    questionText: "A customer objects to your product's price during a negotiation. What is the most effective response?",
-    options: [
-      "Immediately offer a discount to close the deal",
-      "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
-      "Ignore their objection and continue the product demonstration",
-      "Tell the customer that the price is non-negotiable and end the meeting"
-    ],
-    correctAnswer: "Acknowledge their concern, reframe the conversation around ROI and value, and present relevant case studies",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  {
-    questionText: "Which metric best measures sales team efficiency in converting leads to paying customers?",
-    options: [
-      "Website traffic volume",
-      "Lead-to-Customer Conversion Rate",
-      "Number of emails sent per day",
-      "Social media follower count"
-    ],
-    correctAnswer: "Lead-to-Customer Conversion Rate",
-    difficulty: "medium",
-    topic: "technical"
-  },
-  {
-    questionText: "In the context of automobile sales, what is the significance of 'test drive experience' in the buying cycle?",
-    options: [
-      "It is irrelevant and only adds cost to the dealership",
-      "It is a critical touchpoint that builds emotional connection and reduces buyer hesitation",
-      "It is only important for commercial vehicle sales",
-      "It should be offered only after the customer has signed the purchase agreement"
-    ],
-    correctAnswer: "It is a critical touchpoint that builds emotional connection and reduces buyer hesitation",
-    difficulty: "medium",
-    topic: "industry"
-  },
-  {
-    questionText: "What is the 'SPIN Selling' methodology primarily focused on?",
-    options: [
-      "Asking Situation, Problem, Implication, and Need-Payoff questions to understand the buyer",
-      "Spinning the product features to sound more attractive",
-      "Rapidly closing deals by pressuring the buyer",
-      "Sending promotional emails to large contact lists"
-    ],
-    correctAnswer: "Asking Situation, Problem, Implication, and Need-Payoff questions to understand the buyer",
-    difficulty: "medium",
-    topic: "practical"
-  },
-  // Hard
-  {
-    questionText: "A key account representing 25% of your quarterly revenue is threatening to switch to a competitor. What is the most strategic approach?",
-    options: [
-      "Match the competitor's price immediately regardless of margin impact",
-      "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
-      "Let the account go because no single customer should hold that much leverage",
-      "Offer free products for 6 months to retain the account"
-    ],
-    correctAnswer: "Conduct a thorough account review to understand their evolving needs, propose a tailored retention plan, and schedule an executive-level meeting",
-    difficulty: "hard",
-    topic: "practical"
-  },
-  {
-    questionText: "What is the primary difference between 'consultative selling' and 'transactional selling'?",
-    options: [
-      "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
-      "Transactional selling involves more paperwork than consultative selling",
-      "Consultative selling is only used in B2C markets",
-      "There is no difference; they are the same approach"
-    ],
-    correctAnswer: "Consultative selling focuses on understanding client needs and building long-term relationships, while transactional selling prioritizes quick one-time sales",
-    difficulty: "hard",
-    topic: "role-specific"
-  },
-  {
-    questionText: "In market analysis, what does the term 'Total Addressable Market' (TAM) represent?",
-    options: [
-      "The total number of employees in a company",
-      "The total revenue opportunity available if a product achieves 100% market share in its target segment",
-      "The total advertising budget allocated for the fiscal year",
-      "The total number of retail stores in a geographic region"
-    ],
-    correctAnswer: "The total revenue opportunity available if a product achieves 100% market share in its target segment",
-    difficulty: "hard",
-    topic: "technical"
-  }
-];
-
 /**
  * Match a role and select fallback questions
  */
 function selectFallbackQuestions(jobTitle: string): Question[] {
   const title = jobTitle.toLowerCase();
-  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("operations") || title.includes("logistics") || title.includes("warehouse")) {
-    console.log("Using SCM Executive fallback questions");
-    return FALLBACK_SCM_QUESTIONS;
-  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("ui") || title.includes("angular") || title.includes("vue")) {
-    console.log("Using Frontend Engineer fallback questions");
-    return FALLBACK_FRONTEND_QUESTIONS;
-  } else if (title.includes("devops") || title.includes("cloud") || title.includes("aws") || title.includes("sre") || title.includes("infrastructure") || title.includes("platform")) {
-    console.log("Using DevOps Engineer fallback questions");
-    return FALLBACK_DEVOPS_QUESTIONS;
-  } else if (title.includes("sales") || title.includes("marketing") || title.includes("business") || title.includes("account") || title.includes("automobile") || title.includes("automotive") || title.includes("bdm") || title.includes("bde") || title.includes("hr") || title.includes("recruiter") || title.includes("manager") || title.includes("executive") || title.includes("retail") || title.includes("customer")) {
-    console.log("Using Sales/Business fallback questions");
-    return FALLBACK_SALES_BUSINESS_QUESTIONS;
-  } else {
-    console.log("Using Generic fallback questions");
-    return FALLBACK_GENERIC_QUESTIONS;
-  }
-}
+  let techQuestions: Question[] = [];
 
+  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("operations") || title.includes("logistics") || title.includes("warehouse")) {
+    console.log("Using SCM Executive fallback technical questions");
+    techQuestions = SCM_TECHNICAL_QUESTIONS;
+  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("ui") || title.includes("angular") || title.includes("vue")) {
+    console.log("Using Frontend Engineer fallback technical questions");
+    techQuestions = FRONTEND_TECHNICAL_QUESTIONS;
+  } else if (title.includes("devops") || title.includes("cloud") || title.includes("aws") || title.includes("sre") || title.includes("infrastructure") || title.includes("platform")) {
+    console.log("Using DevOps Engineer fallback technical questions");
+    techQuestions = DEVOPS_TECHNICAL_QUESTIONS;
+  } else if (title.includes("sales") || title.includes("marketing") || title.includes("business") || title.includes("account") || title.includes("automobile") || title.includes("automotive") || title.includes("bdm") || title.includes("bde") || title.includes("hr") || title.includes("recruiter") || title.includes("manager") || title.includes("executive") || title.includes("retail") || title.includes("customer")) {
+    console.log("Using Sales/Business fallback technical questions");
+    techQuestions = SALES_TECHNICAL_QUESTIONS;
+  } else {
+    console.log("Using Generic fallback technical questions");
+    techQuestions = GENERIC_TECHNICAL_QUESTIONS;
+  }
+
+  // Combine to create a full 15 question assessment (3 IQ + 6 Technical + 3 Behavioral + 3 Self-Intro)
+  return [
+    ...COMMON_IQ_QUESTIONS,
+    ...techQuestions,
+    ...COMMON_BEHAVIORAL_QUESTIONS,
+    ...COMMON_SELF_INTRO_QUESTIONS
+  ];
+}
 
 /**
  * Creates an assessment for a job if it does not already exist, returning the assessment ID.
@@ -748,7 +648,7 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
     );
   }
 
-  console.log(`✅ Assessment ${assessmentId} created for job ${jobId} (${jobTitle}) with 10 questions.`);
+  console.log(`✅ Assessment ${assessmentId} created for job ${jobId} (${jobTitle}) with 15 questions.`);
   return assessmentId;
 }
 
