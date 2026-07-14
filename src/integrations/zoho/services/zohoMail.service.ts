@@ -105,9 +105,14 @@ export class ZohoMailService {
           if (msg.attachments && msg.attachments.length > 0) {
             for (const attachment of msg.attachments) {
               const ext = path.extname(attachment.filename).toLowerCase();
-              const isDoc = [".pdf", ".docx", ".doc", ".txt"].includes(ext);
+              
+              const lowerName = attachment.filename.toLowerCase();
+              const ignoreKeywords = ["payslip", "pay slip", "pay_slip", "challan", "ecr", "ticket", "boarding", "offer letter", "offer_letter", "invoice", "receipt", "bill", "signature", "logo", "image00"];
+              const isIgnored = ignoreKeywords.some(kw => lowerName.includes(kw));
+              const isDoc = [".pdf", ".docx", ".doc", ".txt"].includes(ext) && !isIgnored;
               
               if (isDoc && !resumeSaved) {
+
                 const finalExt = ext || ".pdf";
                 const relativePath = `uploads/resume-${candidateId}${finalExt}`;
                 const destPath = path.join(process.cwd(), relativePath);

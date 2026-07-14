@@ -191,6 +191,15 @@ export class EmailSyncService {
             continue;
           }
 
+          // Skip non-resume files like payslips, challans, offer letters, tickets, etc.
+          const lowerName = attach.fileName.toLowerCase();
+          const ignoreKeywords = ["payslip", "pay slip", "pay_slip", "challan", "ecr", "ticket", "boarding", "offer letter", "offer_letter", "invoice", "receipt", "bill", "signature", "logo", "image00"];
+          if (ignoreKeywords.some(keyword => lowerName.includes(keyword))) {
+            console.log(`[Email Sync] Skipping non-resume attachment: "${attach.fileName}"`);
+            continue;
+          }
+
+
           // Upload to storage
           const storageMeta = await storage.uploadFile(tenantId, attach.fileName, attach.content);
           await this.logAudit(tenantId, inboxId, "Storage", "Success", provider.name, Date.now() - startTime);
