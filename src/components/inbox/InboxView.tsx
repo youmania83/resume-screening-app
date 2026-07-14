@@ -212,19 +212,19 @@ export default function InboxView() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-750 border border-violet-100/15 dark:border-violet-850 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-800 border border-violet-100/15 dark:border-violet-850 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
             <Sparkles className="text-violet-200" />
             Resume Ingestion Inbox
           </h1>
-          <p className="text-xs text-violet-105 mt-1">
+          <p className="text-xs text-violet-100 mt-1">
             Asynchronously parse, scan, validate, and match incoming candidate resumes.
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
           <label className="flex items-center gap-2 bg-white/10 hover:bg-white/20 dark:bg-[#090d16] dark:hover:bg-secondary/30 text-white dark:text-foreground border border-white/20 dark:border-border rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer transition-all shadow-xs">
-            <FileUp size={14} className="text-violet-250 dark:text-indigo-400" />
+            <FileUp size={14} className="text-violet-200 dark:text-indigo-400" />
             Upload File / ZIP
             <input type="file" multiple onChange={handleFileUpload} className="hidden" accept=".pdf,.docx,.doc,.txt,.zip" />
           </label>
@@ -233,7 +233,7 @@ export default function InboxView() {
             disabled={syncingEmail}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/20 dark:bg-[#090d16] dark:hover:bg-secondary/30 text-white dark:text-foreground border border-white/20 dark:border-border rounded-lg px-4 py-2 text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
           >
-            <Mail size={14} className="text-violet-250 dark:text-indigo-400" />
+            <Mail size={14} className="text-violet-200 dark:text-indigo-400" />
             Sync Mailbox
           </button>
         </div>

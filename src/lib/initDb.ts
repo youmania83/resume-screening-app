@@ -14,6 +14,12 @@ async function init() {
     `);
 
     await client.query(`
+      INSERT INTO tenants (id, name)
+      VALUES ('default-tenant', 'Default Tenant')
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR PRIMARY KEY,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
