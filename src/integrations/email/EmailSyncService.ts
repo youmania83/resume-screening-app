@@ -199,12 +199,21 @@ export class EmailSyncService {
             continue;
           }
 
+          // Deduplication Check by MD5 File Hash
+          const fileHash = crypto.createHash("md5").update(attach.content).digest("hex");
+          const duplicateCheck = await queryGlobal(
+            `SELECT id FROM resume_inbox WHERE file_hash = $1 AND tenant_id = $2 LIMIT 1;`,
+            [fileHash, tenantId]
+          );
+
+          if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
+            console.log(`[Email Sync] Skipping duplicate attachment already in database: "${attach.fileName}" (Hash: ${fileHash})`);
+            continue;
+          }
 
           // Upload to storage
           const storageMeta = await storage.uploadFile(tenantId, attach.fileName, attach.content);
           await this.logAudit(tenantId, inboxId, "Storage", "Success", provider.name, Date.now() - startTime);
-
-          const fileHash = crypto.createHash("md5").update(attach.content).digest("hex");
 
           await queryGlobal(
             `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, created_at, updated_at)
@@ -229,6 +238,16 @@ export class EmailSyncService {
             console.log(`[Email Sync] Extracted ${links.length} potential resume link(s) from email body.`);
             for (const link of links) {
               const inboxId = crypto.randomUUID();
+
+              // Deduplication Check by File URL
+              const urlCheck = await queryGlobal(
+                `SELECT id FROM resume_inbox WHERE file_url = $1 AND tenant_id = $2 LIMIT 1;`,
+                [link, tenantId]
+              );
+              if (urlCheck.rowCount && urlCheck.rowCount > 0) {
+                console.log(`[Email Sync] Skipping duplicate resume link already in database: "${link}"`);
+                continue;
+              }
               
               // Attempt public download
               const downloadRes = await EmailSyncService.tryDownloadPublicCloudFile(link, inboxId);

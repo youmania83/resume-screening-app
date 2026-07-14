@@ -82,7 +82,15 @@ export class ZohoProvider implements IEmailProvider {
       await client.connect();
       const lock = await client.getMailboxLock("INBOX");
       try {
-        const searchResults = await client.search({ seen: false });
+        // Fetch all unread emails, plus any read/unread emails since July 10, 2026
+        const unreadResults = await client.search({ seen: false }) || [];
+        const recentResults = await client.search({ since: new Date("2026-07-10") }) || [];
+        
+        // Merge and deduplicate sequence numbers
+        const searchResults = Array.from(new Set([
+          ...(Array.isArray(unreadResults) ? unreadResults : []),
+          ...(Array.isArray(recentResults) ? recentResults : [])
+        ]));
         const resultsCount = Array.isArray(searchResults) ? searchResults.length : 0;
         console.log(`[Zoho Integration] Found ${resultsCount} unread messages.`);
 
