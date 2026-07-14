@@ -88,12 +88,21 @@ export class ZohoProvider implements IEmailProvider {
         const ext = fileName.split(".").pop()?.toLowerCase();
         if (ext && ["pdf", "docx", "doc", "txt"].includes(ext)) {
           if (part.type?.startsWith("image/")) return false;
-          return true;
-        }
-      }
-      if (part.type) {
-        const lowerType = part.type.toLowerCase();
-        if (lowerType === "application/pdf" || lowerType.includes("word") || lowerType.includes("officedocument")) {
+          
+          const lowerName = fileName.toLowerCase();
+          const blacklist = [
+            "payslip", "pay slip", "pay_slip", "salary",
+            "challan", "ecr", "gst", "tax", "audit", "balance",
+            "ticket", "boarding", "flight", "booking", "travel", "paid",
+            "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+            "scan", "mri", "xray", "medical", "prescription",
+            "tender", "agreement", "contract", "proposal",
+            "issue", "incident", "log", "report", "reports",
+            "program", "training", "certificate", "course"
+          ];
+          if (blacklist.some(keyword => lowerName.includes(keyword)) || lowerName.includes(" to ")) {
+            return false;
+          }
           return true;
         }
       }
@@ -134,11 +143,51 @@ export class ZohoProvider implements IEmailProvider {
                 // 1. Subject keyword match check
                 const isSubjectMatch = /applying|application|resume|cv|job|hiring/i.test(subject);
                 
-                // 2. Attachment check
+                // 2. Attachment check (excluding blacklisted filenames)
                 const isAttachmentMatch = hasResumeAttachment(msg.bodyStructure);
 
+                // 3. For unclassified subjects, enforce that at least one attachment must contain a resume keyword in its filename
+                let shouldFetch = false;
+                if (isSubjectMatch && isAttachmentMatch) {
+                  shouldFetch = true;
+                } else if (isAttachmentMatch) {
+                  // Verify if any attachment filename explicitly contains resume/cv keywords
+                  const hasExplicitResumeFile = (part: any): boolean => {
+                    if (!part) return false;
+                    const fileName = (part.parameters?.name || part.dispositionParameters?.filename || "").toLowerCase();
+                    if (fileName && ["pdf", "docx", "doc", "txt"].some(ext => fileName.endsWith(ext))) {
+                      const lowerName = fileName.toLowerCase();
+                      const blacklist = [
+                        "payslip", "pay slip", "pay_slip", "salary",
+                        "challan", "ecr", "gst", "tax", "audit", "balance",
+                        "ticket", "boarding", "flight", "booking", "travel", "paid",
+                        "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+                        "scan", "mri", "xray", "medical", "prescription",
+                        "tender", "agreement", "contract", "proposal",
+                        "issue", "incident", "log", "report", "reports",
+                        "program", "training", "certificate", "course"
+                      ];
+                      if (blacklist.some(keyword => lowerName.includes(keyword)) || lowerName.includes(" to ")) {
+                        return false;
+                      }
+                      if (lowerName.includes("resume") || lowerName.includes("cv") || lowerName.includes("curriculum") || lowerName.includes("biodata") || lowerName.includes("profile") || lowerName.includes("portfolio") || lowerName.includes("candidate") || lowerName.includes("application")) {
+                        return true;
+                      }
+                    }
+                    if (part.childNodes && Array.isArray(part.childNodes)) {
+                      for (const child of part.childNodes) {
+                        if (hasExplicitResumeFile(child)) return true;
+                      }
+                    }
+                    return false;
+                  };
+                  if (hasExplicitResumeFile(msg.bodyStructure)) {
+                    shouldFetch = true;
+                  }
+                }
+
                 // Only download the full message source if it looks like a candidate application/JD
-                if (isSubjectMatch || isAttachmentMatch) {
+                if (shouldFetch) {
                   try {
                     console.log(`[Zoho Integration] Downloading full message source for matched email: "${subject}" (Seq: ${msg.seq})`);
                     const fullMsg = await client.fetchOne(msg.seq, { source: true });

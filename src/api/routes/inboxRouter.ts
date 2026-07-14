@@ -60,6 +60,69 @@ router.get("/", async (req: any, res: any, next: any) => {
   }
 });
 
+// GET /api/inbox/purge-junk - Purge non-resume junk documents
+router.get("/purge-junk", async (req: any, res: any, next: any) => {
+  try {
+    const tenantId = req.headers["x-tenant-id"] || "default-tenant";
+    const resInbox = await queryGlobal("SELECT id, candidate_id, file_name FROM resume_inbox WHERE tenant_id = $1;", [tenantId]);
+    
+    const BLACKLIST_KEYWORDS = [
+      "payslip", "pay slip", "pay_slip", "salary",
+      "challan", "ecr", "gst", "tax", "audit", "balance",
+      "ticket", "boarding", "flight", "booking", "travel", "paid",
+      "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+      "scan", "mri", "xray", "medical", "prescription",
+      "tender", "agreement", "contract", "proposal",
+      "issue", "incident", "log", "report", "reports",
+      "program", "training", "certificate", "course"
+    ];
+
+    const junkInboxIds: string[] = [];
+    const junkCandidateIds: string[] = [];
+    const deletedFiles: string[] = [];
+
+    for (const row of resInbox.rows) {
+      const fileName = (row.file_name || "").toLowerCase();
+      let isJunk = false;
+      for (const keyword of BLACKLIST_KEYWORDS) {
+        if (fileName.includes(keyword)) {
+          isJunk = true;
+          break;
+        }
+      }
+      if (fileName.includes(" to ")) {
+        isJunk = true;
+      }
+
+      if (isJunk) {
+        junkInboxIds.push(row.id);
+        deletedFiles.push(row.file_name);
+        if (row.candidate_id) {
+          junkCandidateIds.push(row.candidate_id);
+        }
+      }
+    }
+
+    if (junkInboxIds.length === 0) {
+      return res.json({ success: true, message: "No junk files found to purge." });
+    }
+
+    if (junkCandidateIds.length > 0) {
+      await queryGlobal("DELETE FROM candidate_activity_logs WHERE candidate_id = ANY($1);", [junkCandidateIds]);
+      await queryGlobal("DELETE FROM candidates WHERE id = ANY($1);", [junkCandidateIds]);
+    }
+    await queryGlobal("DELETE FROM resume_inbox WHERE id = ANY($1);", [junkInboxIds]);
+
+    return res.json({
+      success: true,
+      message: `Successfully purged ${junkInboxIds.length} junk documents.`,
+      purgedFiles: deletedFiles
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/inbox/stats - Fetch inbox queue SLA and storage metrics
 router.get("/stats", async (req: any, res: any, next: any) => {
   try {

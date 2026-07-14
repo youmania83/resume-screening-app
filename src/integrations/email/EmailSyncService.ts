@@ -113,9 +113,16 @@ export class EmailSyncService {
           }
         }
 
-        // Fallback: If unclassified but contains attachments, assume candidate application
+        // Fallback: If unclassified, we only assume it's a resume if there are attachments and at least one attachment has a resume-related keyword in its filename
         if (!matchedRule && email.attachments && email.attachments.length > 0) {
-          matchedRule = { type: "resume" };
+          const hasResumeInFiles = email.attachments.some(att => {
+            const name = (att.fileName || "").toLowerCase();
+            return name.includes("resume") || name.includes("cv") || name.includes("curriculum") || name.includes("biodata") || name.includes("profile") || name.includes("portfolio") || name.includes("candidate") || name.includes("application");
+          });
+          
+          if (hasResumeInFiles) {
+            matchedRule = { type: "resume" };
+          }
         }
 
         // 2. Process according to classification
@@ -191,10 +198,21 @@ export class EmailSyncService {
             continue;
           }
 
-          // Skip non-resume files like payslips, challans, offer letters, tickets, etc.
+          // Skip non-resume files like payslips, challans, offer letters, tickets, scan reports, bank statements, etc.
           const lowerName = attach.fileName.toLowerCase();
-          const ignoreKeywords = ["payslip", "pay slip", "pay_slip", "challan", "ecr", "ticket", "boarding", "offer letter", "offer_letter", "invoice", "receipt", "bill", "signature", "logo", "image00"];
-          if (ignoreKeywords.some(keyword => lowerName.includes(keyword))) {
+          const ignoreKeywords = [
+            "payslip", "pay slip", "pay_slip", "salary",
+            "challan", "ecr", "gst", "tax", "audit", "balance",
+            "ticket", "boarding", "flight", "booking", "travel", "paid",
+            "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+            "scan", "mri", "xray", "medical", "prescription",
+            "tender", "agreement", "contract", "proposal",
+            "issue", "incident", "log", "report", "reports",
+            "program", "training", "certificate", "course",
+            "signature", "logo", "image00"
+          ];
+          const hasResumeKeyword = lowerName.includes("resume") || lowerName.includes("cv") || lowerName.includes("curriculum");
+          if ((ignoreKeywords.some(keyword => lowerName.includes(keyword)) || lowerName.includes(" to ")) && !hasResumeKeyword) {
             console.log(`[Email Sync] Skipping non-resume attachment: "${attach.fileName}"`);
             continue;
           }
