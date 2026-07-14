@@ -44,7 +44,7 @@ export function CandidatesView({
   handleDeleteCandidate
 }: CandidatesViewProps) {
   const uniqueRoles = useMemo(() => {
-    return Array.from(new Set(candidates.map(c => c.role)));
+    return Array.from(new Set(candidates.map(c => c.jobTitle || c.role)));
   }, [candidates]);
 
   const exportToCSV = () => {
@@ -230,7 +230,12 @@ export function CandidatesView({
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-foreground font-semibold">
-                      {c.role} {c.jobCode && <span className="text-[10px] font-normal text-slate-400">({c.jobCode})</span>}
+                      <div>
+                        <span className="block font-semibold">
+                          {c.jobTitle || c.role} {c.jobCode && <span className="text-[10px] font-normal text-slate-400">({c.jobCode})</span>}
+                        </span>
+                        {c.jobLocation && <span className="text-[10px] font-normal text-muted-foreground block mt-0.5">{c.jobLocation}</span>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
                     <TableCell className="text-xs text-muted-foreground font-mono font-semibold">{c.appliedDate}</TableCell>

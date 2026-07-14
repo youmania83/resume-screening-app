@@ -239,7 +239,12 @@ export function OverviewView({ candidates }: OverviewViewProps) {
                     <TableRow key={c.id} className="border-b border-border/40 hover:bg-secondary/30 transition-colors">
                       <TableCell className="pl-6 text-xs font-semibold text-muted-foreground/80">#{idx + 1}</TableCell>
                       <TableCell className="font-bold text-xs text-foreground dark:text-slate-100">{c.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-semibold">{c.role}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-semibold">
+                        <div>
+                          <span className="text-foreground font-semibold block">{c.jobTitle || c.role}</span>
+                          {c.jobLocation && <span className="text-[10px] text-muted-foreground block mt-0.5">{c.jobLocation}</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears || 0} Years</TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className="text-[10px] font-mono font-bold bg-secondary/35 text-foreground/90 border-border/70">
@@ -299,7 +304,7 @@ export function OverviewView({ candidates }: OverviewViewProps) {
                   <div>
                     <strong className="text-foreground block font-bold">{c.name}</strong>
                     <span className="text-muted-foreground text-[10px] block mt-0.5 font-semibold">
-                      Applied for {c.role} (Score: {c.score || 0}/100)
+                      Applied for {c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""} (Score: {c.score || 0}/100)
                     </span>
                   </div>
                 </div>

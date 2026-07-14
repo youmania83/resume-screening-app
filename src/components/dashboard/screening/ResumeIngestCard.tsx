@@ -274,7 +274,7 @@ export function ResumeIngestCard({
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] text-muted-foreground font-semibold block mt-0.5">{c.role} • {c.experienceYears} yrs</span>
+                      <span className="text-[9px] text-muted-foreground font-semibold block mt-0.5">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""} • {c.experienceYears} yrs</span>
                     </div>
                   </TableCell>
                   <TableCell>

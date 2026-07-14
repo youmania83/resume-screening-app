@@ -82,7 +82,10 @@ export function AssessmentsView({
 
   const filtered = candidates.filter(c => {
     const q = searchQuery.toLowerCase();
-    const nameMatch = c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q);
+    const nameMatch = c.name.toLowerCase().includes(q) || 
+      c.role.toLowerCase().includes(q) || 
+      (c.jobTitle || "").toLowerCase().includes(q) || 
+      (c.jobLocation || "").toLowerCase().includes(q);
     if (!nameMatch) return false;
 
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
@@ -223,7 +226,12 @@ export function AssessmentsView({
                             <span className="text-[10px] text-muted-foreground font-medium">{c.email}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-3.5 text-muted-foreground font-medium">{c.role}</TableCell>
+                        <TableCell className="py-3.5 text-muted-foreground font-medium">
+                          <div>
+                            <span className="text-foreground font-semibold block">{c.jobTitle || c.role}</span>
+                            {c.jobLocation && <span className="text-[10px] text-muted-foreground block mt-0.5">{c.jobLocation}</span>}
+                          </div>
+                        </TableCell>
                         <TableCell className="py-3.5 text-center">
                           <Badge variant="outline" className="text-[10px] font-mono font-bold bg-secondary/30 border-border text-foreground/90">
                             {resumeScore}%

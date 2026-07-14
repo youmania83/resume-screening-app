@@ -66,7 +66,9 @@ export function useCandidates(isLoggedIn?: boolean) {
             finalScore: c.final_score,
             violationCount: c.violation_count,
             activityLogs: c.activityLogs || [],
-            jobCode: c.job_code || undefined
+            jobCode: c.job_code || undefined,
+            jobTitle: c.job_title || undefined,
+            jobLocation: c.job_location || undefined
           }));
           setCandidates(mapped);
           if (mapped.length > 0) {
@@ -344,7 +346,9 @@ export function useCandidates(isLoggedIn?: boolean) {
     return candidates.filter(candidate => {
       const nameMatch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase());
       const roleSearchMatch = candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
-      const searchMatch = nameMatch || roleSearchMatch;
+      const jobTitleMatch = (candidate.jobTitle || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const jobLocMatch = (candidate.jobLocation || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const searchMatch = nameMatch || roleSearchMatch || jobTitleMatch || jobLocMatch;
 
       let scoreMatch = true;
       if (scoreFilter === "high") scoreMatch = candidate.score >= 85;
@@ -370,7 +374,7 @@ export function useCandidates(isLoggedIn?: boolean) {
 
       let roleFilterMatch = true;
       if (roleFilter !== "all") {
-        roleFilterMatch = candidate.role === roleFilter;
+        roleFilterMatch = (candidate.jobTitle || candidate.role) === roleFilter;
       }
 
       return searchMatch && scoreMatch && statusMatch && assessmentMatch && expMatch && roleFilterMatch;

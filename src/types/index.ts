@@ -37,6 +37,8 @@ export interface Candidate {
   violationCount?: number;
   activityLogs?: Array<{ date: string; message: string }>;
   jobCode?: string;
+  jobTitle?: string;
+  jobLocation?: string;
 }
 
 export interface StructuredJD {

@@ -49,7 +49,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
             <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-450 bg-card" onClick={() => selectAndOpen(c)}>
               <CardContent className="p-3 space-y-2 text-xs">
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
-                <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
+                <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
                 <div className="flex items-center justify-between mt-2.5">
                   <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                   <span className="text-xs font-bold text-amber-605">{c.score}%</span>
@@ -68,7 +68,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
             <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-455 bg-card" onClick={() => selectAndOpen(c)}>
               <CardContent className="p-3 space-y-2 text-xs">
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
-                <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
+                <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
                 <div className="flex items-center justify-between mt-2.5">
                   <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                   <span className="text-xs font-bold text-emerald-600">{c.score}%</span>
@@ -87,7 +87,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
             <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-455 bg-card" onClick={() => selectAndOpen(c)}>
               <CardContent className="p-3 space-y-2 text-xs">
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
-                <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
+                <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
                 <div className="flex items-center justify-between mt-2.5">
                   <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
                   <span className="text-xs font-bold text-indigo-600">{c.score}%</span>
@@ -106,7 +106,7 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
             <Card key={c.id} className="shadow-sm border-border cursor-pointer hover:border-slate-450 bg-card opacity-70" onClick={() => selectAndOpen(c)}>
               <CardContent className="p-3 space-y-2 text-xs">
                 <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
-                <span className="text-[10px] text-muted-foreground block truncate">{c.role}</span>
+                <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
                 <div className="flex items-center justify-between mt-2.5">
                   <Badge variant={c.status === "hold" ? "warning" : c.status === "talent_pool" ? "info" : "destructive"} className="text-[8px] px-1 py-0 uppercase">
                     {c.status === "talent_pool" ? "Talent Pool" : c.status}

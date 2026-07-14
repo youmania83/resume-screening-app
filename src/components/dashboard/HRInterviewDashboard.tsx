@@ -33,7 +33,11 @@ export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterview
     }).filter(c => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
-      return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.role.toLowerCase().includes(q);
+      return c.name.toLowerCase().includes(q) || 
+        c.email.toLowerCase().includes(q) || 
+        c.role.toLowerCase().includes(q) ||
+        (c.jobTitle || "").toLowerCase().includes(q) ||
+        (c.jobLocation || "").toLowerCase().includes(q);
     });
   }, [candidates, viewFilter, searchQuery]);
 
@@ -251,7 +255,7 @@ export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterview
                             </div>
                             <div className="flex items-center gap-3 mt-1.5">
                               <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                                <Briefcase className="h-2.5 w-2.5" /> {c.role}
+                                <Briefcase className="h-2.5 w-2.5" /> {c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}
                               </span>
                               <span className="text-[10px] text-muted-foreground font-semibold">
                                 {c.experienceYears}y exp
