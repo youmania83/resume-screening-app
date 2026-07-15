@@ -782,6 +782,33 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_candidate_activity_logs_logged_at ON candidate_activity_logs(tenant_id, logged_at DESC);
     `);
 
+    // Clean up existing candidates' weaknesses to remove any US-centric points (e.g. US visa, work auth, or US market exposure)
+    console.log("Cleaning up US work authorization and visa references from existing candidates' weaknesses...");
+    const candidatesRes = await client.query(`
+      SELECT id, weaknesses FROM candidates WHERE weaknesses IS NOT NULL;
+    `);
+    for (const row of candidatesRes.rows) {
+      if (Array.isArray(row.weaknesses) && row.weaknesses.length > 0) {
+        const filtered = row.weaknesses.filter((w: string) => {
+          const lower = w.toLowerCase();
+          return !(
+            lower.includes("us ") ||
+            lower.includes(" us") ||
+            lower.includes(" visa") ||
+            lower.includes("sponsorship") ||
+            lower.includes("work authorization") ||
+            lower.includes("market exposure")
+          );
+        });
+        if (filtered.length !== row.weaknesses.length) {
+          await client.query(`
+            UPDATE candidates SET weaknesses = $1 WHERE id = $2;
+          `, [filtered, row.id]);
+          console.log(`Updated weaknesses for candidate ${row.id}`);
+        }
+      }
+    }
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();

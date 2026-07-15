@@ -20,6 +20,8 @@ export const STAGE_ROUTING_THRESHOLDS = {
 function buildEvaluatePrompt(jobDescription: string, resumeText: string): string {
   return `You are an expert ATS parser and recruiter. Evaluate the following candidate resume against the Job Description.
 
+CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, risk factors, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
+
 Job Description:
 ${jobDescription}
 
@@ -39,14 +41,14 @@ Analyze the resume and return a JSON object with the following fields:
   "confidence": string (e.g. "95% (High)" or "60% (Medium)" or "40% (Low)"),
   "riskLevel": string (either "Low", "Medium", or "High"),
   "strengths": string[] (3 key professional strengths extracted from the resume),
-  "weaknesses": string[] (2 professional weaknesses or gaps relative to the JD),
+  "weaknesses": string[] (2 professional weaknesses or gaps relative to the JD. DO NOT include any US visa, US work authorization, or lack of US experience/market exposure points.),
   "missingSkills": string[] (skills required/preferred in the JD but missing in the resume),
   "matchedSkills": string[] (skills matching the JD),
   "skills": string[] (all technical and soft skills identified in the resume),
   "certifications": string[] (any professional certifications extracted from the resume),
   "projects": string[] (notable projects or case studies mentioned in the resume),
   "keywords": string[] (list of 5-8 relevant industry keywords identified in the resume),
-  "riskFactors": string[] (any warning flags, e.g. short tenure, gap in employment, etc.),
+  "riskFactors": string[] (any warning flags, e.g. short tenure, gap in employment, etc. DO NOT include any US visa, US work authorization, or lack of US experience/market exposure points.),
   "education": string (highest educational degree and institution)
 }
 

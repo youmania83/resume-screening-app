@@ -34,6 +34,9 @@ const router = Router();
 
 function buildEvaluatePrompt(jobDescription: string, resumeText: string): string {
   return `You are an expert ATS parser and recruiter. Evaluate the following candidate resume against the Job Description.
+
+CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, risk factors, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
+
 Job Description:
 ${jobDescription}
 
@@ -53,14 +56,14 @@ Analyze the resume and return ONLY a JSON object:
   "confidence": "95% (High) / 60% (Medium)",
   "riskLevel": "Low / Medium / High",
   "strengths": ["3 key strengths"],
-  "weaknesses": ["2 weaknesses"],
+  "weaknesses": ["2 weaknesses. DO NOT include any US visa, US work authorization, or lack of US experience/market exposure points."],
   "missingSkills": ["skills in JD but missing in resume"],
   "matchedSkills": ["skills matching the JD"],
   "skills": ["all skills identified"],
   "certifications": ["certifications"],
   "projects": ["notable projects"],
   "keywords": ["5-8 keywords"],
-  "riskFactors": ["any warning flags"],
+  "riskFactors": ["any warning flags. DO NOT include any US visa, US work authorization, or lack of US experience/market exposure points."],
   "education": "highest degree and institution"
 }
 Do not include markdown code block formatting or explanations outside the JSON.`;

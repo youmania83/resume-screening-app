@@ -55,10 +55,12 @@ export interface IResumeParserProvider {
   parseResume(rawText: string, jobDescription?: string): Promise<ParsedResumeData>;
 }
 
-// Prompt template helper
 function buildParserPrompt(rawText: string, jobDescription?: string): string {
   return `You are an expert ATS parser. Parse the raw resume text and extract candidate details.
 ${jobDescription ? `Compare the resume details against this Job Description:\n${jobDescription}\n` : ""}
+
+CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
+
 Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown backticks or include any other text.
 {
   "firstName": "string (first name or empty)",
@@ -88,7 +90,7 @@ Return ONLY a valid JSON object matching the following schema. Do NOT wrap in ma
   "phoneConfidence": number (0.00 to 1.00 confidence of phone accuracy),
   "skillsConfidence": number (0.00 to 1.00 confidence of skills parsing),
   "strengths": ["array of candidate's top 3 strengths"],
-  "concerns": ["array of candidate gaps or concerns"],
+  "concerns": ["array of candidate gaps or concerns. DO NOT include any US visa, US work authorization, or lack of US experience/market exposure points."],
   "recommendationReason": "string (brief justification for why this candidate fits)",
   "matchedSkills": ["array of skills that match the JD requirements"],
   "missingSkills": ["array of skills required by JD but missing in resume"],
