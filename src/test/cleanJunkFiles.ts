@@ -6,20 +6,26 @@ import { queryGlobal } from "../lib/tenantDb.js";
 
 const BLACKLIST_KEYWORDS = [
   "payslip", "pay slip", "pay_slip", "salary",
-  "challan", "ecr", "gst", "tax", "audit", "balance",
-  "ticket", "boarding", "flight", "booking", "travel", "paid",
-  "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+  "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
+  "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
+  "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
   "scan", "mri", "xray", "medical", "prescription",
   "tender", "agreement", "contract", "proposal",
   "issue", "incident", "log", "report", "reports",
-  "program", "training", "certificate", "course"
+  "program", "training", "certificate", "course",
+  "signature", "logo", "image0",
+  "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
 ];
 
 async function main() {
   console.log("=== RUNNING JUNK DOCUMENTS CLEANUP ON DATABASE ===");
 
-  // Fetch all inbox files
-  const res = await queryGlobal("SELECT id, candidate_id, file_name, file_url FROM resume_inbox;");
+  // Fetch all inbox files with candidate details
+  const res = await queryGlobal(`
+    SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, c.name as candidate_name
+    FROM resume_inbox ri
+    LEFT JOIN candidates c ON c.id = ri.candidate_id;
+  `);
   console.log(`Analyzing ${res.rowCount} total records in resume_inbox...`);
 
   const junkInboxIds: string[] = [];
@@ -28,6 +34,8 @@ async function main() {
 
   for (const row of res.rows) {
     const fileName = (row.file_name || "").toLowerCase();
+    const status = row.status;
+    const candidateName = row.candidate_name;
     
     // Check if filename contains any blacklist keyword
     let isJunk = false;
@@ -41,29 +49,54 @@ async function main() {
     if (fileName.includes(" to ")) {
       isJunk = true;
     }
+    if (status === "Failed") {
+      isJunk = true;
+    }
+    if (candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {
+      isJunk = true;
+    }
 
     if (isJunk) {
-      console.log(`📍 Found junk record: "${row.file_name}" (ID: ${row.id})`);
+      console.log(`📍 Found junk record: "${row.file_name}" (ID: ${row.id}, Candidate: ${candidateName}, Status: ${status})`);
       junkInboxIds.push(row.id);
       deletedFiles.push(row.file_name);
-      if (row.candidate_id) {
+      if (row.candidate_id && !junkCandidateIds.includes(row.candidate_id)) {
         junkCandidateIds.push(row.candidate_id);
       }
     }
   }
 
-  if (junkInboxIds.length === 0) {
+  // Also query orphan unknown candidates
+  const orphanRes = await queryGlobal(`
+    SELECT id, name FROM candidates
+    WHERE name = 'Unknown Candidate'
+       OR name ILIKE '%unknown%'
+       OR name IS NULL
+       OR name = '';
+  `);
+  console.log(`Found ${orphanRes.rowCount} potential orphan unknown candidates.`);
+  for (const row of orphanRes.rows) {
+    if (!junkCandidateIds.includes(row.id)) {
+      junkCandidateIds.push(row.id);
+      console.log(`📍 Found orphan unknown candidate: "${row.name}" (ID: ${row.id})`);
+    }
+  }
+
+  if (junkInboxIds.length === 0 && junkCandidateIds.length === 0) {
     console.log("No junk records found. Database is already clean!");
     return;
   }
 
-  console.log(`\nPurging ${junkInboxIds.length} junk records and ${junkCandidateIds.length} candidates...`);
+  console.log(`\nPurging ${junkInboxIds.length} junk inbox records and ${junkCandidateIds.length} candidates...`);
 
   if (junkCandidateIds.length > 0) {
+    await queryGlobal(`DELETE FROM candidate_timeline WHERE candidate_id = ANY($1);`, [junkCandidateIds]);
     await queryGlobal(`DELETE FROM candidate_activity_logs WHERE candidate_id = ANY($1);`, [junkCandidateIds]);
     await queryGlobal(`DELETE FROM candidates WHERE id = ANY($1);`, [junkCandidateIds]);
   }
-  await queryGlobal(`DELETE FROM resume_inbox WHERE id = ANY($1);`, [junkInboxIds]);
+  if (junkInboxIds.length > 0) {
+    await queryGlobal(`DELETE FROM resume_inbox WHERE id = ANY($1);`, [junkInboxIds]);
+  }
 
   console.log("\nCleanup successfully completed!");
   console.log("Purged files:", deletedFiles);
