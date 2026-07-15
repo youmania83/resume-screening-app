@@ -86,10 +86,10 @@ async function runTests() {
     assert(valDocx.valid, "Accept clean DOCX file");
 
     const valExe = FileValidationService.validate(dummyExe);
-    assert(!valExe.valid && valExe.errorReason?.includes("Dangerous file type"), "Reject executable files");
+    assert(!!(!valExe.valid && valExe.errorReason?.includes("Dangerous file type")), "Reject executable files");
 
     const valLarge = FileValidationService.validate(dummyLarge);
-    assert(!valLarge.valid && valLarge.errorReason?.includes("size exceeds"), "Reject files exceeding 25MB limit");
+    assert(!!(!valLarge.valid && valLarge.errorReason?.includes("size exceeds")), "Reject files exceeding 25MB limit");
 
     // Clean up virtual test files
     TempStorageService.delete(dummyPdf);

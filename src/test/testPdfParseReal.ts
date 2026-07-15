@@ -18,7 +18,7 @@ async function run() {
     const data = await parser.getText();
     
     console.log("Parse Success!");
-    console.log("Metadata:", data.metadata);
+    console.log("Metadata:", (data as any).metadata);
     console.log("Text length:", (data.text || "").length);
     console.log("Sample text snippet:\n", (data.text || "").substring(0, 300));
   } catch (err: any) {
