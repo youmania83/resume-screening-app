@@ -131,5 +131,9 @@ if (isMain) {
     console.error(maskSecrets(`Job ${job?.id} failed after attempts: ${err.message}`));
   });
 
+  emailWorker.on("error", (err) => {
+    console.error("🚨 [Email Worker] Connection/Runtime error:", err.message || err);
+  });
+
   console.log("🔧 Standalone Email Worker started – listening on BullMQ queue 'email-send-queue'");
 }

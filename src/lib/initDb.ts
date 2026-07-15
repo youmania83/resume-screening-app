@@ -15,7 +15,7 @@ async function init() {
 
     await client.query(`
       INSERT INTO tenants (id, name)
-      VALUES ('default-tenant', 'Default Tenant')
+      VALUES ('87b949cb-2c0d-44ca-a6f5-a025ec43e6a5', 'Rison Scheduling Inc')
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -30,6 +30,17 @@ async function init() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    const defaultUserRes = await client.query("SELECT id FROM users WHERE id = 'd96c9d53-7870-4d07-894c-586497544f8d' LIMIT 1;");
+    if (defaultUserRes.rowCount === 0) {
+      const { hashPassword } = await import("./auth.js");
+      const passwordHash = await hashPassword("admin123");
+      await client.query(`
+        INSERT INTO users (id, tenant_id, name, email, password_hash, role)
+        VALUES ('d96c9d53-7870-4d07-894c-586497544f8d', '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5', 'Yogesh Wadhwa', 'yogesh@isonscheduling.com', $1, 'owner')
+        ON CONFLICT (email) DO NOTHING;
+      `, [passwordHash]);
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (

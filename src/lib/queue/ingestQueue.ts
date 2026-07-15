@@ -20,6 +20,10 @@ try {
     },
   });
 
+  bullQueue.on("error", (err) => {
+    console.error("🚨 [Ingest Queue] BullMQ Error:", err.message || err);
+  });
+
   // Basic connection ping test
   const client = await (bullQueue.client);
   await (client as any).ping();

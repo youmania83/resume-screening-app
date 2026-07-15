@@ -797,5 +797,9 @@ if (isMain) {
     console.error(`❌ Job ${job?.id} failed:`, err);
   });
 
+  resumeWorker.on("error", (err) => {
+    console.error("🚨 [Resume Worker] Connection/Runtime error:", err.message || err);
+  });
+
   console.log("🔧 Standalone Resume Worker started – listening on BullMQ queue 'resume-eval-queue'");
 }

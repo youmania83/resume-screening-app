@@ -70,4 +70,8 @@ parseWorker.on("failed", (job, err) => {
   console.error(`❌ Job ${job?.id} failed:`, err);
 });
 
+parseWorker.on("error", (err) => {
+  console.error("🚨 [Parse Worker] Connection/Runtime error:", err.message || err);
+});
+
 console.log("🔧 Parse worker started – listening on queue 'resume-eval-queue'");

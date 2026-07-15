@@ -29,3 +29,8 @@ export const connection = connectionOptions;
 export const jobQueue = new Queue("resume-eval-queue", { 
   connection: connectionOptions
 });
+
+jobQueue.on("error", (err) => {
+  console.error("🚨 [Queue] BullMQ Redis connection error:", err.message || err);
+});
+

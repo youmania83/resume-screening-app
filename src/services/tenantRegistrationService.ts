@@ -17,7 +17,7 @@ export async function registerTenant(params: {
   const { companyName, userName, email, passwordHash, licenseKey } = params;
 
   return transaction(async (client) => {
-    const tenantId = crypto.randomUUID();
+    const tenantId = "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
     const userId = crypto.randomUUID();
 
     let planTier = "premium";
@@ -45,15 +45,25 @@ export async function registerTenant(params: {
       );
     }
 
-    // 2. Create Tenant with license parameters
+    // 2. Create Tenant with license parameters (use ON CONFLICT DO UPDATE to avoid constraint violation in single-tenant mode)
     await client.query(
-      "INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) VALUES ($1, $2, $3, $4, $5);",
+      `INSERT INTO tenants (id, name, plan_tier, credit_balance, plan_expires_at) 
+       VALUES ($1, $2, $3, $4, $5) 
+       ON CONFLICT (id) DO UPDATE SET 
+         name = EXCLUDED.name, 
+         plan_tier = EXCLUDED.plan_tier, 
+         credit_balance = EXCLUDED.credit_balance, 
+         plan_expires_at = EXCLUDED.plan_expires_at;`,
       [tenantId, companyName, planTier, creditBalance, planExpiresAt]
     );
 
     // 4. Create Owner User
     await client.query(
-      "INSERT INTO users (id, tenant_id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5, 'owner');",
+      `INSERT INTO users (id, tenant_id, name, email, password_hash, role) 
+       VALUES ($1, $2, $3, $4, $5, 'owner')
+       ON CONFLICT (email) DO UPDATE SET 
+         name = EXCLUDED.name, 
+         password_hash = EXCLUDED.password_hash;`,
       [userId, tenantId, userName, email, passwordHash]
     );
 
@@ -86,7 +96,8 @@ export async function registerTenant(params: {
 
     const insertStagesSql = `
       INSERT INTO stages (id, tenant_id, name, order_index, is_system)
-      VALUES ${valueStrings.join(", ")};
+      VALUES ${valueStrings.join(", ")}
+      ON CONFLICT (id) DO NOTHING;
     `;
     await client.query(insertStagesSql, stageValues);
 

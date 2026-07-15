@@ -334,8 +334,9 @@ router.get("/email-health", async (_req: any, res: any, next: any) => {
 // POST /api/inbox/email-sync - Manually trigger an email ingestion sync
 router.post("/email-sync", async (req: any, res: any, next: any) => {
   try {
-    const tenantId = req.headers["x-tenant-id"] || "default-tenant";
+    const tenantId = req.user?.tenantId || req.headers["x-tenant-id"] || "default-tenant";
     let provider = req.body.provider;
+    
     if (!provider) {
       const tenantRes = await queryGlobal(
         "SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;",
@@ -344,8 +345,23 @@ router.post("/email-sync", async (req: any, res: any, next: any) => {
       const emailConfig = tenantRes.rows[0]?.email_config || {};
       provider = emailConfig.incomingProvider || "mock";
     }
-    const ingestedCount = await EmailSyncService.syncMailbox(tenantId, provider);
-    res.json({ success: true, message: `Email sync complete. Ingested ${ingestedCount} resumes.`, ingestedCount });
+
+    console.log(`✉️ [Manual Sync] Triggering background sync for tenant ${tenantId} via ${provider}`);
+    
+    // Execute sync in background to prevent HTTP socket and gateway timeouts
+    EmailSyncService.syncMailbox(tenantId, provider)
+      .then((count) => {
+        console.log(`✉️ [Manual Sync] Finished background sync for tenant ${tenantId}. Ingested: ${count}`);
+      })
+      .catch((err) => {
+        console.error(`🚨 [Manual Sync] Background sync failed for tenant ${tenantId}:`, err.message || err);
+      });
+
+    res.json({ 
+      success: true, 
+      async: true,
+      message: "Email sync triggered in the background. Check candidates shortly." 
+    });
   } catch (err) {
     next(err);
   }

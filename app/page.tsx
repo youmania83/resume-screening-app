@@ -178,14 +178,22 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": "default-tenant"
+          "x-tenant-id": user?.tenantId || "default-tenant"
         }
       })
       if (resp.ok) {
         const data = await resp.json()
-        const count = data.ingestedCount || 0
-        toast.success(`Mailbox sync pass complete. Ingested ${count} new resumes!`, { id: toastId })
-        await loadCandidates()
+        if (data.async) {
+          toast.success("Email sync started in the background. Fresh resumes will appear shortly!", { id: toastId })
+          // Automatically trigger updates to refresh the UI as processing worker finishes
+          setTimeout(loadCandidates, 5000)
+          setTimeout(loadCandidates, 15000)
+          setTimeout(loadCandidates, 30000)
+        } else {
+          const count = data.ingestedCount || 0
+          toast.success(`Mailbox sync pass complete. Ingested ${count} new resumes!`, { id: toastId })
+          await loadCandidates()
+        }
       } else {
         toast.error("Failed to fetch fresh resumes from email.", { id: toastId })
       }

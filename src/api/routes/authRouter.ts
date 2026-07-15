@@ -205,7 +205,7 @@ router.post(
       } else {
         const user = userRes.rows[0];
         userId = user.id;
-        tenantId = user.tenant_id;
+        tenantId = "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
         role = user.role;
         userName = user.name;
       }
@@ -287,11 +287,10 @@ router.post(
          return;
       }
 
-      // Force all logins to resolve to Yogesh's active owner session context
       const tenantId = "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
-      const userId = "d96c9d53-7870-4d07-894c-586497544f8d";
-      const role = "owner";
-      const sessionEmail = "yogesh@isonscheduling.com";
+      const userId = user.id;
+      const role = user.role;
+      const sessionEmail = user.email;
 
       // Generate tokens
       const accessToken = jwt.sign({ userId, tenantId, role, email: sessionEmail }, JWT_SECRET, { expiresIn: "15m" });

@@ -13,6 +13,10 @@ export const pool = new Pool({
   statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT) || 10000,
 });
 
+pool.on("error", (err) => {
+  console.error("🚨 Unexpected error on idle database client:", err.message || err);
+});
+
 // Verify DB connection at startup
 (async () => {
   try {

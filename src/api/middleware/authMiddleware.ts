@@ -70,12 +70,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       try {
         const decoded = jwt.verify(accessToken, JWT_SECRET) as unknown as TokenPayload;
         
-        // Force session context to Yogesh's active owner session so all logins share the active data/integrations
         req.user = {
-          userId: "d96c9d53-7870-4d07-894c-586497544f8d",
+          userId: decoded.userId,
           tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
-          role: "owner",
-          email: "yogesh@isonscheduling.com"
+          role: decoded.role,
+          email: decoded.email
         };
         
         // Execute the rest of request inside tenant storage context
@@ -132,10 +131,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
       // Generate new access token
       const newPayload: TokenPayload = {
-        userId: "d96c9d53-7870-4d07-894c-586497544f8d",
+        userId: dbToken.user_id,
         tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
-        role: "owner",
-        email: "yogesh@isonscheduling.com"
+        role: dbToken.role,
+        email: dbToken.email
       };
 
       const newAccessToken = jwt.sign(newPayload, JWT_SECRET, { expiresIn: "15m" });

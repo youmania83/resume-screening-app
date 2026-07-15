@@ -1,8 +1,7 @@
 // src/api/routes/metricsRouter.ts
 import { Router } from "express";
 import { queryGlobal } from "../../lib/tenantDb.js";
-import { connection } from "../queue.js";
-import { Queue } from "bullmq";
+import { connection, jobQueue } from "../queue.js";
 import { logger } from "../../lib/logger.js";
 
 const router = Router();
@@ -36,10 +35,8 @@ router.get("/", async (req, res) => {
     // 2. Fetch metrics from BullMQ Queue
     let queueSize = 0;
     try {
-      const resumeQueue = new Queue("resume-eval-queue", { connection });
-      const jobsCount = await resumeQueue.getJobCounts("waiting", "active", "delayed");
+      const jobsCount = await jobQueue.getJobCounts("waiting", "active", "delayed");
       queueSize = (jobsCount.waiting || 0) + (jobsCount.active || 0) + (jobsCount.delayed || 0);
-      await resumeQueue.close();
     } catch (qErr: any) {
       logger.warn("Failed to get BullMQ queue metrics directly from Redis, falling back to database count:", qErr.message);
       queueSize = parseInt(pendingRes.rows[0].count || "0", 10);

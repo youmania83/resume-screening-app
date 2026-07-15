@@ -77,6 +77,10 @@ export class ZohoProvider implements IEmailProvider {
       tls: { rejectUnauthorized: false }
     });
 
+    client.on("error", (err) => {
+      console.error("[Zoho IMAP Client] Error:", err.message || err);
+    });
+
     const emails: NormalizedEmail[] = [];
     const folders = ["INBOX", "Inbox/HR Dump", "Inbox/Recruitment"];
 
@@ -135,6 +139,8 @@ export class ZohoProvider implements IEmailProvider {
 
             if (resultsCount > 0) {
               const messages = client.fetch(searchResults, { envelope: true, bodyStructure: true });
+              const matchesToFetch: { seq: number; subject: string; sender: string; date: Date }[] = [];
+
               for await (const msg of messages) {
                 const subject = msg.envelope?.subject || "";
                 const sender = msg.envelope?.from?.[0]?.address || "unknown@sender.com";
@@ -186,39 +192,43 @@ export class ZohoProvider implements IEmailProvider {
                   }
                 }
 
-                // Only download the full message source if it looks like a candidate application/JD
                 if (shouldFetch) {
-                  try {
-                    console.log(`[Zoho Integration] Downloading full message source for matched email: "${subject}" (Seq: ${msg.seq})`);
-                    const fullMsg = await client.fetchOne(msg.seq, { source: true });
-                    if (fullMsg && fullMsg.source) {
-                      const parsed = await simpleParser(fullMsg.source);
-                      const attachments: EmailAttachment[] = [];
+                  matchesToFetch.push({ seq: msg.seq, subject, sender, date });
+                }
+              }
 
-                      if (parsed.attachments && parsed.attachments.length > 0) {
-                        for (const att of parsed.attachments) {
-                          attachments.push({
-                            fileName: att.filename || "attachment",
-                            mimeType: att.contentType,
-                            content: att.content,
-                          });
-                        }
+              // Now download matching emails sequentially after the stream generator has finished and closed
+              for (const match of matchesToFetch) {
+                try {
+                  console.log(`[Zoho Integration] Downloading full message source for matched email: "${match.subject}" (Seq: ${match.seq})`);
+                  const fullMsg = await client.fetchOne(match.seq, { source: true });
+                  if (fullMsg && fullMsg.source) {
+                    const parsed = await simpleParser(fullMsg.source);
+                    const attachments: EmailAttachment[] = [];
+
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                      for (const att of parsed.attachments) {
+                        attachments.push({
+                          fileName: att.filename || "attachment",
+                          mimeType: att.contentType,
+                          content: att.content,
+                        });
                       }
-
-                      emails.push({
-                        id: msg.seq.toString(),
-                        sender,
-                        subject,
-                        bodyText: parsed.text || "",
-                        bodyHtml: parsed.html || "",
-                        receivedAt: date,
-                        attachments,
-                        folder: folderPath
-                      });
                     }
-                  } catch (fetchErr) {
-                    console.error(`[Zoho Integration] Failed to parse message sequence ${msg.seq} in folder "${folderPath}":`, fetchErr);
+
+                    emails.push({
+                      id: match.seq.toString(),
+                      sender: match.sender,
+                      subject: match.subject,
+                      bodyText: parsed.text || "",
+                      bodyHtml: parsed.html || "",
+                      receivedAt: match.date,
+                      attachments,
+                      folder: folderPath
+                    });
                   }
+                } catch (fetchErr) {
+                  console.error(`[Zoho Integration] Failed to parse message sequence ${match.seq} in folder "${folderPath}":`, fetchErr);
                 }
               }
             }
@@ -251,6 +261,10 @@ export class ZohoProvider implements IEmailProvider {
       auth: { user, pass },
       logger: false,
       tls: { rejectUnauthorized: false }
+    });
+
+    client.on("error", (err) => {
+      console.error("[Zoho IMAP Client markAsRead] Error:", err.message || err);
     });
 
     try {

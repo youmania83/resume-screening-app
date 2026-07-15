@@ -373,6 +373,10 @@ try {
     console.error(`❌ [Pipeline Worker] Job ${job?.id} failed:`, err);
   });
 
+  inlineResumeWorker.on("error", (err) => {
+    console.error("🚨 [Pipeline Worker] Connection/Runtime error:", err.message || err);
+  });
+
   console.log("🤖 [Autonomous Pipeline] Inline Resume Worker booted — listening on BullMQ queue 'resume-eval-queue'");
 } catch (workerErr) {
   console.error("🚨 [Autonomous Pipeline] Failed to boot inline resume worker:", workerErr);
