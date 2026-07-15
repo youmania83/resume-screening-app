@@ -292,11 +292,14 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="mt-3.5 text-center space-y-1 text-[9px] text-muted-foreground select-none leading-normal border-t border-border/30 pt-3">
+          <div className="mt-3.5 text-center space-y-1.5 text-[9px] text-muted-foreground select-none leading-normal border-t border-border/30 pt-3">
             <div className="font-semibold text-slate-500 dark:text-slate-400">
               Powered by IRA from Rison Ai Tech
             </div>
-            <div className="text-[8px] text-slate-400 dark:text-slate-500 font-normal px-1">
+            <div className="text-[8px] text-slate-400 dark:text-slate-500 font-normal leading-normal px-1 border-t border-border/20 pt-1.5 mt-1.5 text-left">
+              <strong>Disclaimer:</strong> All candidate data and the screening database are the sole responsibility of <strong>Techsol Engineers</strong>. <strong>Rison AI Tech</strong> has no ownership or control over candidates' personal information.
+            </div>
+            <div className="text-[7.5px] text-slate-400 dark:text-slate-500 font-normal opacity-80 pt-1">
               Apple, App Store, and Google Play are trademarks of their respective owners.
             </div>
           </div>

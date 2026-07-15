@@ -284,6 +284,12 @@ export default function LoginPage() {
           </form>
         </section>
 
+        <div className="bg-secondary/45 border border-border/60 rounded-lg p-3.5 text-[10px] text-muted-foreground leading-normal text-center select-none">
+          <p className="font-bold text-slate-500 mb-1.5 uppercase tracking-wider text-[8.5px]">Data Privacy Disclaimer</p>
+          All candidate data and the screening database are the sole responsibility of <strong>Techsol Engineers</strong>. 
+          <strong> Rison AI Tech</strong> has no ownership or control over candidates' personal information.
+        </div>
+
         <footer className="text-center space-y-2 text-[10px] text-muted-foreground font-semibold">
           <div>Contact your administrator to request access.</div>
           <div className="font-bold text-slate-500">

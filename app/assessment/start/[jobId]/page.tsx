@@ -259,7 +259,7 @@ export default function PublicAssessmentRegistrationPage() {
         </div>
 
         {/* Security / System status footer */}
-        <div className="text-center space-y-2 text-[10px] text-slate-400">
+        <div className="text-center space-y-2.5 text-[10px] text-slate-400">
           <div className="flex items-center justify-center gap-1">
             <Sparkles className="h-3 w-3 text-amber-500" />
             Mobile, desktop and tablet support active. Bounded to one active session at a time.
@@ -267,7 +267,10 @@ export default function PublicAssessmentRegistrationPage() {
           <div className="font-semibold text-slate-500">
             Powered by IRA from Rison Ai Tech
           </div>
-          <div className="text-[9px] text-slate-400 font-normal max-w-sm mx-auto leading-normal">
+          <div className="text-[8.5px] text-slate-500 font-normal max-w-md mx-auto leading-normal border border-slate-200/60 dark:border-slate-850/40 rounded-lg p-2.5 bg-slate-50 dark:bg-slate-900/20">
+            <strong>Data Privacy Disclaimer:</strong> All candidate data and the screening database are the sole responsibility of <strong>Techsol Engineers</strong>. <strong>Rison AI Tech</strong> has no ownership or control over candidates' personal information.
+          </div>
+          <div className="text-[8px] text-slate-400 font-normal max-w-sm mx-auto leading-normal opacity-85">
             Apple, App Store, and Google Play are trademarks of their respective owners. This portal is not endorsed by or affiliated with Apple Inc. or Google LLC.
           </div>
         </div>
