@@ -64,17 +64,24 @@ router.get("/", async (req: any, res: any, next: any) => {
 router.get("/purge-junk", async (req: any, res: any, next: any) => {
   try {
     const tenantId = req.headers["x-tenant-id"] || "default-tenant";
-    const resInbox = await queryGlobal("SELECT id, candidate_id, file_name FROM resume_inbox WHERE tenant_id = $1;", [tenantId]);
+    const resInbox = await queryGlobal(`
+      SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, c.name as candidate_name
+      FROM resume_inbox ri
+      LEFT JOIN candidates c ON c.id = ri.candidate_id
+      WHERE ri.tenant_id = $1;
+    `, [tenantId]);
     
     const BLACKLIST_KEYWORDS = [
       "payslip", "pay slip", "pay_slip", "salary",
-      "challan", "ecr", "gst", "tax", "audit", "balance",
-      "ticket", "boarding", "flight", "booking", "travel", "paid",
-      "invoice", "receipt", "bill", "payment", "transaction", "voucher", "statement", "ledger", "wallet", "bank", "account details",
+      "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
+      "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
+      "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
       "scan", "mri", "xray", "medical", "prescription",
       "tender", "agreement", "contract", "proposal",
       "issue", "incident", "log", "report", "reports",
-      "program", "training", "certificate", "course"
+      "program", "training", "certificate", "course",
+      "signature", "logo", "image0",
+      "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
     ];
 
     const junkInboxIds: string[] = [];
@@ -83,6 +90,9 @@ router.get("/purge-junk", async (req: any, res: any, next: any) => {
 
     for (const row of resInbox.rows) {
       const fileName = (row.file_name || "").toLowerCase();
+      const status = row.status;
+      const candidateName = row.candidate_name;
+
       let isJunk = false;
       for (const keyword of BLACKLIST_KEYWORDS) {
         if (fileName.includes(keyword)) {
@@ -91,6 +101,12 @@ router.get("/purge-junk", async (req: any, res: any, next: any) => {
         }
       }
       if (fileName.includes(" to ")) {
+        isJunk = true;
+      }
+      if (status === "Failed") {
+        isJunk = true;
+      }
+      if (candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {
         isJunk = true;
       }
 

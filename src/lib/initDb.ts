@@ -809,6 +809,86 @@ async function init() {
       }
     }
 
+    // Purge failed / junk inbox items and unknown candidates
+    console.log("Purging failed/junk inbox items and unknown candidates...");
+    const BLACKLIST_KEYWORDS = [
+      "payslip", "pay slip", "pay_slip", "salary",
+      "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
+      "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
+      "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
+      "scan", "mri", "xray", "medical", "prescription",
+      "tender", "agreement", "contract", "proposal",
+      "issue", "incident", "log", "report", "reports",
+      "program", "training", "certificate", "course",
+      "signature", "logo", "image0",
+      "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
+    ];
+
+    const inboxRes = await client.query(`
+      SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, c.name as candidate_name
+      FROM resume_inbox ri
+      LEFT JOIN candidates c ON c.id = ri.candidate_id;
+    `);
+
+    const junkInboxIds: string[] = [];
+    const junkCandidateIds: string[] = [];
+
+    for (const row of inboxRes.rows) {
+      const fileName = (row.file_name || "").toLowerCase();
+      const status = row.status;
+      const candidateName = row.candidate_name;
+
+      let isJunk = false;
+      for (const keyword of BLACKLIST_KEYWORDS) {
+        if (fileName.includes(keyword)) {
+          isJunk = true;
+          break;
+        }
+      }
+      if (fileName.includes(" to ")) {
+        isJunk = true;
+      }
+      if (status === "Failed") {
+        isJunk = true;
+      }
+      if (candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {
+        isJunk = true;
+      }
+
+      if (isJunk) {
+        junkInboxIds.push(row.id);
+        if (row.candidate_id) {
+          junkCandidateIds.push(row.candidate_id);
+        }
+      }
+    }
+
+    // Also search for candidates named 'Unknown Candidate' or whose name contains 'unknown' that might not be in resume_inbox
+    const orphanUnknownRes = await client.query(`
+      SELECT id FROM candidates 
+      WHERE name = 'Unknown Candidate' 
+         OR name ILIKE '%unknown%' 
+         OR name IS NULL 
+         OR name = '';
+    `);
+    for (const row of orphanUnknownRes.rows) {
+      if (!junkCandidateIds.includes(row.id)) {
+        junkCandidateIds.push(row.id);
+      }
+    }
+
+    if (junkCandidateIds.length > 0) {
+      await client.query("DELETE FROM candidate_timeline WHERE candidate_id = ANY($1);", [junkCandidateIds]);
+      await client.query("DELETE FROM candidate_activity_logs WHERE candidate_id = ANY($1);", [junkCandidateIds]);
+      await client.query("DELETE FROM candidates WHERE id = ANY($1);", [junkCandidateIds]);
+      console.log(`Purged ${junkCandidateIds.length} unknown/junk candidate records.`);
+    }
+
+    if (junkInboxIds.length > 0) {
+      await client.query("DELETE FROM resume_inbox WHERE id = ANY($1);", [junkInboxIds]);
+      console.log(`Purged ${junkInboxIds.length} failed/junk inbox items.`);
+    }
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();
