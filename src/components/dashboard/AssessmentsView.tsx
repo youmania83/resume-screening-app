@@ -70,17 +70,20 @@ export function AssessmentsView({
     }
   };
 
-  const invitedCandidates = candidates.filter(c => c.assessmentToken);
-  const completedCandidates = candidates.filter(c => c.assessmentStatus === "passed" || c.assessmentStatus === "failed");
-  const pendingCandidates = candidates.filter(c => c.assessmentStatus === "pending");
-  const passedCandidatesCount = candidates.filter(c => c.assessmentStatus === "passed").length;
+  // Only show candidates who qualify (Resume Score >= 80%) OR have already been invited to keep the list clean
+  const eligibleCandidates = candidates.filter(c => (c.score || 0) >= 80 || !!c.assessmentToken);
+
+  const invitedCandidates = eligibleCandidates.filter(c => c.assessmentToken);
+  const completedCandidates = eligibleCandidates.filter(c => c.assessmentStatus === "passed" || c.assessmentStatus === "failed");
+  const pendingCandidates = eligibleCandidates.filter(c => c.assessmentStatus === "pending");
+  const passedCandidatesCount = eligibleCandidates.filter(c => c.assessmentStatus === "passed").length;
   const totalCompletedCount = completedCandidates.length;
 
   const passRate = totalCompletedCount > 0
     ? `${Math.round((passedCandidatesCount / totalCompletedCount) * 100)}%`
     : "0%";
 
-  const filtered = candidates.filter(c => {
+  const filtered = eligibleCandidates.filter(c => {
     const q = searchQuery.toLowerCase();
     const nameMatch = c.name.toLowerCase().includes(q) || 
       c.role.toLowerCase().includes(q) || 
