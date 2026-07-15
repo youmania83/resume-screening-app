@@ -782,6 +782,9 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_candidate_activity_logs_logged_at ON candidate_activity_logs(tenant_id, logged_at DESC);
     `);
 
+    // Alter experience_years to NUMERIC(4,1) to support fractional experience years (e.g. 0.5, 1.5)
+    await client.query("ALTER TABLE candidates ALTER COLUMN experience_years TYPE NUMERIC(4,1);");
+
     // Clean up existing candidates' weaknesses to remove any US-centric points (e.g. US visa, work auth, or US market exposure)
     console.log("Cleaning up US work authorization and visa references from existing candidates' weaknesses...");
     const candidatesRes = await client.query(`
