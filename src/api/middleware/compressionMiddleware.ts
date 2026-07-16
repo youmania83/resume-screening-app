@@ -25,7 +25,30 @@ export function compressionMiddleware() {
 
     res.writeHead = function (statusCode: number, ...args: any[]) {
       statusCodeSaved = statusCode;
-      writeHeadArgsSaved = args;
+      
+      let headers: any = null;
+      let statusMessage: string | undefined = undefined;
+
+      if (args.length === 1) {
+        if (typeof args[0] === "object") {
+          headers = args[0];
+        } else if (typeof args[0] === "string") {
+          statusMessage = args[0];
+        }
+      } else if (args.length === 2) {
+        statusMessage = args[0];
+        headers = args[1];
+      }
+
+      if (headers) {
+        for (const [key, value] of Object.entries(headers)) {
+          if (value !== undefined) {
+            res.setHeader(key, value as any);
+          }
+        }
+      }
+
+      writeHeadArgsSaved = statusMessage ? [statusMessage] : [];
       return this;
     };
 
