@@ -127,7 +127,7 @@ export function useIngestionPipeline({
     let candidateData: Candidate;
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       const clientId = localStorage.getItem("rison_client_id") || "client_youmania83";
 
       const formData = new FormData();

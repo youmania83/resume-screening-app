@@ -7,7 +7,7 @@ import {
 import { toast } from "sonner";
 
 export default function InboxView() {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
   const [inboxItems, setInboxItems] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [emailHealth, setEmailHealth] = useState<any>(null);

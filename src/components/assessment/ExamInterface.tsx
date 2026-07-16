@@ -78,7 +78,7 @@ export default function ExamInterface({
     setIsSubmittingSupport(true);
     try {
       const token = window.location.pathname.split("/").pop() || "";
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       const resp = await fetch(`${apiBase}/support-tickets/public`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

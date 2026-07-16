@@ -15,7 +15,7 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
   const [isExtracting, setIsExtracting] = useState(false);
   const [isEditingJD, setIsEditingJD] = useState(false);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const loadJobs = useCallback(async () => {
     try {

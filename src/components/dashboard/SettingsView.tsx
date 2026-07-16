@@ -84,7 +84,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
   const [submittingTicket, setSubmittingTicket] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   // Fetch Settings & Templates
   const loadSettingsData = async () => {

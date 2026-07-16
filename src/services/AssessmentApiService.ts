@@ -1,4 +1,4 @@
-const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
 export async function fetchAssessment(token: string, sessionId: string) {
   const resp = await fetch(`${apiBase}/assessment/${token}?sessionId=${sessionId}`);

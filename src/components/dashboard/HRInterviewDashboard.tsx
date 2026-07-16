@@ -14,7 +14,7 @@ interface HRInterviewDashboardProps {
 }
 
 export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterviewDashboardProps) {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [schedulingCandidate, setSchedulingCandidate] = useState<Candidate | null>(null);

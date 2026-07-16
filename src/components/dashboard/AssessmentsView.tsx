@@ -46,7 +46,7 @@ export function AssessmentsView({
     toast.loading("Sending AI assessment invitation...", { id: "invite-loader" });
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       const resp = await fetch(`${apiBase}/assessment/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

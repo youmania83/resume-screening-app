@@ -15,10 +15,10 @@ if (typeof window !== "undefined") {
         url = (input as any).url;
       }
 
-      const targetApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://resume-screening-app-databaseurl.up.railway.app/api";
+      const targetApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       
       const isLocalApi = url.includes("localhost:4000/api") || url.startsWith("/api");
-      const isProdApi = url.includes("resume-screening-app-databaseurl.up.railway.app/api") || (!!process.env.NEXT_PUBLIC_API_URL && url.includes(process.env.NEXT_PUBLIC_API_URL));
+      const isProdApi = url.includes("resume-screening-app-databaseurl.up.railway.app/api") || url.includes("api.risonaitech.com/api") || (!!process.env.NEXT_PUBLIC_API_URL && url.includes(process.env.NEXT_PUBLIC_API_URL));
 
       if (isLocalApi || isProdApi) {
         const hostname = window.location.hostname;

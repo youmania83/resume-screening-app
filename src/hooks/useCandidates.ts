@@ -21,7 +21,7 @@ export function useCandidates(isLoggedIn?: boolean) {
   const [assessmentScoreInput, setAssessmentScoreInput] = useState(85);
   const [interviewFeedbackInput, setInterviewFeedbackInput] = useState("");
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const loadCandidates = useCallback(async () => {
     try {

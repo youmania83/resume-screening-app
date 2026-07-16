@@ -45,7 +45,7 @@ export function PlatformHealthView() {
   const fetchDiagnostics = async () => {
     setLoading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       const resp = await fetch(`${apiBase}/health/diagnostics`);
       if (resp.ok) {
         const json = await resp.json();
@@ -69,7 +69,7 @@ export function PlatformHealthView() {
     setPruning(true);
     toast.loading("Initiating storage pruning job...", { id: "prune-toast" });
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       const resp = await fetch(`${apiBase}/health/prune-storage`, { method: "POST" });
       if (resp.ok) {
         const json = await resp.json();
