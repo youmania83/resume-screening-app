@@ -71,10 +71,41 @@ export class KekaCareersSyncService {
       const rawJobs = (await response.json()) as KekaRawJob[];
       console.log(`[Keka Careers Sync] Retrieved ${rawJobs.length} active jobs from Keka Career portal.`);
 
+      if (rawJobs.length === 0) {
+        return { success: true, syncedCount: 0, errors: [] };
+      }
+
       // 2. Resolve target tenant (current user's tenant)
       const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
       const tenantIds = [targetTenantId];
       console.log(`[Keka Careers Sync] Syncing jobs only for target tenant ID: ${targetTenantId}`);
+
+      // 3. Batch query all existing jobs globally to check in memory
+      const externalIds = rawJobs.map(j => j.id.toString());
+      const existingJobsRes = await query(
+        "SELECT id, external_id, tenant_id, jd FROM jobs WHERE external_id = ANY($1);",
+        [externalIds]
+      );
+
+      const globalExistingJdMap = new Map<string, any>();
+      const tenantJobMap = new Map<string, string>(); // key: externalId_tenantId -> jobId
+
+      if (existingJobsRes.rowCount && existingJobsRes.rowCount > 0) {
+        for (const row of existingJobsRes.rows) {
+          if (row.jd) {
+            try {
+              globalExistingJdMap.set(row.external_id, typeof row.jd === "string" ? JSON.parse(row.jd) : row.jd);
+            } catch {
+              globalExistingJdMap.set(row.external_id, row.jd);
+            }
+          }
+          tenantJobMap.set(`${row.external_id}_${row.tenant_id}`, row.id);
+        }
+      }
+
+      const valuesArray: any[] = [];
+      const placeholders: string[] = [];
+      let paramIndex = 1;
 
       for (const rawJob of rawJobs) {
         try {
@@ -84,26 +115,13 @@ export class KekaCareersSyncService {
           const department = rawJob.departmentName || "Engineering";
 
           // Get or generate structured JD once for this job
-          let jdObj: any = null;
+          let jdObj = globalExistingJdMap.get(rawJob.id.toString()) || null;
 
-          // Check if we already have this job synced under any tenant in the DB to reuse its JD
-          const globalCheck = await query(
-            "SELECT jd FROM jobs WHERE external_id = $1 AND jd IS NOT NULL LIMIT 1;",
-            [rawJob.id.toString()]
-          );
-
-          if (globalCheck.rowCount !== null && globalCheck.rowCount > 0) {
-            const rawJd = globalCheck.rows[0].jd;
-            jdObj = typeof rawJd === "string" ? JSON.parse(rawJd) : rawJd;
-          } else {
+          if (!jdObj) {
             // Check if there are any tenants that don't have this job yet
             let needsAi = false;
             for (const tenantId of tenantIds) {
-              const checkRes = await query(
-                "SELECT id FROM jobs WHERE external_id = $1 AND tenant_id = $2 LIMIT 1;",
-                [rawJob.id.toString(), tenantId]
-              );
-              if (checkRes.rowCount === 0) {
+              if (!tenantJobMap.has(`${rawJob.id.toString()}_${tenantId}`)) {
                 needsAi = true;
                 break;
               }
@@ -151,48 +169,34 @@ ${plainDescription}`;
                   screeningCriteria: ["Experience match", "Skills alignment"]
                 };
               }
+              // Cache in memory to avoid generating again for other tenants
+              globalExistingJdMap.set(rawJob.id.toString(), jdObj);
             }
           }
 
           // Process jobs for each tenant
           for (const tenantId of tenantIds) {
             const deterministicJobId = this.generateDeterministicUuid(rawJob.id, tenantId);
-            // Check if job already exists under this tenant
-            const checkRes = await query(
-              "SELECT id, jd FROM jobs WHERE external_id = $1 AND tenant_id = $2 LIMIT 1;",
-              [rawJob.id.toString(), tenantId]
+            
+            placeholders.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}, $${paramIndex+6}, $${paramIndex+7}, $${paramIndex+8}, $${paramIndex+9}, $${paramIndex+10}, $${paramIndex+11}, $${paramIndex+12}, $${paramIndex+13}, NOW())`);
+            
+            valuesArray.push(
+              deterministicJobId,
+              tenantId,
+              rawJob.title,
+              plainDescription,
+              department,
+              location,
+              experience,
+              JSON.stringify(jdObj),
+              rawJob.skillNames || [],
+              "Onsite",
+              rawJob.id.toString(),
+              rawJob.jobNumber,
+              "Keka",
+              "synced"
             );
-
-            if (checkRes.rowCount !== null && checkRes.rowCount > 0) {
-              console.log(`[Keka Careers Sync] Job "${rawJob.title}" (ID ${rawJob.id}) already exists for tenant ${tenantId}. Updating job code and sync status.`);
-              await query(
-                "UPDATE jobs SET job_code = $1, last_synced_at = NOW(), sync_status = 'synced' WHERE external_id = $2 AND tenant_id = $3;",
-                [rawJob.jobNumber, rawJob.id.toString(), tenantId]
-              );
-              continue;
-            } else {
-              // Insert new job record
-              await query(
-                `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, job_code, source_system, sync_status, last_synced_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW());`,
-                [
-                  deterministicJobId,
-                  tenantId,
-                  rawJob.title,
-                  plainDescription,
-                  department,
-                  location,
-                  experience,
-                  JSON.stringify(jdObj),
-                  rawJob.skillNames || [],
-                  "Onsite",
-                  rawJob.id.toString(),
-                  rawJob.jobNumber,
-                  "Keka",
-                  "synced"
-                ]
-              );
-            }
+            paramIndex += 14;
           }
           syncedCount++;
         } catch (jobErr: any) {
@@ -200,6 +204,20 @@ ${plainDescription}`;
           console.error(`[Keka Careers Sync] ${errMsg}`);
           errors.push(errMsg);
         }
+      }
+
+      // Perform single bulk upsert
+      if (valuesArray.length > 0) {
+        console.log(`[Keka Careers Sync] Performing bulk upsert of ${valuesArray.length / 14} job records...`);
+        await query(
+          `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, job_code, source_system, sync_status, last_synced_at)
+           VALUES ${placeholders.join(", ")}
+           ON CONFLICT (id) DO UPDATE SET
+             job_code = EXCLUDED.job_code,
+             last_synced_at = NOW(),
+             sync_status = 'synced';`,
+          valuesArray
+        );
       }
 
       console.log(`✅ [Keka Careers Sync] Finished active jobs sync. Synced: ${syncedCount}, Errors: ${errors.length}`);

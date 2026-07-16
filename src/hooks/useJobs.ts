@@ -68,9 +68,34 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
   }, [loadJobs, isLoggedIn]);
 
   const saveOrUpdateJob = async (jd: StructuredJD) => {
+    const previousJobs = [...jobs];
+    const previousActiveJD = activeJD;
+
     const existingJob = jobs.find(j => j.title.toLowerCase() === jd.title.toLowerCase());
     const descText = jd.responsibilities?.join("\n") || jd.title || "No description provided";
-    
+
+    // Optimistic Update
+    const optimisticJob: JobListItem = {
+      id: existingJob?.id || `job-opt-${Date.now()}`,
+      title: jd.title,
+      dept: jd.department || "Engineering",
+      loc: jd.location || "Remote",
+      exp: jd.experience || "Not Specified",
+      candidates: existingJob?.candidates || 0,
+      status: existingJob?.status || "Active",
+      jobCode: existingJob?.jobCode,
+      lastSyncedAt: existingJob?.lastSyncedAt,
+      syncStatus: existingJob?.syncStatus,
+      jd: jd
+    };
+
+    if (existingJob) {
+      setJobs(prev => prev.map(j => j.id === existingJob.id ? optimisticJob : j));
+    } else {
+      setJobs(prev => [optimisticJob, ...prev]);
+    }
+    setActiveJD(jd);
+
     const body = {
       title: jd.title,
       description: descText,
@@ -91,7 +116,7 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         if (res.ok) {
           toast.success(`Job "${jd.title}" updated successfully.`);
         } else {
-          toast.error("Failed to update job in database.");
+          throw new Error("Failed to update job");
         }
       } else {
         const res = await fetch(`${apiBase}/jobs`, {
@@ -102,18 +127,20 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         if (res.ok) {
           toast.success(`Job "${jd.title}" saved to database.`);
         } else {
-          toast.error("Failed to save job to database.");
+          throw new Error("Failed to save job");
         }
       }
-      
+
       await loadJobs();
-      
+
       if (onJobSaved) {
         onJobSaved(jd);
       }
     } catch (err) {
-      console.error("Failed to save job to database:", err);
-      toast.error("Network error while saving job.");
+      console.error("Failed to save job to database, rolling back:", err);
+      setJobs(previousJobs);
+      setActiveJD(previousActiveJD);
+      toast.error("Network error while saving job. Rolled back.");
     }
   };
 

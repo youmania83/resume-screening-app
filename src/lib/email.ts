@@ -9,8 +9,24 @@ import { decrypt } from "./crypto.js";
 import { getTenantContext } from "./tenantContext.js";
 import { zohoConfig } from "../integrations/zoho/config/zoho.config";
 import { zohoMailService } from "../integrations/zoho/services/zohoMail.service";
+import { CircuitBreaker, retryWithBackoff } from "./circuitBreaker.js";
 
 dotenv.config();
+
+// Create circuit breakers for Resend and SendGrid
+const resendBreaker = new CircuitBreaker("Resend-Email-API", {
+  failureThreshold: 3,
+  recoveryTimeoutMs: 30000,
+  requestTimeoutMs: 10000,
+  maxConcurrentRequests: 3
+});
+
+const sendgridBreaker = new CircuitBreaker("SendGrid-Email-API", {
+  failureThreshold: 3,
+  recoveryTimeoutMs: 30000,
+  requestTimeoutMs: 10000,
+  maxConcurrentRequests: 3
+});
 
 // Create SMTP transporter using env variables
 const getTransporter = async () => {
@@ -130,26 +146,30 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
           if (config.provider === "resend") {
             const transporter = {
               sendMail: async (mailParams: any) => {
-                console.log(`[Resend HTTP API] Dispatching email to ${mailParams.to}`);
-                const response = await fetch("https://api.resend.com/emails", {
-                  method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${decryptedPass}`,
-                    "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify({
-                    from: mailParams.from || fromEmail,
-                    to: Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to],
-                    subject: mailParams.subject,
-                    html: mailParams.html,
-                    reply_to: config.replyTo || undefined
-                  })
+                return resendBreaker.execute(async () => {
+                  return retryWithBackoff(async () => {
+                    console.log(`[Resend HTTP API] Dispatching email to ${mailParams.to}`);
+                    const response = await fetch("https://api.resend.com/emails", {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${decryptedPass}`,
+                        "Content-Type": "application/json"
+                      },
+                      body: JSON.stringify({
+                        from: mailParams.from || fromEmail,
+                        to: Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to],
+                        subject: mailParams.subject,
+                        html: mailParams.html,
+                        reply_to: config.replyTo || undefined
+                      })
+                    });
+                    if (!response.ok) {
+                      const errText = await response.text();
+                      throw new Error(`Resend API Error: ${errText}`);
+                    }
+                    return await response.json();
+                  }, 2, 1000, 2);
                 });
-                if (!response.ok) {
-                  const errText = await response.text();
-                  throw new Error(`Resend API Error: ${errText}`);
-                }
-                return await response.json();
               }
             };
             return { transporter, fromEmail };
@@ -158,34 +178,38 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
           if (config.provider === "sendgrid") {
             const transporter = {
               sendMail: async (mailParams: any) => {
-                console.log(`[SendGrid HTTP API] Dispatching email to ${mailParams.to}`);
-                const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-                  method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${decryptedPass}`,
-                    "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify({
-                    personalizations: [{
-                      to: (Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to]).map((email: string) => ({ email }))
-                    }],
-                    from: {
-                      email: config.username,
-                      name: fromName || undefined
-                    },
-                    reply_to: config.replyTo ? { email: config.replyTo } : undefined,
-                    subject: mailParams.subject,
-                    content: [{
-                      type: "text/html",
-                      value: mailParams.html
-                    }]
-                  })
+                return sendgridBreaker.execute(async () => {
+                  return retryWithBackoff(async () => {
+                    console.log(`[SendGrid HTTP API] Dispatching email to ${mailParams.to}`);
+                    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${decryptedPass}`,
+                        "Content-Type": "application/json"
+                      },
+                      body: JSON.stringify({
+                        personalizations: [{
+                          to: (Array.isArray(mailParams.to) ? mailParams.to : [mailParams.to]).map((email: string) => ({ email }))
+                        }],
+                        from: {
+                          email: config.username,
+                          name: fromName || undefined
+                        },
+                        reply_to: config.replyTo ? { email: config.replyTo } : undefined,
+                        subject: mailParams.subject,
+                        content: [{
+                          type: "text/html",
+                          value: mailParams.html
+                        }]
+                      })
+                    });
+                    if (!response.ok) {
+                      const errText = await response.text();
+                      throw new Error(`SendGrid API Error: ${errText}`);
+                    }
+                    return {};
+                  }, 2, 1000, 2);
                 });
-                if (!response.ok) {
-                  const errText = await response.text();
-                  throw new Error(`SendGrid API Error: ${errText}`);
-                }
-                return {};
               }
             };
             return { transporter, fromEmail };

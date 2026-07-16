@@ -4,6 +4,15 @@ import nodemailer from "nodemailer";
 import dns from "dns";
 import { ZohoMailAdapter, ZohoEmailMessage, ZohoEmailAttachment } from "./ZohoMailAdapter";
 import { zohoConfig, isZohoConfigured } from "../config/zoho.config";
+import { CircuitBreaker, retryWithBackoff } from "../../../lib/circuitBreaker.js";
+
+// Zoho SMTP circuit breaker
+const zohoSmtpBreaker = new CircuitBreaker("Zoho-SMTP-Mail", {
+  failureThreshold: 3,
+  recoveryTimeoutMs: 30000,
+  requestTimeoutMs: 15000,
+  maxConcurrentRequests: 2
+});
 
 export class RealZohoMailAdapter implements ZohoMailAdapter {
   private checkConfig() {
@@ -68,8 +77,6 @@ export class RealZohoMailAdapter implements ZohoMailAdapter {
       }
     } as any);
 
-    await transporter.verify();
-
     const mailOptions: any = {
       from: fromEmail,
       to,
@@ -81,9 +88,15 @@ export class RealZohoMailAdapter implements ZohoMailAdapter {
       mailOptions.attachments = attachments;
     }
 
-    console.log(`✉️ [RealZohoMailAdapter] Sending email to ${to} (Subject: "${subject}")`);
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ [RealZohoMailAdapter] Email successfully sent to ${to}`);
+    await zohoSmtpBreaker.execute(async () => {
+      return retryWithBackoff(async () => {
+        console.log(`🔌 [RealZohoMailAdapter] Verifying SMTP connection...`);
+        await transporter.verify();
+        console.log(`✉️ [RealZohoMailAdapter] Sending email to ${to} (Subject: "${subject}")`);
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ [RealZohoMailAdapter] Email successfully sent to ${to}`);
+      }, 2, 1000, 2);
+    });
   }
 
   /**

@@ -6,12 +6,13 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
-import compression from "compression";
+import { compressionMiddleware } from "./middleware/compressionMiddleware.js";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 const { json, urlencoded } = bodyParser;
 import authRouter from "./routes/authRouter.js";
 import { authMiddleware } from "./middleware/authMiddleware.js";
+import { cacheInvalidationMiddleware } from "../lib/cache.js";
 import { csrfGuard } from "./middleware/security.js";
 import resumeRouter from "./routes/resumeRouter.js";
 import healthRouter from "./routes/healthRouter.js";
@@ -81,7 +82,7 @@ app.use(helmet({
 }));
 
 // Response compression
-app.use(compression());
+app.use(compressionMiddleware());
 
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_APP_URL,
@@ -133,6 +134,9 @@ app.use(csrfGuard);
 
 // Apply Auth Middleware Globally for API Scoping
 app.use(authMiddleware);
+
+// Apply cache invalidation for mutating requests
+app.use(cacheInvalidationMiddleware);
 
 app.use("/api/auth", authRouter);
 app.use("/api/resumes", resumeRouter);

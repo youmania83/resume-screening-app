@@ -1,0 +1,20 @@
+// src/test/findMekaGanesh.ts
+import { pool } from "../lib/db.js";
+
+async function findMeka() {
+  try {
+    const res = await pool.query(
+      "SELECT ri.id, ri.tenant_id, ri.file_name, ri.status, t.name as tenant_name FROM resume_inbox ri LEFT JOIN tenants t ON ri.tenant_id = t.id WHERE ri.file_name ILIKE '%MEKA_GANESH%';"
+    );
+    console.log(`Found ${res.rowCount} entries matching MEKA_GANESH:`);
+    res.rows.forEach(row => {
+      console.log(JSON.stringify(row, null, 2));
+    });
+  } catch (err: any) {
+    console.error("Error:", err.message || err);
+  } finally {
+    await pool.end();
+  }
+}
+
+findMeka();

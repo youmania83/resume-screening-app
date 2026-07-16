@@ -1,4 +1,5 @@
 // src/test/verifyAutomation.ts
+import "./disableEmail.js";
 import { pool } from "../lib/db.js";
 import { parseAndEvalResume } from "../worker/resumeWorker.js";
 import { kekaWorkflowService } from "../integrations/keka/services/workflow.service.js";
@@ -12,9 +13,17 @@ process.env.DEEPSEEK_API_KEY = "";
 process.env.OPENAI_API_KEY = "";
 process.env.GEMINI_API_KEY = "";
 process.env.SMTP_HOST = ""; // Ensure mock email logger is used
+process.env.ZOHO_MAIL_ENABLED = "false"; // Disable real Zoho adapter in tests
 
 async function runVerification() {
   console.log("🚀 Starting End-to-End AI Automation Pipeline Verification...");
+  
+  process.env.SMTP_HOST = "";
+  process.env.SMTP_USER = "";
+  process.env.SMTP_PASS = "";
+  process.env.ZOHO_SMTP_USER = "";
+  process.env.ZOHO_SMTP_PASSWORD = "";
+  process.env.ZOHO_MAIL_ENABLED = "false";
   
   const uniqueId = `v-${Date.now()}`;
   let tenantId = "";
@@ -165,7 +174,8 @@ async function runVerification() {
         assessmentScore: 90,
         finalScore: 86,
         scheduledDate: new Date(completionResult.interviewDate),
-        hrEmail: "yogeshkumarwadhwa@localhost.com"
+        hrEmail: "yogeshkumarwadhwa@localhost.com",
+        tenantId
       });
     }
 

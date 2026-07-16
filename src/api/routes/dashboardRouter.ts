@@ -1,12 +1,22 @@
 // src/api/routes/dashboardRouter.ts
 import { Router } from "express";
 import { queryTenant } from "../../lib/tenantDb.js";
+import { Cache } from "../../lib/cache.js";
+import { getTenantContext } from "../../lib/tenantContext.js";
 
 const router = Router();
 
 // GET /api/dashboard/metrics - Retrieve recruiters KPIs
 router.get("/metrics", async (req, res, next) => {
   try {
+    const tenantId = getTenantContext()?.tenantId || "default";
+    const cacheKey = `dashboard-metrics-${tenantId}`;
+    
+    const cached = Cache.get<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     // Fetch all recruiter KPIs concurrently in parallel
     const [
       jobsCount,
@@ -92,7 +102,7 @@ router.get("/metrics", async (req, res, next) => {
       `)
     ]);
 
-    res.json({
+    const responsePayload = {
       success: true,
       metrics: {
         openJobs: jobsCount.rows[0]?.count || 0,
@@ -112,7 +122,10 @@ router.get("/metrics", async (req, res, next) => {
         sourceQuality: sourceQuality.rows,
         recruiterProductivity: recruiterProductivity.rows
       }
-    });
+    };
+
+    Cache.set(cacheKey, responsePayload, 30000); // 30s cache TTL
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }
@@ -121,6 +134,14 @@ router.get("/metrics", async (req, res, next) => {
 // GET /api/dashboard/pipeline - Autonomous Pipeline Funnel Analytics
 router.get("/pipeline", async (req, res, next) => {
   try {
+    const tenantId = getTenantContext()?.tenantId || "default";
+    const cacheKey = `dashboard-pipeline-${tenantId}`;
+
+    const cached = Cache.get<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     // Fetch all pipeline counts and activities concurrently in parallel
     const [
       emailsSynced,
@@ -181,7 +202,7 @@ router.get("/pipeline", async (req, res, next) => {
       `)
     ]);
 
-    res.json({
+    const responsePayload = {
       success: true,
       pipeline: {
         funnel: {
@@ -210,7 +231,10 @@ router.get("/pipeline", async (req, res, next) => {
         })),
         scoreDistribution: scoreDistribution.rows[0] || { excellent: 0, good: 0, average: 0, below_average: 0 }
       }
-    });
+    };
+
+    Cache.set(cacheKey, responsePayload, 30000); // 30s cache TTL
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }
