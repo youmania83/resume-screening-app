@@ -6,7 +6,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
-import { compressionMiddleware } from "./middleware/compressionMiddleware.js";
+import compressionPkg from "compression";
+const compression = compressionPkg as any;
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 const { json, urlencoded } = bodyParser;
@@ -81,8 +82,8 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow embedding for assessment portal
 }));
 
-// Response compression
-app.use(compressionMiddleware());
+// Response compression (gzip/deflate via battle-tested npm package)
+app.use(compression({ threshold: 1024 }));
 
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_APP_URL,
