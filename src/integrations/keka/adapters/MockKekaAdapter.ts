@@ -7,6 +7,7 @@ import { KekaApplication } from "../interfaces/Application";
 import { KekaInterview } from "../interfaces/Interview";
 import { KekaOffer } from "../interfaces/Offer";
 import { KekaDocument } from "../interfaces/Document";
+import { query } from "../../../lib/db";
 
 // Stateful in-memory store for rich mocking behavior
 class MockKekaDatabase {
@@ -222,14 +223,35 @@ export class MockKekaAdapter implements ATSAdapter {
     // Update candidate current stage
     let candidate = this.db.candidates.find(c => c.id === candidateId);
     if (!candidate) {
-      // Dynamically seed candidate in mock database to support webhook testing
-      candidate = {
-        id: candidateId,
-        name: "Unknown Webhook Candidate",
-        email: "webhook.candidate@example.com",
-        status: "active",
-        currentStage: stageNameOrId
-      };
+      // Query the real Postgres database to see if this candidate exists!
+      let realJobId: string | null = null;
+      try {
+        const res = await query("SELECT job_id, name, email FROM candidates WHERE id = $1 LIMIT 1;", [candidateId]);
+        if (res.rowCount && res.rowCount > 0) {
+          realJobId = res.rows[0].job_id;
+          candidate = {
+            id: candidateId,
+            name: res.rows[0].name,
+            email: res.rows[0].email,
+            status: "active",
+            currentStage: stageNameOrId,
+            jobId: realJobId || undefined
+          };
+        }
+      } catch (err) {
+        console.error("MockKekaAdapter: failed to lookup candidate in Postgres:", err);
+      }
+
+      if (!candidate) {
+        // Dynamically seed candidate in mock database to support webhook testing
+        candidate = {
+          id: candidateId,
+          name: "Unknown Webhook Candidate",
+          email: "webhook.candidate@example.com",
+          status: "active",
+          currentStage: stageNameOrId
+        };
+      }
       this.db.candidates.push(candidate);
     } else {
       candidate.currentStage = stageNameOrId;
