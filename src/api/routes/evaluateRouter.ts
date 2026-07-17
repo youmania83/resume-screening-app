@@ -7,7 +7,7 @@ import { callDeepSeek } from "../../lib/deepseek.js";
 import { queryTenant } from "../../lib/tenantDb.js";
 import crypto from "crypto";
 import { ensureJobAssessment } from "../../lib/assessmentService.js";
-import { sendAssessmentInviteEmail } from "../../lib/email.js";
+import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../../lib/email.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext, tenantStorage } from "../../lib/tenantContext.js";
@@ -328,6 +328,17 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
           assessmentStatusVal
         ]
       );
+
+      // Send immediate Application Acknowledgement Email
+      try {
+        await sendApplicationAcknowledgementEmail({
+          candidateName: parsedResult.name || "Candidate",
+          candidateEmail: parsedResult.email || "",
+          tenantId
+        });
+      } catch (ackErr) {
+        console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+      }
 
       await queryTenant(
         `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) VALUES ($1, $2, $3, :tenant_id);`,

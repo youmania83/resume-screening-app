@@ -200,6 +200,77 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
   });
 });
 
+// Daily background job to send assessment reminders at 9:00 AM (Lock TTL = 12 hours)
+cron.schedule("0 9 * * *", () => {
+  runWithLock("cron:assessment-reminders", 43200, async () => {
+    try {
+      console.log("⏰ [Cron] Starting daily assessment reminders check...");
+      const { queryGlobal } = await import("../lib/tenantDb.js");
+      const { sendAssessmentReminderEmail } = await import("../lib/email.js");
+
+      // Query candidates who are shortlisted, pending, with active unexpired tokens
+      const candidatesRes = await queryGlobal(`
+        SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry, c.tenant_id,
+               COALESCE(j.title, c.role) as job_title
+        FROM candidates c
+        LEFT JOIN jobs j ON c.job_id = j.id
+        WHERE c.status = 'shortlisted'
+          AND c.assessment_status = 'pending'
+          AND c.assessment_token IS NOT NULL
+          AND c.assessment_token_expiry > CURRENT_TIMESTAMP;
+      `);
+
+      let remindersSent = 0;
+
+      for (const candidate of candidatesRes.rows) {
+        const expiry = new Date(candidate.assessment_token_expiry).getTime();
+        const now = Date.now();
+        const msDiff = expiry - now;
+        const remainingDays = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+
+        // We send reminders when remainingDays is 3 or 1
+        if (remainingDays === 3 || remainingDays === 1) {
+          const thresholdMsg = `Assessment reminder sent. ${remainingDays} days remaining.`;
+
+          // Check if we already sent a reminder for this threshold
+          const checkLog = await queryGlobal(`
+            SELECT COUNT(*) as count 
+            FROM candidate_activity_logs 
+            WHERE candidate_id = $1 
+              AND event_type = 'assessment_reminder' 
+              AND message = $2;
+          `, [candidate.id, thresholdMsg]);
+
+          if (Number(checkLog.rows[0].count) === 0) {
+            console.log(`✉️ Sending assessment reminder to ${candidate.email} (${remainingDays} days remaining)`);
+            
+            await sendAssessmentReminderEmail({
+              candidateName: candidate.name,
+              candidateEmail: candidate.email,
+              jobTitle: candidate.job_title,
+              token: candidate.assessment_token,
+              remainingDays,
+              tenantId: candidate.tenant_id
+            });
+
+            // Log activity
+            await queryGlobal(`
+              INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+              VALUES ($1, 'assessment_reminder', $2, $3);
+            `, [candidate.id, thresholdMsg, candidate.tenant_id]);
+
+            remindersSent++;
+          }
+        }
+      }
+
+      console.log(`✅ [Cron] Assessment reminders check complete. Reminders sent: ${remindersSent}`);
+    } catch (err: any) {
+      console.error("🚨 [Cron] Daily assessment reminders job failed:", err.message || err);
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 🤖 AUTONOMOUS PIPELINE: Email Sync (every 5 minutes) + Inline Resume Worker
 // ═══════════════════════════════════════════════════════════════════════════

@@ -13,7 +13,7 @@ import { ResumeParserManager, ParsedResumeData } from "../lib/parser/ResumeParse
 import { connection } from "../api/queue.js";
 import { TenantUsageService } from "../services/TenantUsageService.js";
 import { ensureJobAssessment } from "../lib/assessmentService.js";
-import { sendAssessmentInviteEmail } from "../lib/email.js";
+import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../lib/email.js";
 
 dotenv.config();
 
@@ -499,6 +499,17 @@ export async function parseAndEvalResume(
 
       // Increment monthly candidate counts
       await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
+
+      // Send immediate Application Acknowledgement Email
+      try {
+        await sendApplicationAcknowledgementEmail({
+          candidateName,
+          candidateEmail: parsedData.email || "",
+          tenantId
+        });
+      } catch (ackErr) {
+        console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+      }
 
       // If duplicate, link it in duplicate_candidates table
       if (primaryCandidateId) {

@@ -841,4 +841,208 @@ export async function sendRestrictedLinkEmail(params: {
   }
 }
 
+/**
+ * Send application acknowledgement email immediately after receiving the application
+ */
+export async function sendApplicationAcknowledgementEmail(params: {
+  candidateName: string;
+  candidateEmail: string;
+  tenantId?: string;
+}): Promise<void> {
+  const safeCandidateName = escapeHtml(params.candidateName);
+  const subject = "Application Received – Next Steps";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Application Received</title>
+      <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; }
+        .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; }
+        .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; }
+        .footer { background-color: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+        .footer p { margin: 4px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Techsol Engineers</h1>
+          <p>Application Status</p>
+        </div>
+        <div class="content">
+          <p class="greeting">Dear ${safeCandidateName},</p>
+          
+          <p class="message">Thank you for your interest in joining Techsol Engineers. We have successfully received your application.</p>
+          
+          <p class="message">Our recruitment team will review your profile. If your profile is shortlisted, an AI Assessment link will be sent to your registered email address on the same day.</p>
+          
+          <p class="message">Kindly complete the assessment at the earliest. The assessment link will remain active for 7 days from the time it is issued. If the assessment is not completed within this period, the link will automatically expire, and your application will be placed on hold.</p>
+          
+          <p class="message">As we receive a high volume of applications, candidates who complete the assessment early and successfully qualify will be given priority during the interview scheduling process. Early completion helps us process your application faster.</p>
+          
+          <p class="message">Upon successfully clearing the assessment, you will receive an email containing an interview scheduling link, allowing you to select a convenient interview slot based on availability.</p>
+          
+          <p class="message">Our recruitment process is designed to ensure a smooth, transparent, and efficient experience for both applicants and our hiring team. We kindly request your cooperation by completing each stage of the process within the specified timelines.</p>
+          
+          <p class="message">We appreciate your interest in Techsol Engineers and wish you the very best.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
+          <p>HR Team - Techsol Engineers</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (zohoConfig.enabled) {
+    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    return;
+  }
+
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+  if (!transporter) {
+    logEmailFallback(params.candidateEmail, subject, html);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: fromEmail,
+      to: params.candidateEmail,
+      subject,
+      html
+    });
+    console.log(`✉️ Application acknowledgement email successfully sent to: ${params.candidateEmail}`);
+  } catch (err) {
+    console.error("Failed to dispatch application acknowledgement email:", err);
+    logEmailFallback(params.candidateEmail, subject, html);
+  }
+}
+
+/**
+ * Send AI assessment reminder email to shortlisted candidates who haven't completed the test
+ */
+export async function sendAssessmentReminderEmail(params: {
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  token: string;
+  remainingDays: number;
+  tenantId?: string;
+}): Promise<void> {
+  const safeCandidateName = escapeHtml(params.candidateName);
+  const safeJobTitle = escapeHtml(params.jobTitle);
+  const { remainingDays, token } = params;
+
+  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const assessmentLink = `${portalUrl}/assessment/${token}`;
+  const subject = "Reminder – AI Assessment Pending";
+
+  const daysLabel = remainingDays === 1 ? "day" : "days";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>AI Assessment Pending</title>
+      <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; }
+        .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; }
+        .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; }
+        .details-box { background-color: #fffbeb; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #d97706; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .detail-row:last-child { margin-bottom: 0; }
+        .detail-label { font-weight: 600; color: #92400e; }
+        .detail-val { font-weight: 700; color: #92400e; text-align: right; }
+        .btn-container { text-align: center; margin: 32px 0; }
+        .btn { display: inline-block; background-color: #0f172a; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.15); transition: background-color 0.2s; }
+        .btn:hover { background-color: #1e293b; }
+        .footer { background-color: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+        .footer p { margin: 4px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Techsol Engineers</h1>
+          <p>Candidate Assessment Portal</p>
+        </div>
+        <div class="content">
+          <p class="greeting">Dear Applicant,</p>
+          
+          <p class="message">This is a friendly reminder that your AI Assessment link has already been sent to your registered email address.</p>
+          
+          <div class="details-box">
+            <div class="detail-row">
+              <span class="detail-label">Role:</span>
+              <span class="detail-val">${safeJobTitle}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Time Remaining:</span>
+              <span class="detail-val" style="font-weight: 800;">${remainingDays} ${daysLabel}</span>
+            </div>
+          </div>
+          
+          <p class="message">Your assessment link will expire in <strong>${remainingDays} ${daysLabel}</strong> if it is not completed. Once expired, your application will be placed on hold and cannot proceed to the next stage of the recruitment process until further review.</p>
+          
+          <p class="message">As interview scheduling is based on assessment completion and qualification, we encourage you to complete the assessment at the earliest to avoid any delay in processing your application.</p>
+          
+          <div class="btn-container">
+            <a href="${assessmentLink}" class="btn" target="_blank">Start Assessment</a>
+          </div>
+          
+          <p class="message" style="font-size: 12px; color: #64748b; text-align: center;">If the button above does not work, copy and paste this URL into your browser:<br>${assessmentLink}</p>
+          
+          <p class="message">Thank you, and we look forward to your participation.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
+          <p>HR Team - Techsol Engineers</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (zohoConfig.enabled) {
+    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    return;
+  }
+
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+  if (!transporter) {
+    logEmailFallback(params.candidateEmail, subject, html);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: fromEmail,
+      to: params.candidateEmail,
+      subject,
+      html
+    });
+    console.log(`✉️ Assessment reminder email successfully sent to: ${params.candidateEmail}`);
+  } catch (err) {
+    console.error("Failed to dispatch assessment reminder email:", err);
+    logEmailFallback(params.candidateEmail, subject, html);
+  }
+}
+
+
 

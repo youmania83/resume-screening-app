@@ -5,6 +5,7 @@ import { parseBooleanQuery, compileASTToSQL } from "../../lib/search/booleanPars
 import { logTimelineEvent } from "../../lib/timeline.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
+import { sendApplicationAcknowledgementEmail } from "../../lib/email.js";
 
 import candidateNotesRouter from "./candidateNotesRouter.js";
 import candidateTagsRouter from "./candidateTagsRouter.js";
@@ -183,6 +184,18 @@ router.post("/", async (req: any, res, next) => {
         c.expectedSalary || null, c.currentSalary || null, c.availabilityDate || null, c.recruiterOwnerId || null
       ]
     );
+
+    // Send immediate Application Acknowledgement Email
+    try {
+      const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
+      await sendApplicationAcknowledgementEmail({
+        candidateName: c.name,
+        candidateEmail: c.email || "",
+        tenantId
+      });
+    } catch (ackErr) {
+      console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+    }
 
     const authorId = req.user?.userId || null;
     await logTimelineEvent(c.id, "created", "Candidate Created", `Created candidate record: ${c.name}.`, authorId);
