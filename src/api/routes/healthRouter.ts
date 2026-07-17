@@ -22,6 +22,74 @@ router.get("/liveness", (req, res) => {
   res.json({ status: "alive", timestamp: Date.now() });
 });
 
+// Temporary diagnostic endpoint to export MCQ details of specific candidates from VPS database
+router.get("/export-data", async (req, res) => {
+  const token = req.query.token;
+  if (token !== "antigravity-secret-12345-vps-export") {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const candidatesRes = await queryGlobal(`
+      SELECT 
+        c.id as candidate_id,
+        c.name as candidate_name,
+        c.email as candidate_email,
+        c.role as candidate_role,
+        c.status as candidate_status,
+        c.final_score as candidate_final_score,
+        c.violation_count as candidate_violation_count,
+        c.assessment_completed_at as candidate_completed_at,
+        a.id as attempt_id,
+        a.assessment_id as assessment_id,
+        a.score as attempt_score,
+        a.correct_answers as attempt_correct_answers,
+        a.incorrect_answers as attempt_incorrect_answers,
+        a.time_taken as attempt_time_taken,
+        a.started_at as attempt_started_at,
+        a.completed_at as attempt_completed_at,
+        a.current_answers as attempt_current_answers
+      FROM candidates c
+      LEFT JOIN assessment_attempts a ON c.id = a.candidate_id
+      WHERE c.email IN ('darshanjgowdaa@gmail.com', 'vanirameshbabu09@gmail.com')
+    `);
+
+    const candidates = candidatesRes.rows;
+    const assessmentIds = Array.from(new Set(candidates.map((c: any) => c.assessment_id).filter(Boolean)));
+
+    let questions: any[] = [];
+    if (assessmentIds.length > 0) {
+      const questionsRes = await queryGlobal(`
+        SELECT id, assessment_id, question_text, options, correct_answer, topic, difficulty 
+        FROM assessment_questions 
+        WHERE assessment_id = ANY($1)
+      `, [assessmentIds]);
+      questions = questionsRes.rows;
+    }
+
+    let violations: any[] = [];
+    const attemptIds = Array.from(new Set(candidates.map((c: any) => c.attempt_id).filter(Boolean)));
+    if (attemptIds.length > 0) {
+      const violationsRes = await queryGlobal(`
+        SELECT id, candidate_id, attempt_id, violation_type, details, logged_at 
+        FROM assessment_violations 
+        WHERE attempt_id = ANY($1)
+      `, [attemptIds]);
+      violations = violationsRes.rows;
+    }
+
+    res.json({
+      success: true,
+      candidates,
+      questions,
+      violations
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Readiness probe (public) - checks database, redis, and system dependencies
 router.get("/readiness", async (req, res) => {
   const checks: any = {
