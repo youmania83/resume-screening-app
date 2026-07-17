@@ -466,32 +466,32 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
     return selectFallbackQuestions(jobTitle);
   }
 
-  const prompt = `You are a senior psychometrician and domain expert designing a rigorous, elite hiring assessment. Analyze the following Job Description and generate exactly 15 highly challenging Multiple Choice Questions (MCQs). The assessment should target candidate expertise for this role.
-
-Job Title: ${jobTitle}
-Job Description:
-${jobDescription}
-
-Generate exactly 15 questions meeting these requirements:
-- Options: Exactly 4 options per question.
-- Correct Answer: One single correct answer that MUST match one of the 4 options EXACTLY.
-- Core coverage (topics mapping):
-  * IQ (Cognitive, logical reasoning, and pattern recognition) (3 questions, topic: 'iq')
-  * Technical (Role-based core competencies and knowledge) (6 questions, topic: 'technical')
-  * Behavioral (Situational judgment, communication, and interpersonal skills) (3 questions, topic: 'behavioral')
-  * Self-introduction (Professional profile matching, background introduction, career motivation/goals) (3 questions, topic: 'self-introduction')
-- Difficulty distribution:
-  * Easy (3 questions, mostly for self-introduction and simple IQ/behavioral scenarios)
-  * Medium (6 questions)
-  * Hard/Expert (6 questions)
-
-CRITICAL RULES FOR QUESTION & OPTION QUALITY (MOST IMPORTANT):
-1. NO TRIVIAL OR DEFINITIONAL QUESTIONS: For technical and IQ questions, design complex, real-world troubleshooting scenarios, architectural trade-off evaluations, or debugging/diagnostic/logical situations.
-2. DISTRACTORS MUST BE EXTREMELY PLAUSIBLE: Wrong answers must represent common industry mistakes, subtle misconceptions, or logical fallacies. A candidate without deep expertise must find all 4 options equally convincing.
-3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure, detail level, and length. The correct answer must NOT be longer or more detailed than the distractors.
-4. INCORRECT OPTIONS MUST BE REAL TERMS/CONCEPTS: Never use made-up words or joke choices.
-5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D) across questions.
-6. NO GIVEAWAY PATTERNS: Do not use words like 'never', 'always', 'all of the above', or 'none of the above' in wrong answers.
+  const prompt = `You are a senior domain expert designing a clear, approachable hiring assessment. Analyze the following Job Description and generate exactly 15 practical and relevant Multiple Choice Questions (MCQs). The assessment should test standard candidate competencies for this role.
+ 
+ Job Title: ${jobTitle}
+ Job Description:
+ ${jobDescription}
+ 
+ Generate exactly 15 questions meeting these requirements:
+ - Options: Exactly 4 options per question.
+ - Correct Answer: One single correct answer that MUST match one of the 4 options EXACTLY.
+ - Core coverage (topics mapping):
+   * IQ (Cognitive, logical reasoning, and pattern recognition) (3 questions, topic: 'iq')
+   * Technical (Role-based core competencies and knowledge) (6 questions, topic: 'technical')
+   * Behavioral (Situational judgment, communication, and interpersonal skills) (3 questions, topic: 'behavioral')
+   * Self-introduction (Professional profile matching, background introduction, career motivation/goals) (3 questions, topic: 'self-introduction')
+ - Difficulty distribution:
+   * Easy (6 questions, covering self-introduction and straightforward IQ/behavioral/technical scenarios)
+   * Medium (6 questions, covering standard core concepts)
+   * Hard (3 questions, covering slightly more advanced scenarios)
+ 
+ CRITICAL RULES FOR QUESTION & OPTION QUALITY (MOST IMPORTANT):
+ 1. BALANCED QUESTIONS: Design practical, day-to-day work scenarios and standard job competencies. Do not make the questions excessively complex, tricky, or purely theoretical; they should test general, practical proficiency.
+ 2. DISTRACTORS MUST BE PLAUSIBLE: Wrong answers must represent common mistakes or plausible misunderstandings.
+ 3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure, detail level, and length. The correct answer must NOT be longer or more detailed than the distractors.
+ 4. INCORRECT OPTIONS MUST BE REAL TERMS/CONCEPTS: Never use made-up words or joke choices.
+ 5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D) across questions.
+ 6. NO GIVEAWAY PATTERNS: Do not use words like 'never', 'always', 'all of the above', or 'none of the above' in wrong answers.
 
 CRITICAL RULES FOR JSON VALIDITY:
 1. Do NOT use double quotes inside your question texts or options (e.g., instead of "What does "SCM" mean?", write "What does 'SCM' mean?"). If you need quotes inside the text, use single quotes.
