@@ -1,7 +1,7 @@
 // src/api/routes/assessmentRouter.ts
 import { Router } from "express";
 import { ensureJobAssessment, regenerateJobAssessment } from "../../lib/assessmentService";
-import { sendAssessmentInviteEmail, sendInterviewScheduleEmail } from "../../lib/email";
+import { sendAssessmentInviteEmail, sendInterviewScheduleEmail, sendAssessmentResultDetailsEmail } from "../../lib/email";
 import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service";
 import crypto from "crypto";
 import { tenantStorage } from "../../lib/tenantContext.js";
@@ -659,6 +659,70 @@ router.post("/submit", async (req: any, res: any) => {
         );
       } catch (logErr) {
         console.error("⚠️ [Side-Effect] Failed to log assessment submission activity:", logErr);
+      }
+
+      // Query full questions to build detailed results report
+      let fullQuestions: any[] = [];
+      try {
+        const fullQuestionsRes = await queryGlobal(
+          `SELECT id, question_text, options, correct_answer, difficulty, topic 
+           FROM assessment_questions 
+           WHERE assessment_id = $1 
+           ORDER BY id ASC;`,
+          [assessmentId]
+        );
+        fullQuestions = fullQuestionsRes.rows.map(q => ({
+          id: q.id,
+          question_text: q.question_text,
+          options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+          correct_answer: q.correct_answer,
+          difficulty: q.difficulty,
+          topic: q.topic
+        }));
+      } catch (qErr) {
+        console.error("⚠️ [Side-Effect] Failed to query full questions for detailed report:", qErr);
+      }
+
+      // Trigger Detailed Assessment Results Email to both Candidate and HR
+      try {
+        let hrEmail = "yogeshkumarwadhwa@localhost.com";
+        try {
+          const tenantCfgRes = await queryGlobal(
+            `SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;`,
+            [candidate.tenant_id]
+          );
+          const emailCfg = tenantCfgRes.rows[0]?.email_config;
+          if (emailCfg?.hrManagerEmail) {
+            hrEmail = emailCfg.hrManagerEmail;
+          } else {
+            const ownerRes = await queryGlobal(
+              `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
+              [candidate.tenant_id]
+            );
+            if (ownerRes.rowCount && ownerRes.rowCount > 0) {
+              hrEmail = ownerRes.rows[0].email;
+            }
+          }
+        } catch (dbErr) {
+          console.error("Failed to lookup HR manager email, falling back to default:", dbErr);
+        }
+
+        if (fullQuestions.length > 0) {
+          await sendAssessmentResultDetailsEmail({
+            candidateName: candidate.name,
+            candidateEmail: candidate.email,
+            hrEmail,
+            jobTitle: candidate.role,
+            resumeScore,
+            assessmentScore,
+            finalScore,
+            questions: fullQuestions,
+            candidateAnswers: answers,
+            tenantId: candidate.tenant_id
+          });
+        }
+      } catch (mailDetailsErr) {
+        console.error("⚠️ [Side-Effect] Failed to trigger detailed results email:", mailDetailsErr);
       }
 
       // Sync assessment completion stage via Keka

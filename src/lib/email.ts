@@ -1044,5 +1044,172 @@ export async function sendAssessmentReminderEmail(params: {
   }
 }
 
+/**
+ * Send detailed assessment result email containing questions, correct options, candidate selections, and score calculations to candidate and HR.
+ */
+export async function sendAssessmentResultDetailsEmail(params: {
+  candidateName: string;
+  candidateEmail: string;
+  hrEmail: string;
+  jobTitle: string;
+  resumeScore: number;
+  assessmentScore: number;
+  finalScore: number;
+  questions: any[];
+  candidateAnswers: any;
+  tenantId?: string;
+}): Promise<void> {
+  const safeCandidateName = escapeHtml(params.candidateName);
+  const safeJobTitle = escapeHtml(params.jobTitle);
+  const subject = `AI Assessment Details: ${safeCandidateName} - ${safeJobTitle}`;
+
+  // Compile questions markup
+  let questionsHtml = "";
+  params.questions.forEach((q, idx) => {
+    const candidateSelected = params.candidateAnswers[q.id] || "";
+    const isCorrect = candidateSelected.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
+
+    let optionsListHtml = "";
+    q.options.forEach((opt: string, optIdx: number) => {
+      const optLetter = ["A", "B", "C", "D"][optIdx] || "";
+      const isThisCorrect = opt.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
+      const isThisSelected = opt.trim().toLowerCase() === candidateSelected.trim().toLowerCase();
+
+      let optionStyle = "padding: 10px 12px; margin: 6px 0; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 14px;";
+      let badgeHtml = "";
+
+      if (isThisCorrect) {
+        optionStyle += " background-color: #ecfdf5; border-color: #10b981; color: #065f46; font-weight: 600;";
+        badgeHtml = `<span style="float: right; font-size: 11px; background-color: #10b981; color: white; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; font-weight: 700;">Correct Option</span>`;
+      } else if (isThisSelected && !isCorrect) {
+        optionStyle += " background-color: #fef2f2; border-color: #ef4444; color: #991b1b; text-decoration: line-through;";
+        badgeHtml = `<span style="float: right; font-size: 11px; background-color: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; font-weight: 700;">Selected (Incorrect)</span>`;
+      } else if (isThisSelected) {
+        optionStyle += " background-color: #ecfdf5; border-color: #10b981; color: #065f46; font-weight: 600;";
+      }
+
+      optionsListHtml += `
+        <div style="${optionStyle}">
+          <strong>${optLetter}.</strong> ${escapeHtml(opt)}
+          ${badgeHtml}
+          <div style="clear: both;"></div>
+        </div>
+      `;
+    });
+
+    const questionStatusText = isCorrect 
+      ? `<span style="background-color: #d1fae5; color: #065f46; font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 12px;">✅ Correct</span>`
+      : (candidateSelected 
+        ? `<span style="background-color: #fee2e2; color: #991b1b; font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 12px;">❌ Incorrect</span>`
+        : `<span style="background-color: #f1f5f9; color: #475569; font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 12px;">⚠️ Unanswered</span>`);
+
+    questionsHtml += `
+      <div style="margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Question ${idx + 1} (${escapeHtml(q.topic || "General")})</span>
+          ${questionStatusText}
+        </div>
+        <p style="font-size: 15px; font-weight: 600; color: #0f172a; margin: 0 0 14px 0; line-height: 1.5;">${escapeHtml(q.question_text)}</p>
+        <div>${optionsListHtml}</div>
+      </div>
+    `;
+  });
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Assessment Details Report</title>
+      <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .container { max-width: 650px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; font-size: 24px; margin: 0; font-weight: 700; tracking: -0.025em; }
+        .header p { color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 0; }
+        .message { font-size: 15px; line-height: 1.6; color: #475569; margin: 16px 0; }
+        .footer { background-color: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+        .footer p { margin: 4px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Techsol Engineers</h1>
+          <p>AI Assessment Performance Report</p>
+        </div>
+        <div class="content">
+          <p class="greeting">Hello,</p>
+          <p class="message">Here are the detailed performance results and score calculation for candidate <strong>${safeCandidateName}</strong>'s AI Assessment for the <strong>${safeJobTitle}</strong> position.</p>
+          
+          <div style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; padding: 20px; margin: 24px 0;">
+            <h3 style="margin-top: 0; color: #0f172a; font-size: 16px; font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Score Summary</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b; font-weight: 600;">Resume Match Score (40% Weight):</span>
+              <span style="color: #0f172a; font-weight: 700;">${params.resumeScore}%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b; font-weight: 600;">Assessment MCQ Score (60% Weight):</span>
+              <span style="color: #0f172a; font-weight: 700;">${params.assessmentScore}%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #cbd5e1; padding-top: 10px; font-size: 16px;">
+              <span style="color: #0f172a; font-weight: 800;">Final Integrated Score:</span>
+              <span style="color: #2563eb; font-weight: 800;">${params.finalScore}%</span>
+            </div>
+            <p style="font-size: 11px; color: #94a3b8; margin: 8px 0 0 0; text-align: right;">Formula: (Resume Match * 0.4) + (Assessment Score * 0.6)</p>
+          </div>
+
+          <h3 style="margin-top: 40px; color: #0f172a; font-size: 16px; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 24px;">Question by Question Breakdown</h3>
+          <div>
+            ${questionsHtml}
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; 2026 Techsol Engineers. All rights reserved.</p>
+          <p>This is an automated system notification. Powered by IRA.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Dispatch to both Candidate and HR
+  const recipients = [params.candidateEmail, params.hrEmail].filter(email => email && email.trim() !== "");
+  
+  for (const to of recipients) {
+    if (zohoConfig.enabled) {
+      try {
+        await zohoMailService.sendEmail(to, subject, html);
+        console.log(`✉️ Detailed results email successfully sent to ${to} (Zoho Mail)`);
+      } catch (err) {
+        console.error(`Failed to dispatch detailed results email to ${to} via Zoho:`, err);
+      }
+      continue;
+    }
+
+    const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+    if (!transporter) {
+      logEmailFallback(to, subject, html);
+      continue;
+    }
+
+    try {
+      await transporter.sendMail({
+        from: fromEmail,
+        to,
+        subject,
+        html
+      });
+      console.log(`✉️ Detailed results email successfully sent to: ${to}`);
+    } catch (err) {
+      console.error(`Failed to dispatch detailed results email to ${to}:`, err);
+      logEmailFallback(to, subject, html);
+    }
+  }
+}
+
+
 
 
