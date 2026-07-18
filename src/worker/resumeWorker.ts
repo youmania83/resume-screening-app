@@ -14,6 +14,7 @@ import { connection } from "../api/queue.js";
 import { TenantUsageService } from "../services/TenantUsageService.js";
 import { ensureJobAssessment } from "../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../lib/email.js";
+import { isNonResumeFile } from "../lib/fileFilters.js";
 
 dotenv.config();
 
@@ -138,6 +139,22 @@ export async function parseAndEvalResume(
 
       // Log SLA Upload timing
       await logProcessingStep(tenantId, inboxId, null, "Upload", "Success", "Storage", uploadDuration);
+
+      // Heuristic non-resume file name check
+      const fileName = inboxRecord.file_name || "";
+      if (isNonResumeFile(fileName)) {
+        const errorMsg = `Rejected: Document "${fileName}" is identified as a non-resume file.`;
+        console.log(`[Worker] ${errorMsg}`);
+        await queryGlobal(
+          "UPDATE resume_inbox SET status = 'Failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;",
+          [errorMsg, inboxId]
+        );
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) { console.warn("Failed to delete temp file:", e); }
+        }
+        await logProcessingStep(tenantId, inboxId, null, "Parsing", "Failed", "System", 0, errorMsg);
+        return;
+      }
 
       // 2. Read file and extract text
       const parseStart = Date.now();
@@ -277,7 +294,8 @@ export async function parseAndEvalResume(
           concerns: cached.weaknesses || [],
           recommendationReason: cached.recommendation || "",
           matchedSkills: cached.matched_skills || [],
-          missingSkills: cached.missing_skills || []
+          missingSkills: cached.missing_skills || [],
+          isResume: true
         };
         providerName = "Cache";
       } else {
@@ -309,6 +327,59 @@ export async function parseAndEvalResume(
          ON CONFLICT (batch_id) DO NOTHING;`,
         [inboxId, inboxRecord.file_name, rawText, tenantId]
       );
+
+      if (!parsedData) {
+        throw new Error("Parsing failed: no data extracted from the document.");
+      }
+
+      // Check if LLM parsed output indicates this is NOT a resume
+      if (parsedData.isResume === false) {
+        const errorMsg = "Rejected: Uploaded document does not appear to be a valid resume/CV (classified by AI).";
+        console.log(`[Worker] ${errorMsg}`);
+        await queryGlobal(
+          "UPDATE resume_inbox SET status = 'Failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;",
+          [errorMsg, inboxId]
+        );
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) { console.warn("Failed to delete temp file:", e); }
+        }
+        await logProcessingStep(tenantId, inboxId, null, "AI Analysis", "Failed", providerName, aiDuration, errorMsg);
+        return;
+      }
+
+      // Check if candidate details have enough mapping data (Name and Email are minimum required)
+      const candNameCheck = `${parsedData.firstName || ""} ${parsedData.lastName || ""}`.trim();
+      const hasEmailCheck = parsedData.email && parsedData.email.trim() && parsedData.email.includes("@");
+      const hasNameCheck = candNameCheck && candNameCheck.toLowerCase() !== "unknown candidate" && !candNameCheck.toLowerCase().includes("unknown");
+
+      if (!hasEmailCheck || !hasNameCheck) {
+        const errorMsg = `Lacks critical information for mapping (Name: "${candNameCheck || "missing"}", Email: "${parsedData.email || "missing"}").`;
+        console.log(`[Worker] ${errorMsg}`);
+        await queryGlobal(
+          `UPDATE resume_inbox SET 
+            status = 'Needs Review', 
+            error_message = $1, 
+            overall_confidence = $2, 
+            email_confidence = $3, 
+            phone_confidence = $4, 
+            skills_confidence = $5, 
+            updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $6;`,
+          [
+            errorMsg,
+            parsedData.overallConfidence || 0.5,
+            parsedData.emailConfidence || 0.5,
+            parsedData.phoneConfidence || 0.5,
+            parsedData.skillsConfidence || 0.5,
+            inboxId
+          ]
+        );
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) { console.warn("Failed to delete temp file:", e); }
+        }
+        await logProcessingStep(tenantId, inboxId, null, "Matching", "Failed", providerName, Date.now() - startTime, errorMsg);
+        return;
+      }
 
       // 4. Candidate Deduplication Scans
       let primaryCandidateId: string | null = null;
@@ -527,10 +598,10 @@ export async function parseAndEvalResume(
         skills: 30, experience: 25, industry: 15, education: 15, location: 15
       };
 
-      // Select jobs to match: either targeted job or all active jobs in the tenant
+      // Select jobs to match: either targeted job (match by id or external_id) or all active jobs in the tenant
       let jobsToMatch: any[] = [];
       if (targetJobId) {
-        const targetJob = await queryGlobal("SELECT * FROM jobs WHERE id = $1 AND tenant_id = $2 LIMIT 1;", [targetJobId, tenantId]);
+        const targetJob = await queryGlobal("SELECT * FROM jobs WHERE (id = $1 OR external_id = $1) AND tenant_id = $2 LIMIT 1;", [targetJobId, tenantId]);
         if ((targetJob.rowCount || 0) > 0) {
           jobsToMatch.push(targetJob.rows[0]);
         }
@@ -572,7 +643,7 @@ export async function parseAndEvalResume(
         );
 
         // Track highest matching job, or target job specifically
-        if (targetJobId && job.id === targetJobId) {
+        if (targetJobId && (job.id === targetJobId || job.external_id === targetJobId)) {
           highestMatchScore = match.score;
           matchedJobId = job.id;
           matchedJobTitle = job.title;
@@ -585,13 +656,11 @@ export async function parseAndEvalResume(
         }
       }
 
-      // Default to first job if no match was targeted or found, and we have jobs
-      if (!matchedJobId && jobsToMatch.length > 0) {
-        matchedJobId = jobsToMatch[0].id;
-        matchedJobTitle = jobsToMatch[0].title;
-        matchedJobDesc = jobsToMatch[0].description;
-        const match = calculateHeuristicMatch(parsedData, jobsToMatch[0], weights);
-        highestMatchScore = match.score;
+      // If no target job was specified, and the highest score is < 50%, clear matchedJobId so it remains unmapped
+      if (!targetJobId && highestMatchScore < 50) {
+        matchedJobId = null;
+        matchedJobTitle = "";
+        matchedJobDesc = "";
       }
 
       // Automated AI screening pipeline trigger
@@ -698,13 +767,43 @@ export async function parseAndEvalResume(
         }
       }
 
+      // If we don't have a matched job (due to low score or no active jobs), route candidate to HR Review / unassigned
+      if (candidateStatus === "applied" && !matchedJobId) {
+        await queryGlobal(
+          `UPDATE candidates 
+           SET status = 'Review', 
+               job_id = NULL, 
+               score = $1, 
+               match_percent = $1
+           WHERE id = $2;`,
+          [highestMatchScore, candidateId]
+        );
+
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+           VALUES ($1, 'stage_changed', $2, $3);`,
+          [candidateId, `Candidate placed on HR Review (No matching job found with score >= 50%).`, tenantId]
+        );
+
+        await queryGlobal(
+          `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+           VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', 'Candidate automatically placed in HR Review because no matching job opening met the 50% score threshold.');`,
+          [crypto.randomUUID(), tenantId, candidateId]
+        );
+      }
+
       const matchDuration = Date.now() - matchStart;
       await logProcessingStep(tenantId, inboxId, candidateId, "Matching", "Success", "System", matchDuration);
 
       // 7. Update Inbox status and confidence values
       let finalInboxStatus = "Matched";
+      let inboxErrorMessage: string | null = null;
+
       if (primaryCandidateId) {
         finalInboxStatus = "Duplicate";
+      } else if (!matchedJobId) {
+        finalInboxStatus = "Needs Review";
+        inboxErrorMessage = `No matching job found with score >= 50% (highest match was ${highestMatchScore}%).`;
       } else if (
         parsedData.overallConfidence < 0.60 ||
         parsedData.emailConfidence < 0.60 ||
@@ -712,6 +811,7 @@ export async function parseAndEvalResume(
         parsedData.skillsConfidence < 0.60
       ) {
         finalInboxStatus = "Needs Review";
+        inboxErrorMessage = "Low confidence values in parsed details.";
       }
 
       await queryGlobal(
@@ -722,12 +822,14 @@ export async function parseAndEvalResume(
           email_confidence = $4, 
           phone_confidence = $5, 
           skills_confidence = $6, 
+          error_message = $7,
           updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $7;`,
+         WHERE id = $8;`,
         [
           finalInboxStatus, candidateId,
           parsedData.overallConfidence, parsedData.emailConfidence,
           parsedData.phoneConfidence, parsedData.skillsConfidence,
+          inboxErrorMessage,
           inboxId
         ]
       );

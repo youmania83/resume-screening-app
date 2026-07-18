@@ -3,19 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { queryGlobal } from "../lib/tenantDb.js";
-
-const BLACKLIST_KEYWORDS = [
-  "payslip", "pay slip", "pay_slip", "salary",
-  "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
-  "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
-  "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
-  "scan", "mri", "xray", "medical", "prescription",
-  "tender", "agreement", "contract", "proposal",
-  "issue", "incident", "log", "report", "reports",
-  "program", "training", "certificate", "course",
-  "signature", "logo", "image0",
-  "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
-];
+import { isNonResumeFile } from "../lib/fileFilters.js";
 
 async function main() {
   console.log("=== RUNNING JUNK DOCUMENTS CLEANUP ON DATABASE ===");
@@ -33,20 +21,13 @@ async function main() {
   const deletedFiles: string[] = [];
 
   for (const row of res.rows) {
-    const fileName = (row.file_name || "").toLowerCase();
+    const fileName = row.file_name || "";
     const status = row.status;
     const candidateName = row.candidate_name;
     
     // Check if filename contains any blacklist keyword
     let isJunk = false;
-    for (const keyword of BLACKLIST_KEYWORDS) {
-      if (fileName.includes(keyword)) {
-        isJunk = true;
-        break;
-      }
-    }
-
-    if (fileName.includes(" to ")) {
+    if (isNonResumeFile(fileName)) {
       isJunk = true;
     }
     if (status === "Failed") {

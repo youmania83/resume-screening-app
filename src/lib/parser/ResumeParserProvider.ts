@@ -4,6 +4,7 @@ import { OpenAILLMAdapter } from "../ai/adapters/OpenAILLMAdapter.js";
 import { GeminiLLMAdapter } from "../ai/adapters/GeminiLLMAdapter.js";
 
 export interface ParsedResumeData {
+  isResume: boolean;
   firstName: string;
   lastName: string;
   email: string;
@@ -63,6 +64,7 @@ CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT ment
 
 Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown backticks or include any other text.
 {
+  "isResume": boolean (true if the text represents a professional resume or curriculum vitae of a candidate, false if the document is a payslip, receipt, invoice, course certificate, mark sheet, dashboard screenshot, agreement, or any other non-resume document),
   "firstName": "string (first name or empty)",
   "lastName": "string (last name or empty)",
   "email": "string (email or empty)",
@@ -177,6 +179,7 @@ export class MockParser implements IResumeParserProvider {
     const missingSkills = jobDescription && matchedSkills.length === 0 ? ["Python"] : [];
 
     return {
+      isResume: true,
       firstName: firstName.charAt(0).toUpperCase() + firstName.slice(1),
       lastName: lastName.charAt(0).toUpperCase() + lastName.slice(1),
       email,

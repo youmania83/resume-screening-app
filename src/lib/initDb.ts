@@ -1,5 +1,6 @@
 // src/lib/initDb.ts
 import { pool } from "./db.js";
+import { isNonResumeFile } from "./fileFilters.js";
 
 async function init() {
   const client = await pool.connect();
@@ -814,19 +815,6 @@ async function init() {
 
     // Purge failed / junk inbox items and unknown candidates
     console.log("Purging failed/junk inbox items and unknown candidates...");
-    const BLACKLIST_KEYWORDS = [
-      "payslip", "pay slip", "pay_slip", "salary",
-      "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
-      "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
-      "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
-      "scan", "mri", "xray", "medical", "prescription",
-      "tender", "agreement", "contract", "proposal",
-      "issue", "incident", "log", "report", "reports",
-      "program", "training", "certificate", "course",
-      "signature", "logo", "image0",
-      "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
-    ];
-
     const inboxRes = await client.query(`
       SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, c.name as candidate_name
       FROM resume_inbox ri
@@ -837,18 +825,12 @@ async function init() {
     const junkCandidateIds: string[] = [];
 
     for (const row of inboxRes.rows) {
-      const fileName = (row.file_name || "").toLowerCase();
+      const fileName = row.file_name || "";
       const status = row.status;
       const candidateName = row.candidate_name;
 
       let isJunk = false;
-      for (const keyword of BLACKLIST_KEYWORDS) {
-        if (fileName.includes(keyword)) {
-          isJunk = true;
-          break;
-        }
-      }
-      if (fileName.includes(" to ")) {
+      if (isNonResumeFile(fileName)) {
         isJunk = true;
       }
       if (status === "Failed") {

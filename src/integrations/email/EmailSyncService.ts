@@ -8,6 +8,7 @@ import { IngestQueue } from "../../lib/queue/ingestQueue.js";
 import { queryGlobal } from "../../lib/tenantDb.js";
 import { JobExtractionService } from "../../services/JobExtractionService.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
+import { isNonResumeFile } from "../../lib/fileFilters.js";
 
 // Global connection health ledger
 export interface ProviderHealth {
@@ -50,6 +51,92 @@ export class EmailSyncService {
       console.warn(`[Email Sync] Invalid regex pattern: ${pattern}`, err);
       return null;
     }
+  }
+
+  /**
+   * Robust job-matching function using ID, code, location, and title.
+   */
+  static async findBestMatchingJob(
+    tenantId: string,
+    jobTitleExtracted: string,
+    subject: string,
+    body: string
+  ): Promise<string | undefined> {
+    try {
+      const jobsRes = await queryGlobal(
+        "SELECT id, title, location, job_code, external_id FROM jobs WHERE tenant_id = $1;",
+        [tenantId]
+      );
+      const jobs = jobsRes.rows;
+
+      const subLower = subject.toLowerCase();
+      const bodyLower = body.toLowerCase();
+
+      // 1. Exact ID / Code match
+      for (const job of jobs) {
+        if (job.id && (subject.includes(job.id) || body.includes(job.id))) {
+          console.log(`[Email Sync] Exact job UUID match: ${job.id}`);
+          return job.id;
+        }
+        if (job.job_code && job.job_code.trim()) {
+          const code = job.job_code.trim().toLowerCase();
+          const codeRegex = new RegExp(`\\b${code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+          if (codeRegex.test(subject) || codeRegex.test(body)) {
+            console.log(`[Email Sync] Exact job code match: ${job.job_code}`);
+            return job.id;
+          }
+        }
+        if (job.external_id && job.external_id.trim()) {
+          const extId = job.external_id.trim().toLowerCase();
+          const extIdRegex = new RegExp(`\\b${extId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+          if (extIdRegex.test(subject) || extIdRegex.test(body)) {
+            console.log(`[Email Sync] Exact job external ID match: ${job.external_id}`);
+            return job.id;
+          }
+        }
+      }
+
+      // 2. Exact Title + Location match (mismatches location fix)
+      if (jobTitleExtracted) {
+        const titleLower = jobTitleExtracted.toLowerCase().trim();
+        const matchedJobs = jobs.filter(j => {
+          const t = j.title.toLowerCase().trim();
+          return t === titleLower || t.includes(titleLower) || titleLower.includes(t);
+        });
+
+        if (matchedJobs.length === 1) {
+          console.log(`[Email Sync] Title-only match: "${matchedJobs[0].title}"`);
+          return matchedJobs[0].id;
+        }
+
+        if (matchedJobs.length > 1) {
+          console.log(`[Email Sync] Multiple jobs match title "${jobTitleExtracted}". Performing location disambiguation...`);
+          // Find location in subject or body
+          for (const job of matchedJobs) {
+            const loc = job.location ? job.location.toLowerCase().trim() : "";
+            if (loc && loc !== "remote") {
+              const city = loc.split(",")[0].trim();
+              if (city && (subLower.includes(city) || bodyLower.includes(city))) {
+                console.log(`[Email Sync] Mapped by title and location: "${job.title}" at "${job.location}"`);
+                return job.id;
+              }
+            }
+          }
+          // Fallback to remote if mentioned, or default to a remote role only if explicitly stated
+          const remoteJob = matchedJobs.find(j => j.location && j.location.toLowerCase().trim() === "remote");
+          if (remoteJob && (subLower.includes("remote") || bodyLower.includes("remote"))) {
+            console.log(`[Email Sync] Mapped by title and remote location: "${remoteJob.title}"`);
+            return remoteJob.id;
+          }
+
+          // If no location matches, do NOT map arbitrarily to prevent mismatches
+          console.log(`[Email Sync] Ambiguous job matching: multiple openings for "${jobTitleExtracted}" with different locations.`);
+        }
+      }
+    } catch (err) {
+      console.error("[Email Sync] Error finding best matching job:", err);
+    }
+    return undefined;
   }
 
   /**
@@ -158,19 +245,7 @@ export class EmailSyncService {
 
         // PATH B: Process Resume Application
         console.log(`[Email Sync] Processing candidate application email: "${subject}"`);
-        let targetJobId: string | undefined = undefined;
-
-        if (jobTitleExtracted) {
-          const jobMatchRes = await queryGlobal(
-            `SELECT id FROM jobs 
-             WHERE tenant_id = $1 AND (LOWER(title) = LOWER($2) OR LOWER(title) LIKE LOWER($3))
-             LIMIT 1;`,
-            [tenantId, jobTitleExtracted, `%${jobTitleExtracted}%`]
-          );
-          if (jobMatchRes.rowCount && jobMatchRes.rowCount > 0) {
-            targetJobId = jobMatchRes.rows[0].id;
-          }
-        }
+        const targetJobId = await EmailSyncService.findBestMatchingJob(tenantId, jobTitleExtracted, subject, body);
 
         let processedAtLeastOneResume = false;
 
@@ -199,22 +274,7 @@ export class EmailSyncService {
           }
 
           // Skip non-resume files like payslips, challans, offer letters, tickets, scan reports, bank statements, etc.
-          const lowerName = attach.fileName.toLowerCase();
-          const ignoreKeywords = [
-            "payslip", "pay slip", "pay_slip", "salary",
-            "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
-            "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
-            "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
-            "scan", "mri", "xray", "medical", "prescription",
-            "tender", "agreement", "contract", "proposal",
-            "issue", "incident", "log", "report", "reports",
-            "program", "training", "certificate", "course",
-            "signature", "logo", "image0",
-            "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
-          ];
-          const hasCv = /(?:^|[^a-z])cv(?:$|[^a-z])/i.test(attach.fileName);
-          const hasResumeKeyword = lowerName.includes("resume") || hasCv || lowerName.includes("curriculum");
-          if ((ignoreKeywords.some(keyword => lowerName.includes(keyword)) || lowerName.includes(" to ")) && !hasResumeKeyword) {
+          if (isNonResumeFile(attach.fileName)) {
             console.log(`[Email Sync] Skipping non-resume attachment: "${attach.fileName}"`);
             continue;
           }

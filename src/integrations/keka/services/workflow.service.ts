@@ -118,7 +118,7 @@ export class KekaWorkflowService {
     // 3. Resolve associated Job Description
     let jobDescription = "React Frontend Engineer with experience in Next.js, Node.js, TypeScript, and SQL databases.";
     if (candidate.job_id) {
-      const jobRes = await query("SELECT title, description FROM jobs WHERE id = $1", [candidate.job_id]);
+      const jobRes = await query("SELECT title, description FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;", [candidate.job_id]);
       if (jobRes.rowCount && jobRes.rowCount > 0) {
         jobDescription = `Job Title: ${jobRes.rows[0].title}\nDescription: ${jobRes.rows[0].description}`;
       }

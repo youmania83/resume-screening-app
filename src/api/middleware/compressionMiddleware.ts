@@ -87,14 +87,14 @@ export function compressionMiddleware() {
             console.error(`${compressionType} compression failed, falling back to uncompressed:`, err);
             res.removeHeader("Content-Encoding");
             res.setHeader("Content-Length", buffer.length);
-            originalWriteHead.call(res, statusCodeSaved, ...writeHeadArgsSaved);
-            originalWrite.call(res, buffer);
-            originalEnd.call(res, undefined, undefined, callback);
+            (originalWriteHead as any).call(res, statusCodeSaved, ...writeHeadArgsSaved);
+            (originalWrite as any).call(res, buffer);
+            (originalEnd as any).call(res, undefined, undefined, callback);
           } else {
             res.setHeader("Content-Length", compressed.length);
-            originalWriteHead.call(res, statusCodeSaved, ...writeHeadArgsSaved);
-            originalWrite.call(res, compressed);
-            originalEnd.call(res, undefined, undefined, callback);
+            (originalWriteHead as any).call(res, statusCodeSaved, ...writeHeadArgsSaved);
+            (originalWrite as any).call(res, compressed);
+            (originalEnd as any).call(res, undefined, undefined, callback);
           }
         };
 
@@ -105,9 +105,9 @@ export function compressionMiddleware() {
         }
       } else {
         res.setHeader("Content-Length", buffer.length);
-        originalWriteHead.call(res, statusCodeSaved, ...writeHeadArgsSaved);
-        originalWrite.call(res, buffer);
-        originalEnd.call(res, undefined, undefined, callback);
+        (originalWriteHead as any).call(res, statusCodeSaved, ...writeHeadArgsSaved);
+        (originalWrite as any).call(res, buffer);
+        (originalEnd as any).call(res, undefined, undefined, callback);
       }
 
       return this;

@@ -46,6 +46,17 @@ export class KekaCandidatesService {
   async syncCandidatesFromKeka(): Promise<void> {
     const candidates = await this.getCandidates();
     for (const c of candidates) {
+      let mappedJobId = c.jobId || null;
+      if (c.jobId) {
+        const jobCheck = await query(
+          "SELECT id FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;",
+          [c.jobId]
+        );
+        if (jobCheck.rowCount && jobCheck.rowCount > 0) {
+          mappedJobId = jobCheck.rows[0].id;
+        }
+      }
+
       await query(`
         INSERT INTO candidates (
           id, name, email, phone, role, score, match_percent, experience_years, 
@@ -85,7 +96,7 @@ export class KekaCandidatesService {
         c.assessmentScore ?? null,
         c.currentStage || "Applied", 
         new Date().toISOString(), 
-        c.jobId || null,
+        mappedJobId,
         c.external_id || c.id,
         c.source_system || "Keka",
         "synced"

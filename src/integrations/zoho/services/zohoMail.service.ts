@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getZohoAdapter } from "../adapters";
 import { query, transaction } from "../../../lib/db";
 import { kekaWorkflowService } from "../../keka/services/workflow.service";
+import { isNonResumeFile } from "../../../lib/fileFilters.js";
 
 // Helper for bulk insertions
 async function bulkInsert(client: any, table: string, columns: string[], rows: any[][]) {
@@ -130,22 +131,7 @@ export class ZohoMailService {
           if (msg.attachments && msg.attachments.length > 0) {
             for (const attachment of msg.attachments) {
               const ext = path.extname(attachment.filename).toLowerCase();
-              const lowerName = attachment.filename.toLowerCase();
-              const ignoreKeywords = [
-                "payslip", "pay slip", "pay_slip", "salary",
-                "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
-                "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
-                "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
-                "scan", "mri", "xray", "medical", "prescription",
-                "tender", "agreement", "contract", "proposal",
-                "issue", "incident", "log", "report", "reports",
-                "program", "training", "certificate", "course",
-                "signature", "logo", "image0",
-                "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
-              ];
-              const hasCv = /(?:^|[^a-z])cv(?:$|[^a-z])/i.test(attachment.filename);
-              const hasResumeKeyword = lowerName.includes("resume") || hasCv || lowerName.includes("curriculum");
-              const isIgnored = (ignoreKeywords.some(kw => lowerName.includes(kw)) || lowerName.includes(" to ")) && !hasResumeKeyword;
+              const isIgnored = isNonResumeFile(attachment.filename);
               const isDoc = [".pdf", ".docx", ".doc", ".txt"].includes(ext) && !isIgnored;
               
               if (isDoc && !resumeSaved) {
