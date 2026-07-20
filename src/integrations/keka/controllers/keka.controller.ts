@@ -6,6 +6,7 @@ import { kekaWebhooksService } from "../services/webhooks.service";
 import { kekaJobsService } from "../services/jobs.service";
 import { kekaCandidatesService } from "../services/candidates.service";
 import { validateWebhookSignature, processWebhookEvent } from "../webhooks/webhook.handlers";
+import { KekaCareersSyncService } from "../../../services/KekaCareersSyncService.js";
 
 export class KekaController {
   /**
@@ -72,15 +73,30 @@ export class KekaController {
     try {
       console.log("Starting manual Keka synchronization...");
       
-      // Synchronize Jobs
-      await kekaJobsService.syncJobsFromKeka();
-      
-      // Synchronize Candidates
-      await kekaCandidatesService.syncCandidatesFromKeka();
+      // 1. Synchronize Live Active Jobs directly from Keka Careers Portal
+      const careersSyncResult = await KekaCareersSyncService.syncActiveJobs();
+
+      // 2. Synchronize Jobs if API is configured
+      if (isKekaEnabled()) {
+        try {
+          await kekaJobsService.syncJobsFromKeka();
+        } catch (apiErr: any) {
+          console.warn("Keka API job sync skipped/warned:", apiErr.message);
+        }
+
+        // 3. Synchronize Candidates
+        try {
+          await kekaCandidatesService.syncCandidatesFromKeka();
+        } catch (candErr: any) {
+          console.warn("Keka API candidate sync skipped/warned:", candErr.message);
+        }
+      }
       
       res.json({
         success: true,
-        message: "Manual sync executed successfully. Jobs and candidates synchronized."
+        message: "Manual sync executed successfully. Jobs and candidates synchronized.",
+        syncedCount: careersSyncResult.syncedCount,
+        errors: careersSyncResult.errors
       });
     } catch (err: any) {
       console.error("Manual synchronization failed:", err);

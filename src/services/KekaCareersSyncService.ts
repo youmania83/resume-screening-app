@@ -72,6 +72,9 @@ export class KekaCareersSyncService {
       console.log(`[Keka Careers Sync] Retrieved ${rawJobs.length} active jobs from Keka Career portal.`);
 
       if (rawJobs.length === 0) {
+        await query(
+          "UPDATE jobs SET sync_status = 'removed', last_synced_at = NOW() WHERE source_system = 'Keka' AND (sync_status IS NULL OR sync_status != 'removed');"
+        );
         return { success: true, syncedCount: 0, errors: [] };
       }
 
@@ -206,18 +209,42 @@ ${plainDescription}`;
         }
       }
 
-      // Perform single bulk upsert
+      // Perform single bulk upsert with full field updates
       if (valuesArray.length > 0) {
         console.log(`[Keka Careers Sync] Performing bulk upsert of ${valuesArray.length / 14} job records...`);
         await query(
           `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, job_code, source_system, sync_status, last_synced_at)
            VALUES ${placeholders.join(", ")}
            ON CONFLICT (id) DO UPDATE SET
+             title = EXCLUDED.title,
+             description = EXCLUDED.description,
+             department = EXCLUDED.department,
+             location = EXCLUDED.location,
+             experience_required = EXCLUDED.experience_required,
+             jd = EXCLUDED.jd,
+             skills = EXCLUDED.skills,
+             work_mode = EXCLUDED.work_mode,
              job_code = EXCLUDED.job_code,
              last_synced_at = NOW(),
              sync_status = 'synced';`,
           valuesArray
         );
+      }
+
+      // Mark Keka jobs in the DB whose external_id is NOT in active Keka jobs response as 'removed'
+      const activeExternalIds = rawJobs.map(j => j.id.toString());
+      if (activeExternalIds.length > 0) {
+        const markRemovedRes = await query(
+          `UPDATE jobs 
+           SET sync_status = 'removed', last_synced_at = NOW() 
+           WHERE source_system = 'Keka' 
+             AND (sync_status IS NULL OR sync_status != 'removed') 
+             AND external_id NOT IN (${activeExternalIds.map((_, i) => `$${i + 1}`).join(", ")});`,
+          activeExternalIds
+        );
+        if (markRemovedRes.rowCount && markRemovedRes.rowCount > 0) {
+          console.log(`[Keka Careers Sync] Marked ${markRemovedRes.rowCount} removed Keka job(s) as 'removed'.`);
+        }
       }
 
       console.log(`✅ [Keka Careers Sync] Finished active jobs sync. Synced: ${syncedCount}, Errors: ${errors.length}`);

@@ -12,12 +12,14 @@ import { rateLimiter } from "../middleware/security.js";
 
 const router = Router();
 
-// GET /api/jobs - Fetch all jobs under tenant
+// GET /api/jobs - Fetch active jobs under tenant
 router.get("/", async (req, res, next) => {
   try {
-    const jobsRes = await queryTenant(
-      "SELECT * FROM jobs WHERE tenant_id = :tenant_id ORDER BY created_at DESC;"
-    );
+    const includeRemoved = req.query.include_removed === "true";
+    const sql = includeRemoved
+      ? "SELECT * FROM jobs WHERE tenant_id = :tenant_id ORDER BY created_at DESC;"
+      : "SELECT * FROM jobs WHERE tenant_id = :tenant_id AND (sync_status IS NULL OR sync_status != 'removed') ORDER BY created_at DESC;";
+    const jobsRes = await queryTenant(sql);
     res.json({ success: true, jobs: jobsRes.rows });
   } catch (err) {
     next(err);
