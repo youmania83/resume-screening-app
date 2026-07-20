@@ -426,6 +426,69 @@ setTimeout(async () => {
   }
 }, 10000);
 
+// Trigger initial Assessment Reminders check at startup (15s delay)
+setTimeout(async () => {
+  try {
+    console.log("⏰ [Startup] Triggering initial assessment reminders check...");
+    const { queryGlobal } = await import("../lib/tenantDb.js");
+    const { sendAssessmentReminderEmail } = await import("../lib/email.js");
+
+    const candidatesRes = await queryGlobal(`
+      SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry, c.tenant_id,
+             COALESCE(j.title, c.role) as job_title
+      FROM candidates c
+      LEFT JOIN jobs j ON c.job_id = j.id
+      WHERE c.status = 'shortlisted'
+        AND c.assessment_status = 'pending'
+        AND c.assessment_token IS NOT NULL
+        AND c.assessment_token_expiry > CURRENT_TIMESTAMP;
+    `);
+
+    let remindersSent = 0;
+    for (const candidate of candidatesRes.rows) {
+      const expiry = new Date(candidate.assessment_token_expiry).getTime();
+      const now = Date.now();
+      const msDiff = expiry - now;
+      const remainingDays = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+
+      if (remainingDays === 3 || remainingDays === 1) {
+        const thresholdMsg = `Assessment reminder sent. ${remainingDays} days remaining.`;
+
+        const checkLog = await queryGlobal(`
+          SELECT COUNT(*) as count 
+          FROM candidate_activity_logs 
+          WHERE candidate_id = $1 
+            AND event_type = 'assessment_reminder' 
+            AND message = $2;
+        `, [candidate.id, thresholdMsg]);
+
+        if (Number(checkLog.rows[0].count) === 0) {
+          console.log(`✉️ [Startup] Sending assessment reminder to ${candidate.email} (${remainingDays} days remaining)`);
+          
+          await sendAssessmentReminderEmail({
+            candidateName: candidate.name,
+            candidateEmail: candidate.email,
+            jobTitle: candidate.job_title,
+            token: candidate.assessment_token,
+            remainingDays,
+            tenantId: candidate.tenant_id
+          });
+
+          await queryGlobal(`
+            INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+            VALUES ($1, 'assessment_reminder', $2, $3);
+          `, [candidate.id, thresholdMsg, candidate.tenant_id]);
+
+          remindersSent++;
+        }
+      }
+    }
+    console.log(`✅ [Startup] Assessment reminders check complete. Reminders sent: ${remindersSent}`);
+  } catch (err: any) {
+    console.error("🚨 [Startup] Initial assessment reminders check failed:", err.message || err);
+  }
+}, 15000);
+
 // Boot inline BullMQ Resume Worker — processes queue items automatically
 try {
   const inlineResumeWorker = new Worker(
