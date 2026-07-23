@@ -215,13 +215,24 @@ export class EmailSyncService {
         // 2. Process according to classification
         if (matchedRule && matchedRule.type === "jd") {
           // PATH A: Ingest Job Description (JD)
+          // Deduplication Check: Check if we already ingested this email ID as a job
+          const duplicateCheck = await queryGlobal(
+            `SELECT id FROM jobs WHERE external_id = $1 AND source_system = 'Email' AND tenant_id = $2 LIMIT 1;`,
+            [email.id, tenantId]
+          );
+
+          if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
+            console.log(`[Email Sync] Skipping duplicate Job Description email already in database: "${subject}" (Email ID: ${email.id})`);
+            continue;
+          }
+
           console.log(`[Email Sync] Ingesting Job Description from email: "${subject}"`);
           const jdExtract = await JobExtractionService.extractFromEmail(subject, body);
           const jobId = crypto.randomUUID();
 
           await queryGlobal(
-            `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`,
+            `INSERT INTO jobs (id, tenant_id, title, description, department, location, experience_required, jd, skills, work_mode, external_id, source_system, sync_status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);`,
             [
               jobId,
               tenantId,
@@ -232,7 +243,10 @@ export class EmailSyncService {
               jdExtract.experienceRequired || "Not Specified",
               JSON.stringify(jdExtract),
               jdExtract.skills || [],
-              jdExtract.workMode || "Remote"
+              jdExtract.workMode || "Remote",
+              email.id,
+              "Email",
+              "synced"
             ]
           );
 
