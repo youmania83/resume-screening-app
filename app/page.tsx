@@ -33,7 +33,7 @@ export default function Dashboard() {
       const trySilentLogin = async () => {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
         try {
-          const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST" });
+          const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST", credentials: "include" });
           if (res.ok) {
             const data = await res.json();
             if (data.success && data.user) {
@@ -60,7 +60,7 @@ export default function Dashboard() {
   const handleLogout = async () => {
     const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
     try {
-      await fetch(`${apiBase}/auth/logout`, { method: "POST" })
+      await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "include" })
     } catch (e) {
       console.warn("Backend logout call failed", e)
     }
@@ -118,7 +118,9 @@ export default function Dashboard() {
     isEditingJD,
     setIsEditingJD,
     handleJdExtract,
-    saveOrUpdateJob
+    saveOrUpdateJob,
+    isSyncingKeka,
+    syncKekaJobs
   } = useJobs(!!user)
 
   const {
@@ -179,7 +181,8 @@ export default function Dashboard() {
         headers: {
           "Content-Type": "application/json",
           "x-tenant-id": user?.tenantId || "default-tenant"
-        }
+        },
+        credentials: "include"
       })
       if (resp.ok) {
         const data = await resp.json()
@@ -392,7 +395,7 @@ export default function Dashboard() {
           {activeTab === "inbox" && <InboxView />}
 
           {activeTab === "dashboard" && <OverviewView candidates={candidates} />}
-          {activeTab === "jobs" && <JobsView jobs={jobs} setActiveTab={setActiveTab} setImportTab={setImportTab} setActiveJD={setActiveJD} />}
+          {activeTab === "jobs" && <JobsView jobs={jobs} setActiveTab={setActiveTab} setImportTab={setImportTab} setActiveJD={setActiveJD} onKekaSync={syncKekaJobs} isSyncingKeka={isSyncingKeka} />}
           {activeTab === "candidates" && (
             <CandidatesView
               candidates={candidates}

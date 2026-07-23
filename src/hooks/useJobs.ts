@@ -14,12 +14,13 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
 
   const [isExtracting, setIsExtracting] = useState(false);
   const [isEditingJD, setIsEditingJD] = useState(false);
+  const [isSyncingKeka, setIsSyncingKeka] = useState(false);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const loadJobs = useCallback(async () => {
     try {
-      const resp = await fetch(`${apiBase}/jobs`);
+      const resp = await fetch(`${apiBase}/jobs`, { credentials: "include" });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.jobs)) {
@@ -111,7 +112,8 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         const res = await fetch(`${apiBase}/jobs/${existingJob.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+          credentials: "include"
         });
         if (res.ok) {
           toast.success(`Job "${jd.title}" updated successfully.`);
@@ -122,7 +124,8 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         const res = await fetch(`${apiBase}/jobs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+          credentials: "include"
         });
         if (res.ok) {
           toast.success(`Job "${jd.title}" saved to database.`);
@@ -175,7 +178,8 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
       const resp = await fetch(`${apiBase}/jobs/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body
+        body,
+        credentials: "include"
       });
 
       if (resp.ok) {
@@ -213,6 +217,32 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
     setIsExtracting(false);
   };
 
+  const syncKekaJobs = async () => {
+    setIsSyncingKeka(true);
+    const toastId = toast.loading("Syncing active jobs from Keka Careers...");
+    try {
+      const resp = await fetch(`${apiBase}/integrations/keka/sync`, {
+        method: "POST",
+        credentials: "include"
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success) {
+          toast.success(`Successfully synced ${data.syncedCount} jobs from Keka!`, { id: toastId });
+          await loadJobs();
+        } else {
+          toast.error(`Sync failed: ${data.error || "Unknown error"}`, { id: toastId });
+        }
+      } else {
+        toast.error("Failed to connect to sync endpoint.", { id: toastId });
+      }
+    } catch (e: any) {
+      toast.error(`Connection error: ${e.message}`, { id: toastId });
+    } finally {
+      setIsSyncingKeka(false);
+    }
+  };
+
   return {
     jobs,
     setJobs,
@@ -231,6 +261,8 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
     setIsEditingJD,
     handleJdExtract,
     saveOrUpdateJob,
-    loadJobs
+    loadJobs,
+    isSyncingKeka,
+    syncKekaJobs
   };
 }

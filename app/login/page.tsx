@@ -17,7 +17,7 @@ export default function LoginPage() {
     const checkSilentLogin = async () => {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
       try {
-        const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST" });
+        const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST", credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.user) {
@@ -50,6 +50,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
+        credentials: "include"
       });
 
       const data = await res.json();
@@ -118,6 +119,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, rememberMe }),
+        credentials: "include"
       });
 
       const data = await res.json();

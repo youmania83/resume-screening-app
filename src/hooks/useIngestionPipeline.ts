@@ -142,7 +142,8 @@ export function useIngestionPipeline({
         method: "POST",
         headers: { "X-Client-ID": clientId },
         body: formData,
-        signal: controller.signal
+        signal: controller.signal,
+        credentials: "include"
       });
       clearTimeout(timeoutId);
 

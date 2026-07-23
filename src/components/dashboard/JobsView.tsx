@@ -1,7 +1,7 @@
 // src/components/dashboard/JobsView.tsx
 import React from "react";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -13,9 +13,18 @@ interface JobsViewProps {
   setActiveTab: (tab: any) => void;
   setImportTab: (tab: any) => void;
   setActiveJD: (jd: StructuredJD) => void;
+  onKekaSync?: () => Promise<void>;
+  isSyncingKeka?: boolean;
 }
 
-export function JobsView({ jobs, setActiveTab, setImportTab, setActiveJD }: JobsViewProps) {
+export function JobsView({
+  jobs,
+  setActiveTab,
+  setImportTab,
+  setActiveJD,
+  onKekaSync,
+  isSyncingKeka = false
+}: JobsViewProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 5 }}
@@ -29,18 +38,32 @@ export function JobsView({ jobs, setActiveTab, setImportTab, setActiveJD }: Jobs
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Enterprise Job Listings</h2>
           <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Manage positions and respective AI search vectors.</p>
         </div>
-        <Button
-          variant="default"
-          size="sm"
-          className="text-xs font-semibold gap-1.5"
-          onClick={() => {
-            setActiveTab("screening");
-            setImportTab("url");
-            toast.info("Import a new Job Description workspace.");
-          }}
-        >
-          <Plus className="h-3.5 w-3.5" /> Import New Position
-        </Button>
+        <div className="flex items-center gap-2">
+          {onKekaSync && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs font-semibold gap-1.5 border-border text-foreground bg-background hover:bg-muted"
+              onClick={onKekaSync}
+              disabled={isSyncingKeka}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isSyncingKeka ? "animate-spin" : ""}`} />
+              {isSyncingKeka ? "Syncing..." : "Sync Keka Jobs"}
+            </Button>
+          )}
+          <Button
+            variant="default"
+            size="sm"
+            className="text-xs font-semibold gap-1.5"
+            onClick={() => {
+              setActiveTab("screening");
+              setImportTab("url");
+              toast.info("Import a new Job Description workspace.");
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" /> Import New Position
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

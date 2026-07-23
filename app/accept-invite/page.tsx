@@ -33,6 +33,7 @@ function AcceptInviteForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, name, password }),
+        credentials: "include"
       });
 
       const data = await res.json();

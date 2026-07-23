@@ -25,7 +25,7 @@ export function useCandidates(isLoggedIn?: boolean) {
 
   const loadCandidates = useCallback(async () => {
     try {
-      const resp = await fetch(`${apiBase}/candidates`);
+      const resp = await fetch(`${apiBase}/candidates`, { credentials: "include" });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.candidates)) {
@@ -134,7 +134,8 @@ export function useCandidates(isLoggedIn?: boolean) {
       const resp = await fetch(`${apiBase}/candidates/${id}/submit-assessment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score })
+        body: JSON.stringify({ score }),
+        credentials: "include"
       });
 
       if (resp.ok) {
@@ -209,7 +210,8 @@ export function useCandidates(isLoggedIn?: boolean) {
       const resp = await fetch(`${apiBase}/candidates/${id}/submit-interview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, feedback })
+        body: JSON.stringify({ decision, feedback }),
+        credentials: "include"
       });
 
       if (resp.ok) {
@@ -269,7 +271,10 @@ export function useCandidates(isLoggedIn?: boolean) {
     }, 100);
 
     try {
-      const resp = await fetch(`${apiBase}/candidates/${id}/onboard`, { method: "POST" });
+      const resp = await fetch(`${apiBase}/candidates/${id}/onboard`, {
+        method: "POST",
+        credentials: "include"
+      });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success) {
@@ -315,7 +320,10 @@ export function useCandidates(isLoggedIn?: boolean) {
     toast.success("Candidate profile removed.");
 
     try {
-      const resp = await fetch(`${apiBase}/candidates/${id}`, { method: "DELETE" });
+      const resp = await fetch(`${apiBase}/candidates/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
       if (!resp.ok) {
         throw new Error("Delete failed on server");
       }
@@ -338,7 +346,8 @@ export function useCandidates(isLoggedIn?: boolean) {
       const resp = await fetch(`${apiBase}/candidates/${id}/decision`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: newStatus })
+        body: JSON.stringify({ decision: newStatus }),
+        credentials: "include"
       });
 
       if (resp.ok) {
