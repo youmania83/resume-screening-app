@@ -21,9 +21,10 @@ export class DeepSeekLLMAdapter implements LLMAdapter {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🤖 DeepSeek (chat) API request (Attempt ${attempt}/${maxRetries})...`);
+        const modelName = process.env.DEEPSEEK_MODEL || "deepseek-v4-pro";
+        console.log(`🤖 DeepSeek (${modelName}) API request (Attempt ${attempt}/${maxRetries})...`);
         const completion = await openai.chat.completions.create({
-          model: "deepseek-chat",
+          model: modelName,
           messages: [{ role: "user", content: prompt }],
           temperature,
           max_tokens: maxTokens,
