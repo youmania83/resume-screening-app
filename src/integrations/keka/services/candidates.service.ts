@@ -106,6 +106,30 @@ export class KekaCandidatesService {
       ]);
     }
   }
+
+  // Sequentially screen candidates that have not been evaluated yet
+  async screenUnscreenedCandidates(): Promise<void> {
+    const unscreened = await query(
+      "SELECT id, name FROM candidates WHERE source_system = 'Keka' AND (score = 0 OR score IS NULL) LIMIT 10;"
+    );
+    if (!unscreened.rowCount || unscreened.rowCount === 0) {
+      return;
+    }
+
+    console.log(`[Auto Screening] Found ${unscreened.rowCount} unscreened Keka candidates. Screening them sequentially...`);
+    
+    for (const row of unscreened.rows) {
+      try {
+        const { kekaWorkflowService } = await import("./workflow.service.js");
+        console.log(`[Auto Screening] Screening Keka candidate: ${row.name} (${row.id})...`);
+        await kekaWorkflowService.screenCandidate(row.id);
+        // Sleep for 3 seconds between candidates to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } catch (err: any) {
+        console.error(`[Auto Screening] Failed to screen candidate ${row.name}:`, err.message || err);
+      }
+    }
+  }
 }
 
 export const kekaCandidatesService = new KekaCandidatesService();

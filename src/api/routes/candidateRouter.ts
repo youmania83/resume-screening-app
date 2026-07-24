@@ -40,7 +40,7 @@ router.get("/recruiters/list", async (req, res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 500));
     const offset = (page - 1) * limit;
 
     const sortBy = ["created_at", "score", "name", "applied_date", "final_score"].includes(req.query.sortBy as string)

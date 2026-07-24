@@ -392,6 +392,11 @@ cron.schedule("0 */3 * * *", () => {
         try {
           await kekaCandidatesService.syncCandidatesFromKeka();
           console.log("✅ [Cron] Keka API candidates sync complete.");
+          
+          // Trigger sequential candidate screening in the background
+          kekaCandidatesService.screenUnscreenedCandidates().catch(err => {
+            console.error("🚨 [Cron] Keka auto-screening failed:", err.message || err);
+          });
         } catch (candErr: any) {
           console.error("🚨 [Cron] Keka API candidates sync failed:", candErr.message || candErr);
         }
@@ -427,6 +432,11 @@ setTimeout(async () => {
       try {
         await kekaCandidatesService.syncCandidatesFromKeka();
         console.log("✅ [Startup] Initial Keka API candidates sync complete.");
+        
+        // Trigger sequential candidate screening in the background on startup
+        kekaCandidatesService.screenUnscreenedCandidates().catch(err => {
+          console.error("🚨 [Startup] Keka auto-screening failed:", err.message || err);
+        });
       } catch (candErr: any) {
         console.error("🚨 [Startup] Initial Keka API candidates sync failed:", candErr.message || candErr);
       }
