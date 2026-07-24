@@ -44,6 +44,7 @@ export class KekaCandidatesService {
 
   // Sync candidate details from Keka into local database
   async syncCandidatesFromKeka(): Promise<void> {
+    const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
     const candidates = await this.getCandidates();
     for (const c of candidates) {
       let mappedJobId = c.jobId || null;
@@ -59,12 +60,13 @@ export class KekaCandidatesService {
 
       await query(`
         INSERT INTO candidates (
-          id, name, email, phone, role, score, match_percent, experience_years, 
+          id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
           status, application_source, assessment_score, keka_status, applied_date, 
           job_id, external_id, source_system, sync_status, last_synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
         ON CONFLICT (id) DO UPDATE SET
+          tenant_id = EXCLUDED.tenant_id,
           name = EXCLUDED.name,
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
@@ -84,6 +86,7 @@ export class KekaCandidatesService {
           last_synced_at = EXCLUDED.last_synced_at
       `, [
         c.id,
+        targetTenantId,
         c.name,
         c.email,
         c.phone || null,
