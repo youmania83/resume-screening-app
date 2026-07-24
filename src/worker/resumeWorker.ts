@@ -243,7 +243,17 @@ export async function parseAndEvalResume(
       // Check text readability
       const validateRes = validateResumeText(rawText);
       if (!validateRes.valid) {
-        throw new Error(validateRes.reason);
+        // Gracefully handle unreadable resumes (image-only PDFs, empty files, etc.)
+        // Do NOT throw — that would cause BullMQ to mark the job as failed and retry.
+        // Instead, mark the inbox item and return cleanly.
+        const reason = validateRes.reason || "Resume text is unreadable or too short.";
+        console.warn(`[Worker] Unreadable resume for inbox ${inboxId}: ${reason}`);
+        await queryGlobal(
+          `UPDATE resume_inbox SET status = 'Unreadable', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;`,
+          [reason, inboxId]
+        );
+        await logProcessingStep(tenantId, inboxId, null, "Parsing", "Skipped", "System", 0, reason);
+        return;
       }
 
       const parseDuration = Date.now() - parseStart;
