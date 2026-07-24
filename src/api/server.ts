@@ -371,9 +371,31 @@ cron.schedule("0 */3 * * *", () => {
   runWithLock("cron:keka-careers-active-sync", 3600, async () => {
     try {
       const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
+      const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
+      
       console.log("⏰ [Cron] Starting Keka Careers active jobs sync...");
       const result = await KekaCareersSyncService.syncActiveJobs();
       console.log(`✅ [Cron] Keka Careers sync complete. Synced: ${result.syncedCount}, Errors: ${result.errors.length}`);
+
+      if (isKekaEnabled()) {
+        console.log("⏰ [Cron] Starting Keka Developer API jobs and candidates sync...");
+        const { kekaJobsService } = await import("../integrations/keka/services/jobs.service.js");
+        const { kekaCandidatesService } = await import("../integrations/keka/services/candidates.service.js");
+        
+        try {
+          await kekaJobsService.syncJobsFromKeka();
+          console.log("✅ [Cron] Keka API jobs sync complete.");
+        } catch (jobErr: any) {
+          console.error("🚨 [Cron] Keka API jobs sync failed:", jobErr.message || jobErr);
+        }
+
+        try {
+          await kekaCandidatesService.syncCandidatesFromKeka();
+          console.log("✅ [Cron] Keka API candidates sync complete.");
+        } catch (candErr: any) {
+          console.error("🚨 [Cron] Keka API candidates sync failed:", candErr.message || candErr);
+        }
+      }
     } catch (err: any) {
       console.error("🚨 [Cron] Keka Careers sync failed:", err.message || err);
     }
@@ -384,11 +406,33 @@ cron.schedule("0 */3 * * *", () => {
 setTimeout(async () => {
   try {
     const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
+    const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
+
     console.log("⏰ [Startup] Triggering initial Keka Careers active jobs sync...");
     const result = await KekaCareersSyncService.syncActiveJobs();
     console.log(`✅ [Startup] Initial Keka Careers sync complete. Synced: ${result.syncedCount}, Errors: ${result.errors.length}`);
+
+    if (isKekaEnabled()) {
+      console.log("⏰ [Startup] Triggering Keka Developer API jobs and candidates sync...");
+      const { kekaJobsService } = await import("../integrations/keka/services/jobs.service.js");
+      const { kekaCandidatesService } = await import("../integrations/keka/services/candidates.service.js");
+      
+      try {
+        await kekaJobsService.syncJobsFromKeka();
+        console.log("✅ [Startup] Initial Keka API jobs sync complete.");
+      } catch (jobErr: any) {
+        console.error("🚨 [Startup] Initial Keka API jobs sync failed:", jobErr.message || jobErr);
+      }
+
+      try {
+        await kekaCandidatesService.syncCandidatesFromKeka();
+        console.log("✅ [Startup] Initial Keka API candidates sync complete.");
+      } catch (candErr: any) {
+        console.error("🚨 [Startup] Initial Keka API candidates sync failed:", candErr.message || candErr);
+      }
+    }
   } catch (err: any) {
-    console.error("🚨 [Startup] Initial Keka Careers sync failed:", err.message || err);
+    console.error("🚨 [Startup] Initial Keka sync failed:", err.message || err);
   }
 }, 5000);
 
