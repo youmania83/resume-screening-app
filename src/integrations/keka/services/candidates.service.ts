@@ -110,7 +110,7 @@ export class KekaCandidatesService {
   // Sequentially screen candidates that have not been evaluated yet
   async screenUnscreenedCandidates(): Promise<void> {
     const unscreened = await query(
-      "SELECT id, name FROM candidates WHERE source_system = 'Keka' AND (score = 0 OR score IS NULL) LIMIT 10;"
+      "SELECT id, name FROM candidates WHERE source_system = 'Keka' AND (score = 0 OR score IS NULL) ORDER BY applied_date DESC, created_at DESC LIMIT 50;"
     );
     if (!unscreened.rowCount || unscreened.rowCount === 0) {
       return;
