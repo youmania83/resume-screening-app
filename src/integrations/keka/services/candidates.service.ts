@@ -83,7 +83,8 @@ export class KekaCandidatesService {
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
           keka_status = EXCLUDED.keka_status,
-          applied_date = EXCLUDED.applied_date,
+          -- Preserve original applied_date; don't reset it on every sync
+          applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
           -- Only update job_id if we don't already have one from email pipeline
           job_id = COALESCE(candidates.job_id, EXCLUDED.job_id),
           external_id = EXCLUDED.external_id,
