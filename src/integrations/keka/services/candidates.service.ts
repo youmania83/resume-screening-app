@@ -71,10 +71,15 @@ export class KekaCandidatesService {
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
           role = EXCLUDED.role,
-          score = EXCLUDED.score,
-          match_percent = EXCLUDED.match_percent,
+          -- Keep computed AI scores on conflict
+          -- score = EXCLUDED.score,
+          -- match_percent = EXCLUDED.match_percent,
           experience_years = EXCLUDED.experience_years,
-          status = EXCLUDED.status,
+          -- Keep our shortlisted / Review statuses on conflict unless rejected
+          status = CASE 
+            WHEN EXCLUDED.status = 'rejected' THEN 'rejected'
+            ELSE candidates.status 
+          END,
           application_source = EXCLUDED.application_source,
           assessment_score = EXCLUDED.assessment_score,
           keka_status = EXCLUDED.keka_status,
@@ -98,7 +103,7 @@ export class KekaCandidatesService {
         "Keka Integration", 
         c.assessmentScore ?? null,
         c.currentStage || "Applied", 
-        new Date().toISOString(), 
+        c.appliedDate || new Date().toISOString(), 
         mappedJobId,
         c.external_id || c.id,
         c.source_system || "Keka",
