@@ -10,19 +10,19 @@ const breakers: Record<string, CircuitBreaker<string>> = {
   DeepSeek: new CircuitBreaker("DeepSeek-LLM", {
     failureThreshold: 3,
     recoveryTimeoutMs: 30000,
-    requestTimeoutMs: 15000, // 15s timeout
+    requestTimeoutMs: 60000, // 60s timeout for large generations
     maxConcurrentRequests: 5
   }),
   OpenAI: new CircuitBreaker("OpenAI-LLM", {
     failureThreshold: 3,
     recoveryTimeoutMs: 30000,
-    requestTimeoutMs: 15000,
+    requestTimeoutMs: 60000,
     maxConcurrentRequests: 5
   }),
   Gemini: new CircuitBreaker("Gemini-LLM", {
     failureThreshold: 3,
     recoveryTimeoutMs: 30000,
-    requestTimeoutMs: 15000,
+    requestTimeoutMs: 60000,
     maxConcurrentRequests: 5
   })
 };
@@ -45,7 +45,7 @@ export class AIService {
     const breaker = breakers[providerName] || new CircuitBreaker(providerName, {
       failureThreshold: 3,
       recoveryTimeoutMs: 30000,
-      requestTimeoutMs: 15000
+      requestTimeoutMs: 60000
     });
 
     try {
@@ -72,7 +72,7 @@ export class AIService {
           const fallbackBreaker = breakers[fallback.name] || new CircuitBreaker(fallback.name, {
             failureThreshold: 3,
             recoveryTimeoutMs: 30000,
-            requestTimeoutMs: 15000
+            requestTimeoutMs: 60000
           });
 
           return await fallbackBreaker.execute(
