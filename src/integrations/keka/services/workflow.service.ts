@@ -1,5 +1,7 @@
 // src/integrations/keka/services/workflow.service.ts
 import crypto from "crypto";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 
 import { query } from "../../../lib/db";
 import { kekaApplicationsService } from "./applications.service";
@@ -90,7 +92,7 @@ export class KekaWorkflowService {
             Projects: Daily Planet News CMS - React frontend, Node.js backend.
           `;
         } else {
-          const pdfParse = await import("pdf-parse");
+          const pdfParse = require("pdf-parse");
           let parsedText = "";
           if (typeof pdfParse === 'function') {
             const data = await (pdfParse as any)(resumeBuffer);

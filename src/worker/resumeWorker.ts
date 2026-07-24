@@ -1,6 +1,8 @@
 // src/worker/resumeWorker.ts
 import dns from "dns";
 dns.setDefaultResultOrder("ipv4first");
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 
 import { Worker, Job } from "bullmq";
 import fs from "fs";
@@ -209,7 +211,7 @@ export async function parseAndEvalResume(
         rawText = result.text;
       } else {
         if (ext === ".pdf") {
-          const pdfParse = await import("pdf-parse");
+          const pdfParse = require("pdf-parse");
           let parsedText = "";
           if (typeof pdfParse === 'function') {
             const data = await (pdfParse as any)(fileBuffer);
