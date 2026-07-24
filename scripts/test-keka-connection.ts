@@ -40,27 +40,46 @@ async function main() {
     });
 
     if (jobs.length > 0) {
-      console.log("\n🔄 Fetching candidates for the first job...");
-      const candidates = await adapter.getCandidatesForJob(jobs[0].id);
-      console.log(`✅ Success! Fetched ${candidates.length} candidates.`);
+      let candidates: any[] = [];
+      let activeJob: any = null;
 
-      candidates.slice(0, 3).forEach((cand) => {
-        console.log(`- Candidate: ${cand.name} (${cand.email})`);
-        console.log(`  ID: ${cand.id}`);
-        console.log(`  Stage: ${cand.currentStage || "N/A"}`);
-        console.log("-------------------------------------");
-      });
+      console.log("\n🔄 Finding a job that has candidates to test candidate and resume endpoints...");
+      for (const job of jobs) {
+        const cands = await adapter.getCandidatesForJob(job.id);
+        if (cands.length > 0) {
+          candidates = cands;
+          activeJob = job;
+          break;
+        }
+      }
 
-      if (candidates.length > 0) {
+      if (activeJob) {
+        console.log(`✅ Success! Found job "${activeJob.title}" with ${candidates.length} candidates.`);
+
+        candidates.slice(0, 3).forEach((cand) => {
+          console.log(`- Candidate: ${cand.name} (${cand.email})`);
+          console.log(`  ID: ${cand.id}`);
+          console.log(`  Stage: ${cand.currentStage || "N/A"}`);
+          console.log("-------------------------------------");
+        });
+
         const testCand = candidates[0];
-        console.log(`\n🔄 Attempting to fetch resume download URL/documents for candidate: ${testCand.name} (${testCand.id})...`);
+        console.log(`\n🔄 Attempting to fetch resume documents for candidate: ${testCand.name} (${testCand.id})...`);
         const docs = await adapter.getDocuments(testCand.id);
         console.log(`✅ Success! Found ${docs.length} documents.`);
         docs.forEach(doc => {
           console.log(`- File Name: ${doc.title}`);
           console.log(`  Type: ${doc.documentType}`);
-          console.log(`  URL: ${doc.fileUrl}`);
+          console.log(`  URL: ${doc.fileUrl.substring(0, 80)}...`);
         });
+
+        if (docs.length > 0) {
+          console.log(`\n🔄 Testing resume download/buffer retrieval for candidate: ${testCand.name}...`);
+          const buffer = await adapter.downloadResume(testCand.id);
+          console.log(`✅ Success! Downloaded resume buffer (${buffer.length} bytes).`);
+        }
+      } else {
+        console.log("⚠️ Could not find any jobs with active candidates to test candidate/resume endpoints.");
       }
     }
   } catch (error: any) {

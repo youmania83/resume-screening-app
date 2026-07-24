@@ -267,9 +267,9 @@ export class KekaWorkflowService {
     let status = "applied";
     let activityLog = "";
 
-    // Fetch candidate name & job details
+    // Fetch candidate name, job details, and existing assessment state
     const candRes = await query(`
-      SELECT c.name, c.email, c.job_id, j.title, j.description 
+      SELECT c.name, c.email, c.job_id, c.assessment_token, c.assessment_status, j.title, j.description 
       FROM candidates c 
       LEFT JOIN jobs j ON c.job_id = j.id 
       WHERE c.id = $1
@@ -278,7 +278,7 @@ export class KekaWorkflowService {
     if (!candRes.rowCount || candRes.rowCount === 0) {
       throw new Error(`Candidate details query failed for ${candidateId}`);
     }
-    const { name, email, job_id: jobId, title: jobTitle, description: jobDesc } = candRes.rows[0];
+    const { name, email, job_id: jobId, assessment_token: existingToken, assessment_status: existingStatus, title: jobTitle, description: jobDesc } = candRes.rows[0];
 
     if (aiScore < 60) {
       targetStage = "Rejected";
@@ -299,6 +299,18 @@ export class KekaWorkflowService {
     else {
       targetStage = "Assessment";
       status = "shortlisted";
+
+      if (existingToken && existingStatus && existingStatus !== "rejected") {
+        console.log(`ℹ️ Candidate ${candidateId} already has an active assessment (${existingStatus}). Skipping duplicate invitation email.`);
+        return {
+          candidateId,
+          score: aiScore,
+          targetStage,
+          status,
+          log: `Candidate already has active assessment. Invitation email skipped to prevent spam.`
+        };
+      }
+      
       activityLog = `Candidate qualified for Assessment (Score ${aiScore}/100 >= 80). Generating MCQ link and sending invite email.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "Assessment");

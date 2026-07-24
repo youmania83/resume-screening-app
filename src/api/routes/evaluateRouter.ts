@@ -329,15 +329,17 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
         ]
       );
 
-      // Send immediate Application Acknowledgement Email
-      try {
-        await sendApplicationAcknowledgementEmail({
-          candidateName: parsedResult.name || "Candidate",
-          candidateEmail: parsedResult.email || "",
-          tenantId
-        });
-      } catch (ackErr) {
-        console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+      // Send immediate Application Acknowledgement Email only if candidate is NOT immediately invited to assessment
+      if (score < 80) {
+        try {
+          await sendApplicationAcknowledgementEmail({
+            candidateName: parsedResult.name || "Candidate",
+            candidateEmail: parsedResult.email || "",
+            tenantId
+          });
+        } catch (ackErr) {
+          console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+        }
       }
 
       await queryTenant(

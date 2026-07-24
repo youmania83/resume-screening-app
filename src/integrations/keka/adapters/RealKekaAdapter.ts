@@ -93,7 +93,8 @@ export class RealKekaAdapter implements ATSAdapter {
       throw new Error(`Keka API - getJobs failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const rawJobs = await response.json() as any[];
+    const result = await response.json() as any;
+    const rawJobs = (result.data || []) as any[];
     return rawJobs.map((job: any) => ({
       id: job.id,
       title: job.title,
@@ -154,7 +155,8 @@ export class RealKekaAdapter implements ATSAdapter {
       throw new Error(`Keka API - getCandidatesForJob failed for ${jobId}: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const rawCandidates = await response.json() as any[];
+    const result = await response.json() as any;
+    const rawCandidates = (result.data || []) as any[];
     return rawCandidates.map((cand: any) => ({
       id: cand.id,
       jobId: jobId,
@@ -272,13 +274,14 @@ export class RealKekaAdapter implements ATSAdapter {
         }
       });
       if (response.ok) {
-        const data = await response.json() as { fileUrl?: string };
-        if (data.fileUrl) {
+        const result = await response.json() as any;
+        const fileUrl = result.data?.fileUrl;
+        if (fileUrl) {
           return [{
             id: `resume-${candidateId}`,
             candidateId,
             title: "resume.pdf",
-            fileUrl: data.fileUrl,
+            fileUrl: fileUrl,
             documentType: "Resume",
             uploadedAt: new Date()
           }];
@@ -307,12 +310,13 @@ export class RealKekaAdapter implements ATSAdapter {
       throw new Error(`Keka API - Fetch resume URL failed for candidate ${candidateId}: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json() as { fileUrl?: string };
-    if (!data.fileUrl) {
+    const result = await response.json() as any;
+    const fileUrl = result.data?.fileUrl;
+    if (!fileUrl) {
       throw new Error(`Keka API - No resume file URL returned for candidate ${candidateId}`);
     }
 
-    const fileResponse = await fetch(data.fileUrl);
+    const fileResponse = await fetch(fileUrl);
     if (!fileResponse.ok) {
       throw new Error(`Keka API - Failed to download file from resume URL: ${fileResponse.status} ${fileResponse.statusText}`);
     }

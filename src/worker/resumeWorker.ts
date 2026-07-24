@@ -384,6 +384,7 @@ export async function parseAndEvalResume(
       // 4. Candidate Deduplication Scans
       let primaryCandidateId: string | null = null;
       let dupReason = "";
+      let hasSentAssessmentInvite = false;
 
       // Check email
       if (parsedData.email) {
@@ -571,16 +572,7 @@ export async function parseAndEvalResume(
       // Increment monthly candidate counts
       await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
 
-      // Send immediate Application Acknowledgement Email
-      try {
-        await sendApplicationAcknowledgementEmail({
-          candidateName,
-          candidateEmail: parsedData.email || "",
-          tenantId
-        });
-      } catch (ackErr) {
-        console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
-      }
+      // Application acknowledgement email sending is deferred until after scoring and assessment invitation status is determined.
 
       // If duplicate, link it in duplicate_candidates table
       if (primaryCandidateId) {
@@ -709,6 +701,8 @@ export async function parseAndEvalResume(
               expiryDate: expiry,
               tenantId
             });
+            
+            hasSentAssessmentInvite = true;
 
             await queryGlobal(
               `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
@@ -790,6 +784,19 @@ export async function parseAndEvalResume(
            VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', 'Candidate automatically placed in HR Review because no matching job opening met the 50% score threshold.');`,
           [crypto.randomUUID(), tenantId, candidateId]
         );
+      }
+
+      // 6.5 Send immediate Application Acknowledgement Email only if not duplicate and not invited to assessment
+      if (!primaryCandidateId && !hasSentAssessmentInvite) {
+        try {
+          await sendApplicationAcknowledgementEmail({
+            candidateName,
+            candidateEmail: parsedData.email || "",
+            tenantId
+          });
+        } catch (ackErr) {
+          console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
+        }
       }
 
       const matchDuration = Date.now() - matchStart;
