@@ -73,52 +73,90 @@ export class KekaWorkflowService {
     }
     const candidate = res.rows[0];
 
-    // 2. Download candidate resume from Keka (mocked or real based on active adapter)
-    console.log(`Downloading resume for candidate ${candidateId}...`);
-    const resumeBuffer = await kekaDocumentsService.downloadResume(candidateId);
-    
+    // 2. Get resume text — try multiple sources in priority order
     let resumeText = "";
-    try {
-      if (resumeBuffer.toString("utf8").startsWith("%PDF")) {
-        if (resumeBuffer.toString("utf8").includes("Mock Resume Contents")) {
-          // Stateful simulation of mock resumes to ensure realistic scoring runs
-          resumeText = `
-            Full Name: ${candidate.name || "Clark Kent"}
-            Email: ${candidate.email || "clark.kent@example.com"}
-            Phone: ${candidate.phone || "+91 99999 55555"}
-            Experience: 5 years of full stack software engineering. Worked on React, Node.js, TypeScript, PostgreSQL, AWS.
-            Education: Bachelor of Technology in Computer Science from Metropolis University.
-            Skills: React, Node.js, Express, JavaScript, TypeScript, HTML, CSS, SQL, Git, Docker.
-            Projects: Daily Planet News CMS - React frontend, Node.js backend.
-          `;
-        } else {
-          const pdfParse = require("pdf-parse");
-          let parsedText = "";
-          if (typeof pdfParse === 'function') {
-            const data = await (pdfParse as any)(resumeBuffer);
-            parsedText = data.text;
-          } else if (typeof (pdfParse as any).default === 'function') {
-            const data = await (pdfParse as any).default(resumeBuffer);
-            parsedText = data.text;
-          } else if (typeof (pdfParse as any).PDFParse === 'function') {
-            const parser = new (pdfParse as any).PDFParse({ data: resumeBuffer });
-            const data = await parser.getText();
-            parsedText = data.text;
+
+    // 2a. First: check if we already have extracted text stored locally (email pipeline candidates)
+    const storedTextRes = await query(
+      `SELECT rt.resume_text FROM resume_texts rt
+       JOIN resume_inbox ri ON ri.id = rt.inbox_id
+       WHERE ri.candidate_id = $1 AND rt.resume_text IS NOT NULL AND length(rt.resume_text) > 50
+       ORDER BY ri.created_at DESC LIMIT 1;`,
+      [candidateId]
+    ).catch(() => ({ rowCount: 0, rows: [] }));
+
+    if ((storedTextRes.rowCount || 0) > 0) {
+      resumeText = storedTextRes.rows[0].resume_text;
+      console.log(`[Auto Screening] Using stored resume text for candidate ${candidateId}`);
+    } else {
+      // 2b. Try downloading from Keka
+      console.log(`Downloading resume for candidate ${candidateId}...`);
+      try {
+        const resumeBuffer = await kekaDocumentsService.downloadResume(candidateId);
+        
+        if (resumeBuffer.toString("utf8").startsWith("%PDF")) {
+          if (resumeBuffer.toString("utf8").includes("Mock Resume Contents")) {
+            // Mock adapter simulation
+            resumeText = `
+              Full Name: ${candidate.name || "Clark Kent"}
+              Email: ${candidate.email || "clark.kent@example.com"}
+              Phone: ${candidate.phone || "+91 99999 55555"}
+              Experience: 5 years of full stack software engineering. Worked on React, Node.js, TypeScript, PostgreSQL, AWS.
+              Education: Bachelor of Technology in Computer Science from Metropolis University.
+              Skills: React, Node.js, Express, JavaScript, TypeScript, HTML, CSS, SQL, Git, Docker.
+              Projects: Daily Planet News CMS - React frontend, Node.js backend.
+            `;
           } else {
-            throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+            const pdfParse = require("pdf-parse");
+            let parsedText = "";
+            if (typeof pdfParse === 'function') {
+              const data = await (pdfParse as any)(resumeBuffer);
+              parsedText = data.text;
+            } else if (typeof (pdfParse as any).default === 'function') {
+              const data = await (pdfParse as any).default(resumeBuffer);
+              parsedText = data.text;
+            } else if (typeof (pdfParse as any).PDFParse === 'function') {
+              const parser = new (pdfParse as any).PDFParse({ data: resumeBuffer });
+              const data = await parser.getText();
+              parsedText = data.text;
+            } else {
+              throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+            }
+            resumeText = parsedText;
           }
-          resumeText = parsedText;
+        } else {
+          resumeText = resumeBuffer.toString("utf8");
         }
-      } else {
-        resumeText = resumeBuffer.toString("utf8");
+      } catch (downloadErr: any) {
+        const errMsg: string = downloadErr.message || String(downloadErr);
+        
+        // 2c. Fallback: if Keka has no resume file, build a profile from DB data for AI scoring
+        if (errMsg.includes("No resume attached") || errMsg.includes("400")) {
+          console.warn(`[Auto Screening] No resume in Keka for ${candidate.name}. Building profile from DB data for AI scoring...`);
+          const skills = Array.isArray(candidate.skills) ? candidate.skills.join(", ") : (candidate.skills || "Not specified");
+          const education = candidate.education || "Not specified";
+          const experience = candidate.experience_years || 0;
+          const role = candidate.role || candidate.keka_status || "Not specified";
+          resumeText = [
+            `Candidate Name: ${candidate.name}`,
+            `Email: ${candidate.email}`,
+            `Phone: ${candidate.phone || "Not provided"}`,
+            `Current Role / Application Stage: ${role}`,
+            `Total Experience: ${experience} years`,
+            `Skills: ${skills}`,
+            `Education: ${education}`,
+            `Source: Applied via Keka ATS`,
+            `Note: No detailed resume document available. Scoring is based on profile data only.`
+          ].join("\n");
+        } else {
+          // Re-throw unexpected errors so the caller can handle them
+          throw downloadErr;
+        }
       }
-    } catch (err) {
-      console.warn("Failed to parse PDF binary. Falling back to text decode:", err);
-      resumeText = resumeBuffer.toString("utf8");
     }
 
     // 3. Resolve associated Job Description
-    let jobDescription = "React Frontend Engineer with experience in Next.js, Node.js, TypeScript, and SQL databases.";
+    let jobDescription = "Graduate Engineer Trainee with mechanical, electrical, or civil engineering background for Indian domestic manufacturing roles.";
     if (candidate.job_id) {
       const jobRes = await query("SELECT title, description FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;", [candidate.job_id]);
       if (jobRes.rowCount && jobRes.rowCount > 0) {

@@ -71,22 +71,28 @@ export class KekaCandidatesService {
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
           role = EXCLUDED.role,
-          -- Keep computed AI scores on conflict
+          -- NEVER overwrite AI-computed scores — keep whatever our pipeline calculated
           -- score = EXCLUDED.score,
           -- match_percent = EXCLUDED.match_percent,
           experience_years = EXCLUDED.experience_years,
-          -- Keep our shortlisted / Review statuses on conflict unless rejected
+          -- Keep our shortlisted / Review statuses on conflict unless Keka marks as rejected
           status = CASE 
             WHEN EXCLUDED.status = 'rejected' THEN 'rejected'
             ELSE candidates.status 
           END,
           application_source = EXCLUDED.application_source,
-          assessment_score = EXCLUDED.assessment_score,
+          assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
           keka_status = EXCLUDED.keka_status,
           applied_date = EXCLUDED.applied_date,
-          job_id = EXCLUDED.job_id,
+          -- Only update job_id if we don't already have one from email pipeline
+          job_id = COALESCE(candidates.job_id, EXCLUDED.job_id),
           external_id = EXCLUDED.external_id,
-          source_system = EXCLUDED.source_system,
+          -- NEVER overwrite source_system if candidate already has email-pipeline data (resume_inbox record)
+          source_system = CASE
+            WHEN EXISTS (SELECT 1 FROM resume_inbox WHERE candidate_id = candidates.id LIMIT 1)
+            THEN candidates.source_system
+            ELSE EXCLUDED.source_system
+          END,
           sync_status = EXCLUDED.sync_status,
           last_synced_at = EXCLUDED.last_synced_at
       `, [
@@ -112,26 +118,59 @@ export class KekaCandidatesService {
     }
   }
 
-  // Sequentially screen candidates that have not been evaluated yet
+  /**
+   * Screen ALL unscreened candidates (regardless of source system).
+   * - Keka-sourced: download resume from Keka API, fall back to heuristic if no resume attached
+   * - Email/upload sourced: use resume text already stored in resume_texts table
+   * - Processes up to 100 at a time, skips permanently-failed ones
+   */
   async screenUnscreenedCandidates(): Promise<void> {
+    const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
+
+    // Pick ALL 0% candidates that aren't rejected and haven't been permanently marked as no-resume
     const unscreened = await query(
-      "SELECT id, name FROM candidates WHERE source_system = 'Keka' AND (score = 0 OR score IS NULL) ORDER BY applied_date DESC, created_at DESC LIMIT 50;"
+      `SELECT id, name, source_system, job_id 
+       FROM candidates 
+       WHERE tenant_id = $1
+         AND (score = 0 OR score IS NULL)
+         AND status NOT IN ('rejected')
+         AND (recommendation IS NULL OR recommendation = '')
+       ORDER BY applied_date DESC NULLS LAST, created_at DESC 
+       LIMIT 100;`,
+      [targetTenantId]
     );
+
     if (!unscreened.rowCount || unscreened.rowCount === 0) {
       return;
     }
 
-    console.log(`[Auto Screening] Found ${unscreened.rowCount} unscreened Keka candidates. Screening them sequentially...`);
+    console.log(`[Auto Screening] Found ${unscreened.rowCount} unscreened candidates. Processing...`);
     
     for (const row of unscreened.rows) {
       try {
         const { kekaWorkflowService } = await import("./workflow.service.js");
-        console.log(`[Auto Screening] Screening Keka candidate: ${row.name} (${row.id})...`);
+        const src = row.source_system || "Email";
+        console.log(`[Auto Screening] Screening candidate (${src}): ${row.name} (${row.id})...`);
         await kekaWorkflowService.screenCandidate(row.id);
-        // Sleep for 3 seconds between candidates to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Small pause to respect DeepSeek API rate limits
+        await new Promise(resolve => setTimeout(resolve, 1500));
       } catch (err: any) {
-        console.error(`[Auto Screening] Failed to screen candidate ${row.name}:`, err.message || err);
+        const msg: string = err.message || String(err);
+        console.error(`[Auto Screening] Failed to screen candidate ${row.name}: ${msg}`);
+
+        // If Keka says "No resume attached", mark this candidate so it stops retrying
+        // and set a minimal placeholder so it won't be picked up in future screener runs
+        if (msg.includes("No resume attached")) {
+          await query(
+            `UPDATE candidates 
+             SET recommendation = 'No resume available in Keka — manual review required.',
+                 risk_level = 'High',
+                 last_synced_at = NOW()
+             WHERE id = $1`,
+            [row.id]
+          );
+          console.log(`[Auto Screening] Marked ${row.name} as no-resume-available. Will not retry.`);
+        }
       }
     }
   }
