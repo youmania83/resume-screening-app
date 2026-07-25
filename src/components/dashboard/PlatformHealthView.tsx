@@ -175,8 +175,8 @@ export function PlatformHealthView() {
           </CardHeader>
           <CardContent className="pt-4 space-y-3.5 text-xs">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-muted-foreground">Active Tenants Count:</span>
-              <span className="font-bold text-foreground">{data.tenants.activeCount} Tenants</span>
+              <span className="font-semibold text-muted-foreground">Workspace Engine:</span>
+              <Badge variant="outline" className="font-semibold text-[10px] bg-secondary/30">Single Workspace Mode</Badge>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-semibold text-muted-foreground">Storage Provider:</span>

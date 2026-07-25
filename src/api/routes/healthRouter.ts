@@ -192,7 +192,8 @@ router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, r
           filesCount: storageFilesCount
         },
         tenants: {
-          activeCount: activeTenants
+          activeCount: 1,
+          mode: "Single Workspace Mode"
         },
         metrics: {
           averageParseTimeMs: avgParseTime || 120 // fallback default
