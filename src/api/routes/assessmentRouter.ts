@@ -4,58 +4,20 @@ import { ensureJobAssessment, regenerateJobAssessment } from "../../lib/assessme
 import { sendAssessmentInviteEmail, sendInterviewScheduleEmail, sendAssessmentResultDetailsEmail } from "../../lib/email";
 import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service";
 import crypto from "crypto";
-import { tenantStorage } from "../../lib/tenantContext.js";
+import { tenantStorage, DEFAULT_TENANT_ID } from "../../lib/tenantContext.js";
 import { queryGlobal, queryTenant } from "../../lib/tenantDb.js";
 
 const router = Router();
 
-// Middleware to resolve tenant context for guest candidates
+// Middleware to resolve tenant context for single-user workspace
 async function resolveTenantContext(req: any, res: any, next: any) {
-  // If recruiter/owner is logged in, authMiddleware has already set tenant context
   if (req.user && req.user.tenantId) {
     return next();
   }
 
-  try {
-    let tenantId: string | null = null;
-
-    // 1. Resolve by assessment token
-    const token = req.params?.token || req.body?.token || req.query?.token;
-    if (token && typeof token === "string" && token.length > 20) {
-      const result = await queryGlobal("SELECT tenant_id FROM candidates WHERE assessment_token = $1 LIMIT 1;", [token]);
-      if (result.rowCount && result.rowCount > 0) {
-        tenantId = result.rows[0].tenant_id;
-      }
-    }
-
-    // 2. Resolve by candidateId
-    const candidateId = req.body?.candidateId || req.query?.candidateId;
-    if (!tenantId && candidateId && typeof candidateId === "string") {
-      const result = await queryGlobal("SELECT tenant_id FROM candidates WHERE id = $1 LIMIT 1;", [candidateId]);
-      if (result.rowCount && result.rowCount > 0) {
-        tenantId = result.rows[0].tenant_id;
-      }
-    }
-
-    // 3. Resolve by jobId
-    const jobId = req.body?.jobId || req.params?.jobId || req.query?.jobId;
-    if (!tenantId && jobId && typeof jobId === "string") {
-      const result = await queryGlobal("SELECT tenant_id FROM jobs WHERE id = $1 LIMIT 1;", [jobId]);
-      if (result.rowCount && result.rowCount > 0) {
-        tenantId = result.rows[0].tenant_id;
-      }
-    }
-
-    if (tenantId) {
-      tenantStorage.run({ tenantId, userId: "guest", role: "candidate" }, () => {
-        next();
-      });
-    } else {
-      next();
-    }
-  } catch (err) {
-    next(err);
-  }
+  tenantStorage.run({ tenantId: DEFAULT_TENANT_ID, userId: "guest", role: "candidate" }, () => {
+    next();
+  });
 }
 
 router.use(resolveTenantContext);
