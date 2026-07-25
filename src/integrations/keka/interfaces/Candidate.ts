@@ -17,6 +17,8 @@ export interface KekaCandidate {
   interviewScore?: number;
   finalScore?: number;
   
+  appliedDate?: string;
+  
   // Sync metadata fields
   external_id?: string;
   source_system?: string;

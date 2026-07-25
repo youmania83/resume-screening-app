@@ -52,7 +52,7 @@ export default function AssessmentInstructions({
             </h2>
             <ul className="space-y-2 text-xs text-muted-foreground list-disc list-inside">
               <li>
-                <strong>15 Minutes Total Time</strong>: The exam contains 10 MCQs. You have 15 minutes. It auto-submits
+                <strong>15 Minutes Total Time</strong>: The exam contains 15 MCQs. You have 15 minutes. It auto-submits
                 on expiry.
               </li>
               <li>

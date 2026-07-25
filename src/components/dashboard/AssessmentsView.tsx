@@ -312,7 +312,8 @@ export function AssessmentsView({
                                 variant="outline"
                                 className="text-[10px] px-2 py-1 font-bold rounded border-border text-foreground/90"
                                 onClick={() => {
-                                  const inviteUrl = `${window.location.origin.includes("localhost") ? "https://resume-screening-app-sage.vercel.app" : window.location.origin}/assessment/${c.assessmentToken}`;
+                                  const baseUrl = window.location.origin;
+                                  const inviteUrl = `${baseUrl}/assessment/${c.assessmentToken}`;
                                   copyToClipboard(inviteUrl);
                                 }}
                               >

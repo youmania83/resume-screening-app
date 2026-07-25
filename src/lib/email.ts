@@ -459,7 +459,7 @@ export async function sendAssessmentInviteEmail(params: {
             </div>
             <div class="detail-row">
               <span class="detail-label">Time Limit:</span>
-              <span class="detail-val">15 Minutes (10 MCQs)</span>
+              <span class="detail-val">15 Minutes (15 MCQs)</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Deadline:</span>

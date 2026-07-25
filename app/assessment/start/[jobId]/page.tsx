@@ -241,7 +241,7 @@ export default function PublicAssessmentRegistrationPage() {
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <span className="font-bold text-foreground block leading-none">10 MCQs</span>
+                  <span className="font-bold text-foreground block leading-none">15 MCQs</span>
                   <span className="text-[10px] text-muted-foreground font-semibold block mt-0.5">Multiple Choice</span>
                 </div>
               </div>
