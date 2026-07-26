@@ -65,7 +65,7 @@ Return ONLY a JSON object with the shape {\"overall\": number, \"criteria\": {\"
 export async function computeScore(batchId: string, jobDescription: string): Promise<ScoreResult> {
   const resumeText = await getResumeText(batchId);
   const prompt = buildPrompt(jobDescription, resumeText);
-  const response = await callDeepSeek(prompt, { maxTokens: 4000 });
+  const response = await callDeepSeek(prompt, { maxTokens: 800 });
   try {
     let cleaned = response.trim();
     const firstBrace = cleaned.indexOf("{");

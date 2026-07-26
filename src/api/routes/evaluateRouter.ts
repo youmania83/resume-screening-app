@@ -6,6 +6,7 @@ import fs from "fs";
 import { callDeepSeek } from "../../lib/deepseek.js";
 import { queryTenant } from "../../lib/tenantDb.js";
 import crypto from "crypto";
+import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation } from "../../lib/aiEvaluationCache.js";
 import { ensureJobAssessment } from "../../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../../lib/email.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
@@ -157,23 +158,31 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       // Keep original text format
     }
 
-    const prompt = buildEvaluatePrompt(formattedJobDescription, rawText);
-    const responseText = await callDeepSeek(prompt, { maxTokens: 4000 });
-
     let parsedResult;
-    try {
-      let cleanedJson = responseText.trim();
-      const firstBrace = cleanedJson.indexOf("{");
-      const lastBrace = cleanedJson.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
+    const cacheHash = computeSHA256Hash(rawText, formattedJobDescription);
+    const cached = getCachedEvaluation(cacheHash);
+
+    if (cached) {
+      parsedResult = cached;
+    } else {
+      const prompt = buildEvaluatePrompt(formattedJobDescription, rawText);
+      const responseText = await callDeepSeek(prompt, { maxTokens: 800 });
+
+      try {
+        let cleanedJson = responseText.trim();
+        const firstBrace = cleanedJson.indexOf("{");
+        const lastBrace = cleanedJson.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
+        }
+        cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
+        parsedResult = JSON.parse(cleanedJson);
+        setCachedEvaluation(cacheHash, parsedResult);
+      } catch {
+        console.error("Failed to parse AI response as JSON:", responseText);
+        res.status(500).json({ error: "Invalid response formatting from AI model" });
+        return;
       }
-      cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
-      parsedResult = JSON.parse(cleanedJson);
-    } catch {
-      console.error("Failed to parse AI response as JSON:", responseText);
-       res.status(500).json({ error: "Invalid response formatting from AI model" });
-       return;
     }
 
     // Log usage to database scoped by tenant
@@ -191,7 +200,8 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     try {
       await TenantUsageService.deductCredits(tenantId, 3);
       await TenantUsageService.incrementMetric(tenantId, "ai_screens", 1);
-      await TenantUsageService.incrementMetric(tenantId, "ai_tokens_consumed", Math.round(responseText.length / 4));
+      const estimatedTokens = Math.round(JSON.stringify(parsedResult).length / 4);
+      await TenantUsageService.incrementMetric(tenantId, "ai_tokens_consumed", estimatedTokens);
     } catch (metricErr) {
       console.error("Failed to update credit usage metrics:", metricErr);
     }

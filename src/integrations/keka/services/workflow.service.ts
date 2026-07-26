@@ -11,6 +11,7 @@ import { kekaAssessmentService } from "./assessment.service";
 import { kekaDocumentsService } from "./documents.service";
 import { callDeepSeek } from "../../../lib/deepseek";
 import { isKekaEnabled } from "../config/keka.config";
+import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic } from "../../../lib/aiEvaluationCache.js";
 
 // Define the threshold mapping configurations
 export const STAGE_ROUTING_THRESHOLDS = {
@@ -75,6 +76,8 @@ export class KekaWorkflowService {
 
     // 2. Get resume text — try multiple sources in priority order
     let resumeText = "";
+    let isProfileOnly = false;
+    let parsedResult: any = null;
 
     // 2a. First: check if we already have extracted text stored locally (email pipeline candidates)
     const storedTextRes = await query(
@@ -130,24 +133,17 @@ export class KekaWorkflowService {
       } catch (downloadErr: any) {
         const errMsg: string = downloadErr.message || String(downloadErr);
         
-        // 2c. Fallback: if Keka has no resume file, build a profile from DB data for AI scoring
+        // 2c. Fallback: if Keka has no resume file, use local profile heuristic scoring (0 LLM cost)
         if (errMsg.includes("No resume attached") || errMsg.includes("400")) {
-          console.warn(`[Auto Screening] No resume in Keka for ${candidate.name}. Building profile from DB data for AI scoring...`);
-          const skills = Array.isArray(candidate.skills) ? candidate.skills.join(", ") : (candidate.skills || "Not specified");
-          const education = candidate.education || "Not specified";
-          const experience = candidate.experience_years || 0;
-          const role = candidate.role || candidate.keka_status || "Not specified";
-          resumeText = [
-            `Candidate Name: ${candidate.name}`,
-            `Email: ${candidate.email}`,
-            `Phone: ${candidate.phone || "Not provided"}`,
-            `Current Role / Application Stage: ${role}`,
-            `Total Experience: ${experience} years`,
-            `Skills: ${skills}`,
-            `Education: ${education}`,
-            `Source: Applied via Keka ATS`,
-            `Note: No detailed resume document available. Scoring is based on profile data only.`
-          ].join("\n");
+          console.warn(`[Auto Screening] No resume file in Keka for ${candidate.name}. Using zero-cost profile heuristic scoring...`);
+          isProfileOnly = true;
+          parsedResult = evaluateProfileHeuristic({
+            name: candidate.name,
+            role: candidate.role || candidate.keka_status,
+            experienceYears: candidate.experience_years || 0,
+            skills: candidate.skills,
+            education: candidate.education
+          });
         } else {
           // Re-throw unexpected errors so the caller can handle them
           throw downloadErr;
@@ -164,24 +160,33 @@ export class KekaWorkflowService {
       }
     }
 
-    // 4. Run LLM Scoring via DeepSeek
-    console.log("Calling AI model for resume parsing and score calculation...");
-    const prompt = buildEvaluatePrompt(jobDescription, resumeText);
-    const responseText = await callDeepSeek(prompt, { maxTokens: 4000 });
+    // 4. Run LLM Scoring via DeepSeek with Caching and Token Reduction
+    if (!isProfileOnly) {
+      const cacheHash = computeSHA256Hash(resumeText, jobDescription);
+      const cached = getCachedEvaluation(cacheHash);
 
-    let parsedResult;
-    try {
-      let cleanedJson = responseText.trim();
-      const firstBrace = cleanedJson.indexOf("{");
-      const lastBrace = cleanedJson.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
+      if (cached) {
+        parsedResult = cached;
+      } else {
+        console.log("Calling AI model for resume parsing and score calculation...");
+        const prompt = buildEvaluatePrompt(jobDescription, resumeText);
+        const responseText = await callDeepSeek(prompt, { maxTokens: 800 });
+
+        try {
+          let cleanedJson = responseText.trim();
+          const firstBrace = cleanedJson.indexOf("{");
+          const lastBrace = cleanedJson.lastIndexOf("}");
+          if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
+          }
+          cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
+          parsedResult = JSON.parse(cleanedJson);
+          setCachedEvaluation(cacheHash, parsedResult);
+        } catch {
+          console.error("Failed to parse AI response JSON:", responseText);
+          throw new Error("Invalid response formatting from AI model during automated screening");
+        }
       }
-      cleanedJson = cleanedJson.replace(/,\s*([\]}])/g, "$1");
-      parsedResult = JSON.parse(cleanedJson);
-    } catch {
-      console.error("Failed to parse AI response JSON:", responseText);
-      throw new Error("Invalid response formatting from AI model during automated screening");
     }
 
     const score = parsedResult.score || 0;
