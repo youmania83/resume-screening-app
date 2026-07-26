@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Candidate } from "../../types/index";
+import { formatDisplayDate } from "../../lib/utils";
 import { 
   CheckCircle2, 
   Circle, 
@@ -298,8 +299,8 @@ export function OverviewView({ candidates }: OverviewViewProps) {
             <CardContent className="space-y-4 pt-4">
               {candidates.slice(0, 5).map((c, i) => (
                 <div key={i} className="flex gap-3 text-xs leading-normal">
-                  <span className="text-[9px] text-muted-foreground font-mono w-20 flex-shrink-0 pt-0.5">
-                    {c.appliedDate ? new Date(c.appliedDate).toLocaleDateString() : "Just now"}
+                  <span className="text-[10px] text-muted-foreground font-mono w-28 flex-shrink-0 pt-0.5 whitespace-nowrap">
+                    {formatDisplayDate(c.appliedDate)}
                   </span>
                   <div>
                     <strong className="text-foreground block font-bold">{c.name}</strong>

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../ui/badge";
 import { Candidate } from "../../types/index";
 import { toast } from "sonner";
+import { formatDisplayDate } from "../../lib/utils";
 
 interface CandidatesViewProps {
   candidates: Candidate[];
@@ -238,7 +239,7 @@ export function CandidatesView({
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-mono font-semibold">{c.appliedDate}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">{formatDisplayDate(c.appliedDate)}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[280px]">
                         {c.matchedSkills.map(s => (
