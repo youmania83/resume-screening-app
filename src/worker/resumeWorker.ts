@@ -930,6 +930,10 @@ if (isMain) {
   });
 
   resumeWorker.on("error", (err) => {
+    if (err?.message?.includes("max requests limit exceeded")) {
+      console.warn("⚠️ [Resume Worker] Redis quota limit reached. Async DB polling fallback active.");
+      return;
+    }
     console.error("🚨 [Resume Worker] Connection/Runtime error:", err.message || err);
   });
 

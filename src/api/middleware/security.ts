@@ -5,6 +5,10 @@ import { connection } from "../queue.js";
 
 const rateLimits = new Map<string, { count: number; resetTime: number }>();
 
+export function resetMemoryRateLimits() {
+  rateLimits.clear();
+}
+
 export let redisClient: Redis | null = null;
 export let isRedisConnected = false;
 

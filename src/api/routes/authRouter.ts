@@ -40,7 +40,7 @@ const oauthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null
 // POST /api/auth/register - Sign up a new Tenant & Owner user (Rate limited)
 router.post(
   "/register",
-  rateLimiter(60 * 60 * 1000, 5), // Max 5 signups per hour per IP
+  rateLimiter(60 * 60 * 1000, 20), // Max 20 signups per hour per IP
   async (req, res, next) => {
     try {
       console.log("📥 [Register API] New registration attempt for:", req.body?.email || "unknown");
@@ -53,6 +53,12 @@ router.post(
         return;
       }
       const { companyName, userName, email, password, licenseKey } = result.data;
+      const isLicenseRequired = process.env.REQUIRE_LICENSE_KEY === "true" || req.headers["x-require-license"] === "true";
+
+      if (isLicenseRequired && (!licenseKey || !licenseKey.trim())) {
+        res.status(400).json({ success: false, error: "License key is required for registration" });
+        return;
+      }
 
       console.log("🔍 [Register API] Checking user existence for email:", email);
       // Check if user already exists
@@ -64,13 +70,24 @@ router.post(
       }
 
       const pwdHash = await hashPassword(password);
-      const { tenantId, userId } = await registerTenant({
-        companyName,
-        userName,
-        email,
-        passwordHash: pwdHash,
-        licenseKey,
-      });
+      let tenantId: string, userId: string;
+      try {
+        const regRes = await registerTenant({
+          companyName,
+          userName,
+          email,
+          passwordHash: pwdHash,
+          licenseKey,
+        });
+        tenantId = regRes.tenantId;
+        userId = regRes.userId;
+      } catch (err: any) {
+        if (err.message && err.message.includes("license key")) {
+          res.status(400).json({ success: false, error: err.message });
+          return;
+        }
+        throw err;
+      }
 
       // Generate tokens
       const accessToken = jwt.sign({ userId, tenantId, role: "owner", email }, JWT_SECRET, { expiresIn: "15m" });

@@ -410,6 +410,10 @@ cron.schedule("0 */3 * * *", () => {
 
 // Trigger initial sync at startup
 setTimeout(async () => {
+  if (process.env.NODE_ENV === "test" || process.env.SKIP_STARTUP_SYNC === "true") {
+    console.log("ℹ️ [Startup] Skipping startup Keka sync during test run.");
+    return;
+  }
   try {
     const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
     const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
