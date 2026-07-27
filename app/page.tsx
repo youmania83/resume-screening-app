@@ -22,6 +22,7 @@ import { SettingsView } from "@/src/components/dashboard/SettingsView"
 import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthView"
 import { HRInterviewDashboard } from "@/src/components/dashboard/HRInterviewDashboard"
 import InboxView from "@/src/components/inbox/InboxView"
+import { CandidateDetailPanel } from "@/src/components/dashboard/CandidateDetailPanel"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -435,6 +436,23 @@ export default function Dashboard() {
           {activeTab === "health" && <PlatformHealthView />}
           {activeTab === "settings" && <SettingsView webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
         </main>
+
+        <CandidateDetailPanel
+          candidate={selectedCandidate}
+          onClose={() => setSelectedCandidate(null)}
+          handleDeleteCandidate={handleDeleteCandidate}
+          assessmentScoreInput={assessmentScoreInput}
+          setAssessmentScoreInput={setAssessmentScoreInput}
+          handleAssessmentSubmit={handleAssessmentSubmit}
+          isAssessmentSubmitting={isAssessmentSubmitting}
+          interviewFeedbackInput={interviewFeedbackInput}
+          setInterviewFeedbackInput={setInterviewFeedbackInput}
+          handleInterviewSubmit={handleInterviewSubmit}
+          isInterviewSubmitting={isInterviewSubmitting}
+          isOnboardingSubmitting={isOnboardingSubmitting}
+          handleOnboardSubmit={handleOnboardSubmit}
+          handleDecision={handleDecision}
+        />
       </div>
     </div>
   )

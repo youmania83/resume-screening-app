@@ -17,8 +17,16 @@ router.get("/", async (req, res, next) => {
   try {
     const includeRemoved = req.query.include_removed === "true";
     const sql = includeRemoved
-      ? "SELECT * FROM jobs WHERE tenant_id = :tenant_id ORDER BY created_at DESC;"
-      : "SELECT * FROM jobs WHERE tenant_id = :tenant_id AND (sync_status IS NULL OR sync_status != 'removed') ORDER BY created_at DESC;";
+      ? `SELECT j.*, 
+                (SELECT COUNT(*) FROM candidates c WHERE (c.job_id = j.id OR c.job_id = j.external_id) AND (c.score > 0 OR c.recommendation IS NOT NULL)) as candidates_count
+         FROM jobs j 
+         WHERE j.tenant_id = :tenant_id 
+         ORDER BY j.created_at DESC;`
+      : `SELECT j.*, 
+                (SELECT COUNT(*) FROM candidates c WHERE (c.job_id = j.id OR c.job_id = j.external_id) AND (c.score > 0 OR c.recommendation IS NOT NULL)) as candidates_count
+         FROM jobs j 
+         WHERE j.tenant_id = :tenant_id AND (j.sync_status IS NULL OR j.sync_status != 'removed') 
+         ORDER BY j.created_at DESC;`;
     const jobsRes = await queryTenant(sql);
     res.json({ success: true, jobs: jobsRes.rows });
   } catch (err) {

@@ -48,7 +48,7 @@ router.get("/", async (req, res, next) => {
       : "created_at";
     const sortOrder = (req.query.sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
-    let whereClause = "candidates.tenant_id = :tenant_id";
+    let whereClause = "(candidates.tenant_id = :tenant_id OR candidates.tenant_id IS NULL OR j.tenant_id = :tenant_id)";
     const queryParams: any[] = [];
     let paramIndex = 1;
 

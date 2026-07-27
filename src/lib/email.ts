@@ -674,6 +674,28 @@ export async function sendInterviewScheduleEmail(params: {
     </html>
   `;
 
+  const csContent = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Techsol Engineers//Recruitment Portal//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:interview-${Date.now()}@techsolengineers.com`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `DTSTART:${params.scheduledDate.toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `DTEND:${new Date(params.scheduledDate.getTime() + 30 * 60000).toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `SUMMARY:HR Interview - ${safeJobTitle} at Techsol Engineers`,
+    `DESCRIPTION:HR Interview scheduled for candidate ${safeCandidateName} for position ${safeJobTitle}.`,
+    "LOCATION:Google Meet / Video Call",
+    `ORGANIZER;CN=Techsol Engineers HR:mailto:${params.hrEmail || "hr@techsolengineers.com"}`,
+    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${safeCandidateName}:mailto:${params.candidateEmail}`,
+    "STATUS:CONFIRMED",
+    "SEQUENCE:0",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
+
   if (zohoConfig.enabled) {
     await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
     await zohoMailService.sendEmail(params.hrEmail, hrSubject, hrHtml);
@@ -687,12 +709,24 @@ export async function sendInterviewScheduleEmail(params: {
     return { success: true, mock: true };
   }
 
-  // Send to candidate
+  // Send to candidate with calendar invite attachment
   await transporter.sendMail({
     from: fromEmail,
     to: params.candidateEmail,
     subject: candidateSubject,
     html: candidateHtml,
+    icalEvent: {
+      filename: "invite.ics",
+      method: "REQUEST",
+      content: csContent
+    },
+    attachments: [
+      {
+        filename: "invite.ics",
+        content: csContent,
+        contentType: "text/calendar; method=REQUEST"
+      }
+    ]
   });
 
   // Send to HR
@@ -703,8 +737,27 @@ export async function sendInterviewScheduleEmail(params: {
     html: hrHtml,
   });
 
-  console.log(`📧 Interview scheduled emails sent successfully to candidate (${params.candidateEmail}) and HR (${params.hrEmail})`);
+  console.log(`📧 Interview scheduled emails sent with .ics calendar invite to candidate (${params.candidateEmail}) and HR (${params.hrEmail})`);
   return { success: true, mock: false };
+}
+
+/**
+ * Send Offer Letter / Selection Notification Email
+ */
+export async function sendOfferLetterEmail(params: {
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  tenantId?: string;
+}) {
+  return sendCandidateDecisionEmail({
+    candidateName: params.candidateName,
+    candidateEmail: params.candidateEmail,
+    jobTitle: params.jobTitle,
+    decision: "selected",
+    remarks: "Congratulations! Our HR team will reach out with your formal Offer Letter and onboarding documentation.",
+    tenantId: params.tenantId
+  });
 }
 
 /**

@@ -18,10 +18,10 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
 
   const selectAndOpen = (c: Candidate) => {
     setSelectedCandidate(c);
-    setActiveTab("screening");
   };
 
   const appliedList = filterByStatus(["applied"]);
+  const reviewList = filterByStatus(["review", "under_review", "under review"]);
   const shortlistedList = filterByStatus(["shortlisted"]);
   const interviewingList = filterByStatus(["interviewing"]);
   const inactiveList = filterByStatus(["hold", "rejected", "talent_pool"]);
@@ -36,10 +36,10 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
     >
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">ATS Pipeline Stages</h2>
-        <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Board mapping candidate workflows.</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Board mapping candidate recruitment workflows across Applied, Review, Shortlisted, Interviewing, and Inactive stages.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 overflow-x-auto custom-scrollbar pb-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 flex-1 overflow-x-auto custom-scrollbar pb-4 items-start">
         {/* Applied Column */}
         <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between border-b border-border pb-2">
@@ -52,11 +52,34 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
                 <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
                 <div className="flex items-center justify-between mt-2.5">
                   <Badge variant="outline" className="text-[8px] font-mono px-1 bg-secondary/40">{c.experienceYears} yrs exp</Badge>
-                  <span className="text-xs font-bold text-amber-605">{c.score}%</span>
+                  <span className="text-xs font-bold text-amber-600">{c.score}%</span>
                 </div>
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Review Column */}
+        <div className="bg-secondary/40 dark:bg-slate-900/40 border border-border rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <span className="text-xs font-bold uppercase text-amber-600 dark:text-amber-400">Under Review ({reviewList.length})</span>
+          </div>
+          {reviewList.length === 0 ? (
+            <div className="text-[10px] text-center text-muted-foreground py-6 font-medium">No candidates under review</div>
+          ) : (
+            reviewList.map(c => (
+              <Card key={c.id} className="shadow-sm border-amber-200/50 dark:border-amber-900/40 cursor-pointer hover:border-amber-400 bg-card" onClick={() => selectAndOpen(c)}>
+                <CardContent className="p-3 space-y-2 text-xs">
+                  <span className="font-bold text-xs block truncate text-foreground">{c.name}</span>
+                  <span className="text-[10px] text-muted-foreground block truncate">{c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""}</span>
+                  <div className="flex items-center justify-between mt-2.5">
+                    <Badge variant="warning" className="text-[8px] px-1 py-0 uppercase">Review</Badge>
+                    <span className="text-xs font-bold text-amber-600">{c.score}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
 
         {/* Shortlisted Column */}

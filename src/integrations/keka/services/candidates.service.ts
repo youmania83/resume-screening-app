@@ -47,14 +47,16 @@ export class KekaCandidatesService {
     const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
     const candidates = await this.getCandidates();
     for (const c of candidates) {
-      let mappedJobId = c.jobId || null;
+      let mappedJobId: string | null = null;
+      let roleTitle = (c as any).jobTitle || (c.jobId ? "Candidate" : "Unassigned");
       if (c.jobId) {
         const jobCheck = await query(
-          "SELECT id FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;",
+          "SELECT id, title FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;",
           [c.jobId]
         );
         if (jobCheck.rowCount && jobCheck.rowCount > 0) {
           mappedJobId = jobCheck.rows[0].id;
+          roleTitle = jobCheck.rows[0].title;
         }
       }
 
@@ -70,7 +72,7 @@ export class KekaCandidatesService {
           name = EXCLUDED.name,
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
-          role = EXCLUDED.role,
+          role = CASE WHEN candidates.role = 'Candidate' THEN EXCLUDED.role ELSE candidates.role END,
           -- NEVER overwrite AI-computed scores — keep whatever our pipeline calculated
           -- score = EXCLUDED.score,
           -- match_percent = EXCLUDED.match_percent,
@@ -85,8 +87,8 @@ export class KekaCandidatesService {
           keka_status = EXCLUDED.keka_status,
           -- Preserve original applied_date; don't reset it on every sync
           applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
-          -- Only update job_id if we don't already have one from email pipeline
-          job_id = COALESCE(candidates.job_id, EXCLUDED.job_id),
+          -- Only update job_id if valid or preserve existing
+          job_id = COALESCE(EXCLUDED.job_id, candidates.job_id),
           external_id = EXCLUDED.external_id,
           -- NEVER overwrite source_system if candidate already has email-pipeline data (resume_inbox record)
           source_system = CASE
@@ -102,7 +104,7 @@ export class KekaCandidatesService {
         c.name,
         c.email,
         c.phone || null,
-        c.jobId ? "Candidate" : "Unassigned", 
+        roleTitle,
         c.aiScore || 0,
         c.aiScore || 0, 
         c.experience || 0,
@@ -159,22 +161,28 @@ export class KekaCandidatesService {
         const msg: string = err.message || String(err);
         console.error(`[Auto Screening] Failed to screen candidate ${row.name}: ${msg}`);
 
-        // If Keka says "No resume attached", mark this candidate so it stops retrying
-        // and set a minimal placeholder so it won't be picked up in future screener runs
-        if (msg.includes("No resume attached")) {
+        // If Keka says "No resume attached" or missing resume URL, mark candidate to stop infinite retries
+        if (
+          msg.includes("No resume") || 
+          msg.includes("400") || 
+          msg.includes("404") || 
+          msg.includes("Fetch resume URL failed") || 
+          msg.includes("No resume file URL returned")
+        ) {
           await query(
             `UPDATE candidates 
-             SET recommendation = 'No resume available in Keka — manual review required.',
+             SET recommendation = 'No resume file available in Keka — profile review required.',
                  risk_level = 'High',
                  last_synced_at = NOW()
              WHERE id = $1`,
             [row.id]
           );
-          console.log(`[Auto Screening] Marked ${row.name} as no-resume-available. Will not retry.`);
+          console.log(`[Auto Screening] Marked ${row.name} as no-resume-file-available. Will not retry.`);
         }
       }
     }
   }
+
 }
 
 export const kekaCandidatesService = new KekaCandidatesService();

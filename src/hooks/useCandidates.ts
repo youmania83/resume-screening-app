@@ -84,6 +84,10 @@ export function useCandidates(isLoggedIn?: boolean) {
   useEffect(() => {
     if (isLoggedIn) {
       loadCandidates();
+      const interval = setInterval(() => {
+        loadCandidates();
+      }, 15000);
+      return () => clearInterval(interval);
     }
   }, [loadCandidates, isLoggedIn]);
 

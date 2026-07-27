@@ -277,7 +277,7 @@ router.get("/:token", async (req: any, res: any) => {
         );
         
         const now = new Date();
-        const activeTimeoutMs = 30 * 1000; // 30 seconds timeout
+        const activeTimeoutMs = 15 * 1000; // 15 seconds timeout for quick session recovery
         let isSessionActive = false;
         
         if (sessionRes.rowCount && sessionRes.rowCount > 0) {
@@ -1041,6 +1041,8 @@ router.post("/public-register", async (req: any, res: any) => {
     expiry.setDate(expiry.getDate() + 7); // 7 days expiry
     const appliedDate = new Date().toISOString().split("T")[0];
 
+    const targetTenantId = job.tenant_id || process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
+
     await queryGlobal(
       `INSERT INTO candidates (
         id, name, email, phone, role, score, match_percent, experience_years, 
@@ -1048,7 +1050,7 @@ router.post("/public-register", async (req: any, res: any) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);`,
       [
         candidateId, name, email, phone || null, job.title, 0, 0, 0, 
-        "applied", "public_link", jobId, token, expiry, "pending", appliedDate, job.tenant_id
+        "applied", "public_link", jobId, token, expiry, "pending", appliedDate, targetTenantId
       ]
     );
 

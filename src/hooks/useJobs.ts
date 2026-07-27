@@ -65,6 +65,10 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
   useEffect(() => {
     if (isLoggedIn) {
       loadJobs();
+      const interval = setInterval(() => {
+        loadJobs();
+      }, 15000);
+      return () => clearInterval(interval);
     }
   }, [loadJobs, isLoggedIn]);
 

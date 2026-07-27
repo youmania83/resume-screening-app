@@ -133,9 +133,15 @@ export class KekaWorkflowService {
       } catch (downloadErr: any) {
         const errMsg: string = downloadErr.message || String(downloadErr);
         
-        // 2c. Fallback: if Keka has no resume file, use local profile heuristic scoring (0 LLM cost)
-        if (errMsg.includes("No resume attached") || errMsg.includes("400")) {
-          console.warn(`[Auto Screening] No resume file in Keka for ${candidate.name}. Using zero-cost profile heuristic scoring...`);
+        // 2c. Fallback: if Keka has no resume file or download fails, use zero-cost profile heuristic scoring
+        if (
+          errMsg.includes("No resume") || 
+          errMsg.includes("400") || 
+          errMsg.includes("404") || 
+          errMsg.includes("Fetch resume URL failed") ||
+          errMsg.includes("No valid PDF")
+        ) {
+          console.warn(`[Auto Screening] No resume file in Keka for ${candidate.name} (${errMsg}). Using zero-cost profile heuristic scoring...`);
           isProfileOnly = true;
           parsedResult = evaluateProfileHeuristic({
             name: candidate.name,

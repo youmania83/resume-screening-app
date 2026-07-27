@@ -220,9 +220,8 @@ export function CandidatesView({
                     key={c.id}
                     onClick={() => {
                       setSelectedCandidate(c);
-                      setActiveTab("screening");
                     }}
-                    className="cursor-pointer"
+                    className="cursor-pointer hover:bg-secondary/60"
                   >
                     <TableCell className="pl-6">
                       <div>
