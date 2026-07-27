@@ -55,7 +55,31 @@ router.get("/", async (req, res) => {
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
 
-    // 3. Format into Prometheus Text Exposition Format
+    // 3. Check requested format (JSON vs Prometheus text exposition)
+    const wantsJson = req.query.format === "json" || req.headers.accept?.includes("application/json");
+
+    if (wantsJson) {
+      res.json({
+        success: true,
+        metrics: {
+          activeUsers,
+          screenedResumes,
+          pendingResumes,
+          failedResumes,
+          emailsSent,
+          interviewsScheduled,
+          avgAiResponseMs: avgAiResponse,
+          avgParsingTimeMs: avgParsingTime,
+          queueSize,
+          apiRequestsTotal: metricsState.apiRequestsTotal,
+          memory: memoryUsage,
+          cpu: cpuUsage
+        }
+      });
+      return;
+    }
+
+    // 4. Format into Prometheus Text Exposition Format
     let metricsText = "";
     
     // Active Users

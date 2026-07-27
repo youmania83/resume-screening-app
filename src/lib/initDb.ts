@@ -780,8 +780,10 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_candidates_source ON candidates(tenant_id, source);
       CREATE INDEX IF NOT EXISTS idx_candidate_assignments_recruiter ON candidate_assignments(tenant_id, recruiter_id);
       CREATE INDEX IF NOT EXISTS idx_client_submissions_submitted_by ON client_submissions(tenant_id, submitted_by);
-      CREATE INDEX IF NOT EXISTS idx_candidate_activity_logs_logged_at ON candidate_activity_logs(tenant_id, logged_at DESC);
       CREATE INDEX IF NOT EXISTS idx_candidates_job_eval ON candidates(job_id, external_id) WHERE score > 0 OR recommendation IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_candidates_tenant_job_score ON candidates(tenant_id, job_id, score DESC);
+      CREATE INDEX IF NOT EXISTS idx_assessment_attempts_cand_status ON assessment_attempts(candidate_id, status);
+      CREATE INDEX IF NOT EXISTS idx_jobs_tenant_sync ON jobs(tenant_id, sync_status, created_at DESC);
     `);
 
     // Alter experience_years to NUMERIC(4,1) to support fractional experience years (e.g. 0.5, 1.5)

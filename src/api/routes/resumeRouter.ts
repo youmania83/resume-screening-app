@@ -20,6 +20,34 @@ const BLACKLISTED_EXTS = [".exe", ".js", ".bat", ".cmd", ".scr"];
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 /**
+ * Validates binary magic bytes to prevent file extension spoofing attacks.
+ */
+function validateMagicNumber(buffer: Buffer, ext: string): boolean {
+  if (buffer.length < 4) return false;
+
+  switch (ext) {
+    case ".pdf": {
+      const header = buffer.subarray(0, Math.min(buffer.length, 1024)).toString("latin1");
+      return header.includes("%PDF-");
+    }
+    case ".docx": {
+      return buffer[0] === 0x50 && buffer[1] === 0x4b && (buffer[2] === 0x03 || buffer[2] === 0x05) && (buffer[3] === 0x04 || buffer[3] === 0x06);
+    }
+    case ".doc": {
+      const isOle = buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
+      const isZip = buffer[0] === 0x50 && buffer[1] === 0x4b;
+      return isOle || isZip;
+    }
+    case ".txt": {
+      const sample = buffer.subarray(0, Math.min(buffer.length, 512));
+      return !sample.includes(0x00);
+    }
+    default:
+      return false;
+  }
+}
+
+/**
  * Validates and enqueues a single file buffer.
  */
 async function processAndEnqueue(
@@ -35,6 +63,11 @@ async function processAndEnqueue(
   // Validate extension
   if (BLACKLISTED_EXTS.includes(ext) || !ACCEPTED_EXTS.includes(ext)) {
     throw new Error(`Unsupported or dangerous file extension: ${ext}`);
+  }
+
+  // Validate file header magic numbers
+  if (!validateMagicNumber(buffer, ext)) {
+    throw new Error(`File binary content does not match expected format for ${ext} (possible extension spoofing)`);
   }
 
   // Upload to Storage Provider

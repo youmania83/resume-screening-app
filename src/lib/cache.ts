@@ -63,6 +63,7 @@ export function cacheInvalidationMiddleware(req: any, res: any, next: any) {
             console.log(`🧹 [Cache Invalidation] Invalidating dashboard cache for tenant ${tenantId} due to ${req.method} ${originalUrl}`);
             Cache.delete(`dashboard-metrics-${tenantId}`);
             Cache.delete(`dashboard-pipeline-${tenantId}`);
+            Cache.delete(`jobs-${tenantId}`);
           }
         }
       });

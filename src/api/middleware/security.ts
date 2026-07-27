@@ -30,7 +30,7 @@ try {
 /**
  * Increment and check rate limits inside Redis
  */
-async function redisRateLimit(ip: string, path: string, windowMs: number, maxRequests: number): Promise<boolean> {
+async function redisRateLimit(ip: string, path: string, windowMs: number, maxRequests: number): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
   if (!redisClient || !isRedisConnected) {
     throw new Error("Redis client offline");
   }
@@ -40,16 +40,20 @@ async function redisRateLimit(ip: string, path: string, windowMs: number, maxReq
   multi.ttl(key);
   
   const results = await multi.exec();
-  if (!results) return false;
+  if (!results) return { allowed: false, remaining: 0, resetTime: Math.ceil(Date.now() / 1000) + Math.ceil(windowMs / 1000) };
   
-  // count is results[0][1], ttl is results[1][1]
   const count = results[0][1] as number;
+  let ttl = results[1][1] as number;
   
-  if (count === 1) {
-    await redisClient.expire(key, Math.ceil(windowMs / 1000));
+  if (count === 1 || ttl <= 0) {
+    ttl = Math.ceil(windowMs / 1000);
+    await redisClient.expire(key, ttl);
   }
+
+  const remaining = Math.max(0, maxRequests - count);
+  const resetTime = Math.ceil(Date.now() / 1000) + (ttl > 0 ? ttl : Math.ceil(windowMs / 1000));
   
-  return count <= maxRequests;
+  return { allowed: count <= maxRequests, remaining, resetTime };
 }
 
 /**
@@ -65,65 +69,65 @@ export function rateLimiter(windowMs: number, maxRequests: number) {
     const ip = (req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
     const path = req.path;
 
-    console.log(`⏱️ [Rate Limiter] Request path: ${req.path}, IP: ${ip}`);
+    let remaining = maxRequests;
+    let resetTimeSec = Math.ceil((Date.now() + windowMs) / 1000);
+    let allowed = true;
+
     // 1. Try Redis
     if (isRedisConnected && redisClient) {
       try {
-        console.log(`⏱️ [Rate Limiter] Querying Redis for ${ip}:${path}`);
-        const allowed = await redisRateLimit(ip, path, windowMs, maxRequests);
-        console.log(`⏱️ [Rate Limiter] Redis allowed? ${allowed}`);
-        if (!allowed) {
-          res.status(429).json({
-            success: false,
-            error: "Too many requests. Please slow down and try again later."
-          });
-          return;
-        }
-        return next();
+        const result = await redisRateLimit(ip, path, windowMs, maxRequests);
+        allowed = result.allowed;
+        remaining = result.remaining;
+        resetTimeSec = result.resetTime;
       } catch (err: any) {
         console.error("[Rate Limiter] Redis rate limiting failed, falling back to memory:", err.message);
       }
+    } else {
+      // 2. Memory Fallback
+      try {
+        const now = Date.now();
+        const limitKey = `${ip}:${path}`;
+        let limit = rateLimits.get(limitKey);
+
+        if (!limit || now > limit.resetTime) {
+          limit = { count: 1, resetTime: now + windowMs };
+          rateLimits.set(limitKey, limit);
+        } else {
+          limit.count++;
+        }
+
+        allowed = limit.count <= maxRequests;
+        remaining = Math.max(0, maxRequests - limit.count);
+        resetTimeSec = Math.ceil(limit.resetTime / 1000);
+      } catch (memErr) {
+        console.error("[Rate Limiter] Local rate limiter error:", memErr);
+        if (isAuthRoute) {
+          res.status(429).json({
+            success: false,
+            error: "Authentication rate limiting active. Request blocked for security."
+          });
+          return;
+        }
+      }
     }
 
-    // 2. Memory Fallback
-    try {
-      const now = Date.now();
-      const limitKey = `${ip}:${path}`;
-      const limit = rateLimits.get(limitKey);
+    // Set standard RateLimit security headers
+    res.setHeader("RateLimit-Limit", maxRequests);
+    res.setHeader("RateLimit-Remaining", remaining);
+    res.setHeader("RateLimit-Reset", resetTimeSec);
 
-      if (!limit) {
-        rateLimits.set(limitKey, { count: 1, resetTime: now + windowMs });
-        return next();
-      }
-
-      if (now > limit.resetTime) {
-        limit.count = 1;
-        limit.resetTime = now + windowMs;
-        return next();
-      }
-
-      limit.count++;
-      if (limit.count > maxRequests) {
-        res.status(429).json({
-          success: false,
-          error: "Too many requests. Please slow down and try again later."
-        });
-        return;
-      }
-
-      next();
-    } catch (memErr) {
-      console.error("[Rate Limiter] Local rate limiter error:", memErr);
-      // 3. Fail Closed on Auth Routes
-      if (isAuthRoute) {
-        res.status(429).json({
-          success: false,
-          error: "Authentication rate limiting active. Request blocked for security."
-        });
-        return;
-      }
-      next();
+    if (!allowed) {
+      const retryAfterSec = Math.max(1, resetTimeSec - Math.ceil(Date.now() / 1000));
+      res.setHeader("Retry-After", retryAfterSec);
+      res.status(429).json({
+        success: false,
+        error: "Too many requests. Please slow down and try again later."
+      });
+      return;
     }
+
+    next();
   };
 }
 

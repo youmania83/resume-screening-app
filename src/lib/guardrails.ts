@@ -45,3 +45,16 @@ export function detectPromptInjection(text: string): boolean {
   
   return false;
 }
+
+/**
+ * Sanitizes candidate resume text by stripping out prompt injection attempts
+ * before interpolating into LLM prompt templates.
+ */
+export function sanitizePromptInjection(text: string): string {
+  if (!text) return "";
+  let sanitized = sanitizeInput(text);
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(new RegExp(pattern.source, "gi"), "[FILTERED_INSTRUCTION]");
+  }
+  return sanitized;
+}

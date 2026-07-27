@@ -361,6 +361,81 @@ router.post(
   }
 );
 
+// POST /api/auth/refresh - Refresh Access Token with Refresh Token Rotation
+router.post("/refresh", async (req, res, next) => {
+  try {
+    const rawRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (!rawRefreshToken) {
+      res.status(401).json({ success: false, error: "Refresh token is missing" });
+      return;
+    }
+
+    const hashedToken = hashToken(rawRefreshToken);
+    const tokenRes = await queryGlobal(
+      "SELECT * FROM refresh_tokens WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP LIMIT 1;",
+      [hashedToken]
+    );
+
+    if (tokenRes.rowCount === 0) {
+      res.status(401).json({ success: false, error: "Invalid or expired refresh token" });
+      return;
+    }
+
+    const tokenRecord = tokenRes.rows[0];
+    const userId = tokenRecord.user_id;
+
+    // SINGLE-USE REFRESH TOKEN ROTATION: Delete the old token immediately
+    await queryGlobal("DELETE FROM refresh_tokens WHERE id = $1;", [tokenRecord.id]);
+
+    const userRes = await queryGlobal("SELECT * FROM users WHERE id = $1 LIMIT 1;", [userId]);
+    if (userRes.rowCount === 0) {
+      res.status(401).json({ success: false, error: "Associated user profile not found" });
+      return;
+    }
+
+    const user = userRes.rows[0];
+    const newAccessToken = jwt.sign(
+      { userId: user.id, tenantId: user.tenant_id, role: user.role, email: user.email },
+      JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    const newRefreshToken = crypto.randomBytes(40).toString("hex");
+    const newHashedRefreshToken = hashToken(newRefreshToken);
+    const expiryDuration = 8 * 60 * 60 * 1000; // 8 hours
+    const expiresAt = new Date(Date.now() + expiryDuration);
+
+    await queryGlobal(
+      "INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4);",
+      [crypto.randomUUID(), user.id, newHashedRefreshToken, expiresAt]
+    );
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+    };
+
+    res.cookie("accessToken", newAccessToken, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", newRefreshToken, {
+      ...cookieOptions,
+      maxAge: expiryDuration,
+    });
+
+    res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      user: { id: user.id, tenantId: user.tenant_id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/auth/logout - User Logout
 router.post("/logout", authMiddleware, async (req, res, next) => {
   try {

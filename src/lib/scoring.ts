@@ -23,6 +23,7 @@
  */
 import { callDeepSeek } from "./deepseek.js";
 import { pool } from "./db.js";
+import { parseCleanJson } from "./parser/ResumeParserProvider.js";
 
 type ScoreResult = {
   overall: number;
@@ -67,17 +68,13 @@ export async function computeScore(batchId: string, jobDescription: string): Pro
   const prompt = buildPrompt(jobDescription, resumeText);
   const response = await callDeepSeek(prompt, { maxTokens: 800 });
   try {
-    let cleaned = response.trim();
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    const parsed = parseCleanJson(response) as ScoreResult;
+    if (typeof parsed.overall !== "number") {
+      throw new Error("Missing overall score field");
     }
-    cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
-    const parsed = JSON.parse(cleaned) as ScoreResult;
     return parsed;
-  } catch {
-    console.error("Failed to parse AI scoring response as JSON:", response);
-    throw new Error("Invalid scoring response from AI model");
+  } catch (err: any) {
+    console.error("Failed to parse AI scoring response as JSON:", response, err.message);
+    throw new Error(`Invalid scoring response from AI model: ${err.message}`);
   }
 }

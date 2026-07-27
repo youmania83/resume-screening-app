@@ -17,14 +17,26 @@ router.get("/", async (req, res, next) => {
   try {
     const includeRemoved = req.query.include_removed === "true";
     const sql = includeRemoved
-      ? `SELECT j.*, 
-                (SELECT COUNT(*) FROM candidates c WHERE (c.job_id = j.id OR c.job_id = j.external_id) AND (c.score > 0 OR c.recommendation IS NOT NULL)) as candidates_count
+      ? `WITH candidate_counts AS (
+           SELECT job_id, COUNT(*) as count
+           FROM candidates
+           WHERE score > 0 OR recommendation IS NOT NULL
+           GROUP BY job_id
+         )
+         SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
+         LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
          WHERE j.tenant_id = :tenant_id 
          ORDER BY j.created_at DESC;`
-      : `SELECT j.*, 
-                (SELECT COUNT(*) FROM candidates c WHERE (c.job_id = j.id OR c.job_id = j.external_id) AND (c.score > 0 OR c.recommendation IS NOT NULL)) as candidates_count
+      : `WITH candidate_counts AS (
+           SELECT job_id, COUNT(*) as count
+           FROM candidates
+           WHERE score > 0 OR recommendation IS NOT NULL
+           GROUP BY job_id
+         )
+         SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
+         LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
          WHERE j.tenant_id = :tenant_id AND (j.sync_status IS NULL OR j.sync_status != 'removed') 
          ORDER BY j.created_at DESC;`;
     const jobsRes = await queryTenant(sql);

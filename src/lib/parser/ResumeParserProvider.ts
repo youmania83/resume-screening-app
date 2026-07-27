@@ -107,18 +107,33 @@ Resume Text:
 ${rawText}`;
 }
 
-function parseCleanJson(text: string): any {
+export function parseCleanJson(text: string): any {
+  if (!text || typeof text !== "string") {
+    throw new Error("Empty or non-string response received from LLM model");
+  }
+
   let cleaned = text.trim();
+  // Strip markdown code fences if present (e.g. ```json { ... } ```)
+  cleaned = cleaned.replace(/^```(?:json)?\s*/gi, "").replace(/\s*```$/g, "");
+
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace !== -1) {
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
     cleaned = cleaned.substring(firstBrace, lastBrace + 1);
   }
-  // Strip trailing commas before closing braces/brackets to prevent JSON parse errors
+
+  // Strip trailing commas before closing brackets or braces
   cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
-  // Strip comments if any
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
-  return JSON.parse(cleaned);
+  // Replace unescaped control characters (ASCII 0x00-0x1F except newline/tab) with spaces
+  cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ");
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err: any) {
+    console.warn("⚠️ [JSON Extractor] Primary parse failed, attempting secondary repair:", err.message);
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*/gm, "$1");
+    return JSON.parse(cleaned);
+  }
 }
 
 // 1. DeepSeek Resume Parser
