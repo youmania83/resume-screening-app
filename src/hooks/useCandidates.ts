@@ -6,7 +6,7 @@ import { INITIAL_CANDIDATES } from "../lib/mockData";
 
 export function useCandidates(isLoggedIn?: boolean) {
   const [candidates, setCandidates] = useState<Candidate[]>(INITIAL_CANDIDATES);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(INITIAL_CANDIDATES[0]);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [scoreFilter, setScoreFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -71,9 +71,11 @@ export function useCandidates(isLoggedIn?: boolean) {
             jobLocation: c.job_location || undefined
           }));
           setCandidates(mapped);
-          if (mapped.length > 0) {
-            setSelectedCandidate(mapped[0]);
-          }
+          setSelectedCandidate(prev => {
+            if (!prev) return null;
+            const match = mapped.find(c => c.id === prev.id);
+            return match || prev;
+          });
         }
       }
     } catch (e) {
