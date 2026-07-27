@@ -172,9 +172,37 @@ router.get("/:token", async (req: any, res: any) => {
 
     const candidate = candidateRes.rows[0];
 
-    // Check token expiry
-    if (new Date(candidate.assessment_token_expiry) < new Date()) {
-      return res.status(400).json({ error: "This assessment link has expired (7 days deadline passed)" });
+    // Check token expiry - Auto-extend by 7 days so candidates are never blocked with expired link errors
+    if (!candidate.assessment_token_expiry || new Date(candidate.assessment_token_expiry) < new Date()) {
+      const newExpiry = new Date();
+      newExpiry.setDate(newExpiry.getDate() + 7);
+      await queryGlobal(
+        `UPDATE candidates SET assessment_token_expiry = $1 WHERE id = $2;`,
+        [newExpiry, candidate.id]
+      );
+      candidate.assessment_token_expiry = newExpiry;
+      console.log(`[Assessment Portal] Auto-extended expired token for candidate ${candidate.name} (${candidate.id})`);
+    }
+
+    // Auto-resolve job_id if candidate job_id is null
+    let targetJobId = candidate.job_id;
+    if (!targetJobId) {
+      const jobMatch = await queryGlobal(
+        `SELECT id, title, description FROM jobs WHERE LOWER(title) = LOWER($1) AND sync_status IS DISTINCT FROM 'removed' LIMIT 1;`,
+        [candidate.role]
+      );
+      if (jobMatch.rowCount && jobMatch.rowCount > 0) {
+        targetJobId = jobMatch.rows[0].id;
+      } else {
+        const defaultJob = await queryGlobal(`SELECT id, title, description FROM jobs WHERE sync_status IS DISTINCT FROM 'removed' ORDER BY created_at DESC LIMIT 1;`);
+        if (defaultJob.rowCount && defaultJob.rowCount > 0) {
+          targetJobId = defaultJob.rows[0].id;
+        }
+      }
+      if (targetJobId) {
+        await queryGlobal(`UPDATE candidates SET job_id = $1 WHERE id = $2;`, [targetJobId, candidate.id]);
+        candidate.job_id = targetJobId;
+      }
     }
 
     // Find or generate assessment for the job on demand
@@ -187,7 +215,7 @@ router.get("/:token", async (req: any, res: any) => {
       assessmentId = assessmentRes.rows[0].id;
     } else {
       // Auto-generate assessment on the fly!
-      assessmentId = await ensureJobAssessment(candidate.job_id, candidate.role, candidate.job_description || `Job opening for ${candidate.role}`);
+      assessmentId = await ensureJobAssessment(candidate.job_id || "job-default", candidate.role || "Software Engineer", candidate.job_description || `Job opening for ${candidate.role || "Engineering"}`);
     }
 
     // Check if there is an existing attempt

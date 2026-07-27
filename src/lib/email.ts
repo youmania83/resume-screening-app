@@ -402,7 +402,7 @@ export async function sendAssessmentInviteEmail(params: {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
 
-  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "https://api.risonaitech.com";
   const assessmentLink = `${portalUrl}/assessment/${params.token}`;
   const formattedExpiry = params.expiryDate.toLocaleDateString("en-US", {
     weekday: "long",
@@ -996,7 +996,7 @@ export async function sendAssessmentReminderEmail(params: {
   const safeJobTitle = escapeHtml(params.jobTitle);
   const { remainingDays, token } = params;
 
-  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "https://api.risonaitech.com";
   const assessmentLink = `${portalUrl}/assessment/${token}`;
   const subject = "Reminder – AI Assessment Pending";
 
