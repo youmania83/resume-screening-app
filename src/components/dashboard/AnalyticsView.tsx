@@ -7,24 +7,27 @@ import { Candidate } from "../../types/index";
 import { BarChart3, TrendingUp, UserCheck, XCircle, Users, CheckCircle } from "lucide-react";
 import { Badge } from "../ui/badge";
 
+import { CandidateStats } from "../../hooks/useCandidates";
+
 interface AnalyticsViewProps {
   candidates: Candidate[];
+  stats?: CandidateStats;
 }
 
-export function AnalyticsView({ candidates }: AnalyticsViewProps) {
-  const totalApplied = candidates.length;
+export function AnalyticsView({ candidates, stats: dbStats }: AnalyticsViewProps) {
+  const totalApplied = Math.max(candidates.length, dbStats?.totalApplicants || dbStats?.totalRecords || 0);
 
   // Calculate counts for key stages
   const stats = useMemo(() => {
-    const total = candidates.length;
+    const total = totalApplied;
     
     // Status counts
     const appliedCount = total;
-    const shortlistedCount = candidates.filter(c => (c.status || "").toLowerCase() === "shortlisted").length;
+    const shortlistedCount = dbStats?.shortlisted ?? candidates.filter(c => (c.status || "").toLowerCase() === "shortlisted").length;
     const interviewingCount = candidates.filter(c => (c.status || "").toLowerCase() === "interviewing").length;
-    const scheduledCount = candidates.filter(c => (c.status || "").toLowerCase() === "interview_scheduled").length;
-    const rejectedCount = candidates.filter(c => (c.status || "").toLowerCase() === "rejected").length;
-    const selectedCount = candidates.filter(c => ["selected", "hired", "onboarded"].includes((c.status || "").toLowerCase())).length;
+    const scheduledCount = dbStats?.interviewsScheduled ?? candidates.filter(c => (c.status || "").toLowerCase() === "interview_scheduled").length;
+    const rejectedCount = dbStats?.rejected ?? candidates.filter(c => (c.status || "").toLowerCase() === "rejected").length;
+    const selectedCount = dbStats?.candidatesSelected ?? candidates.filter(c => ["selected", "hired", "onboarded"].includes((c.status || "").toLowerCase())).length;
     const holdCount = candidates.filter(c => (c.status || "").toLowerCase() === "hold").length;
 
     // Percentages (relative to total applied)

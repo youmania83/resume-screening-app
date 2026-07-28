@@ -100,7 +100,8 @@ export default function Dashboard() {
     handleDeleteCandidate,
     handleDecision,
     filteredCandidates,
-    loadCandidates
+    loadCandidates,
+    stats
   } = useCandidates(!!user)
 
   const {
@@ -395,7 +396,7 @@ export default function Dashboard() {
 
           {activeTab === "inbox" && <InboxView />}
 
-          {activeTab === "dashboard" && <OverviewView candidates={candidates} />}
+          {activeTab === "dashboard" && <OverviewView candidates={candidates} stats={stats} />}
           {activeTab === "jobs" && <JobsView jobs={jobs} setActiveTab={setActiveTab} setImportTab={setImportTab} setActiveJD={setActiveJD} onKekaSync={syncKekaJobs} isSyncingKeka={isSyncingKeka} />}
           {activeTab === "candidates" && (
             <CandidatesView
@@ -432,7 +433,7 @@ export default function Dashboard() {
           )}
           {activeTab === "pipeline" && <PipelineView candidates={candidates} setSelectedCandidate={setSelectedCandidate} setActiveTab={setActiveTab} />}
           {activeTab === "hr_interview" && <HRInterviewDashboard candidates={candidates} loadCandidates={loadCandidates} />}
-          {activeTab === "analytics" && <AnalyticsView candidates={candidates} />}
+          {activeTab === "analytics" && <AnalyticsView candidates={candidates} stats={stats} />}
           {activeTab === "health" && <PlatformHealthView />}
           {activeTab === "settings" && <SettingsView webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
         </main>

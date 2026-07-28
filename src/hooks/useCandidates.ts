@@ -4,8 +4,27 @@ import { toast } from "sonner";
 import { Candidate } from "../types/index";
 import { INITIAL_CANDIDATES } from "../lib/mockData";
 
+export interface CandidateStats {
+  totalApplicants: number;
+  totalRecords: number;
+  screened: number;
+  shortlisted: number;
+  rejected: number;
+  interviewsScheduled: number;
+  candidatesSelected: number;
+}
+
 export function useCandidates(isLoggedIn?: boolean) {
   const [candidates, setCandidates] = useState<Candidate[]>(INITIAL_CANDIDATES);
+  const [stats, setStats] = useState<CandidateStats>({
+    totalApplicants: 0,
+    totalRecords: 0,
+    screened: 0,
+    shortlisted: 0,
+    rejected: 0,
+    interviewsScheduled: 0,
+    candidatesSelected: 0
+  });
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [scoreFilter, setScoreFilter] = useState("all");
@@ -25,7 +44,18 @@ export function useCandidates(isLoggedIn?: boolean) {
 
   const loadCandidates = useCallback(async () => {
     try {
-      const resp = await fetch(`${apiBase}/candidates`, { credentials: "include" });
+      const [resp, statsResp] = await Promise.all([
+        fetch(`${apiBase}/candidates?limit=1000`, { credentials: "include" }),
+        fetch(`${apiBase}/candidates/stats`, { credentials: "include" }).catch(() => null)
+      ]);
+
+      if (statsResp && statsResp.ok) {
+        const statsData = await statsResp.json();
+        if (statsData && statsData.success && statsData.stats) {
+          setStats(statsData.stats);
+        }
+      }
+
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.candidates)) {
@@ -88,7 +118,7 @@ export function useCandidates(isLoggedIn?: boolean) {
       loadCandidates();
       const interval = setInterval(() => {
         loadCandidates();
-      }, 15000);
+      }, 5000); // 5s real-time refresh interval
       return () => clearInterval(interval);
     }
   }, [loadCandidates, isLoggedIn]);
@@ -431,6 +461,7 @@ export function useCandidates(isLoggedIn?: boolean) {
   return {
     candidates,
     setCandidates,
+    stats,
     selectedCandidate,
     setSelectedCandidate,
     searchQuery,

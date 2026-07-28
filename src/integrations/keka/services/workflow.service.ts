@@ -1,4 +1,6 @@
 // src/integrations/keka/services/workflow.service.ts
+import fs from "fs";
+import path from "path";
 import crypto from "crypto";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
@@ -79,80 +81,129 @@ export class KekaWorkflowService {
     let isProfileOnly = false;
     let parsedResult: any = null;
 
-    // 2a. First: check if we already have extracted text stored locally (email pipeline candidates)
+    // 2a. First: check if we already have extracted text stored locally in resume_texts table
     const storedTextRes = await query(
-      `SELECT rt.resume_text FROM resume_texts rt
-       JOIN resume_inbox ri ON ri.id = rt.inbox_id
-       WHERE ri.candidate_id = $1 AND rt.resume_text IS NOT NULL AND length(rt.resume_text) > 50
+      `SELECT rt.raw_text FROM resume_texts rt
+       JOIN resume_inbox ri ON ri.id = rt.batch_id
+       WHERE ri.candidate_id = $1 AND rt.raw_text IS NOT NULL AND length(rt.raw_text) > 50
        ORDER BY ri.created_at DESC LIMIT 1;`,
       [candidateId]
     ).catch(() => ({ rowCount: 0, rows: [] }));
 
-    if ((storedTextRes.rowCount || 0) > 0) {
-      resumeText = storedTextRes.rows[0].resume_text;
+    if ((storedTextRes.rowCount || 0) > 0 && storedTextRes.rows[0].raw_text) {
+      resumeText = storedTextRes.rows[0].raw_text;
       console.log(`[Auto Screening] Using stored resume text for candidate ${candidateId}`);
     } else {
-      // 2b. Try downloading from Keka
-      console.log(`Downloading resume for candidate ${candidateId}...`);
-      try {
-        const resumeBuffer = await kekaDocumentsService.downloadResume(candidateId);
-        
-        if (resumeBuffer.toString("utf8").startsWith("%PDF")) {
-          if (resumeBuffer.toString("utf8").includes("Mock Resume Contents")) {
-            // Mock adapter simulation
-            resumeText = `
-              Full Name: ${candidate.name || "Clark Kent"}
-              Email: ${candidate.email || "clark.kent@example.com"}
-              Phone: ${candidate.phone || "+91 99999 55555"}
-              Experience: 5 years of full stack software engineering. Worked on React, Node.js, TypeScript, PostgreSQL, AWS.
-              Education: Bachelor of Technology in Computer Science from Metropolis University.
-              Skills: React, Node.js, Express, JavaScript, TypeScript, HTML, CSS, SQL, Git, Docker.
-              Projects: Daily Planet News CMS - React frontend, Node.js backend.
-            `;
-          } else {
+      // 2b. Check local uploads directory for files uploaded for this candidate (e.g. Zoho, direct upload)
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      let foundLocalFile = "";
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir);
+        const match = files.find(f => f.includes(candidateId));
+        if (match) {
+          foundLocalFile = path.join(uploadsDir, match);
+        }
+      }
+
+      if (foundLocalFile && fs.existsSync(foundLocalFile)) {
+        console.log(`[Auto Screening] Found local resume file on disk for candidate ${candidateId}: ${foundLocalFile}`);
+        try {
+          const fileBuf = fs.readFileSync(foundLocalFile);
+          const ext = path.extname(foundLocalFile).toLowerCase();
+          if (ext === ".pdf" || fileBuf.toString("utf8", 0, 10).includes("%PDF")) {
             const pdfParse = require("pdf-parse");
             let parsedText = "";
             if (typeof pdfParse === 'function') {
-              const data = await (pdfParse as any)(resumeBuffer);
+              const data = await (pdfParse as any)(fileBuf);
               parsedText = data.text;
             } else if (typeof (pdfParse as any).default === 'function') {
-              const data = await (pdfParse as any).default(resumeBuffer);
+              const data = await (pdfParse as any).default(fileBuf);
               parsedText = data.text;
             } else if (typeof (pdfParse as any).PDFParse === 'function') {
-              const parser = new (pdfParse as any).PDFParse({ data: resumeBuffer });
+              const parser = new (pdfParse as any).PDFParse({ data: fileBuf });
               const data = await parser.getText();
               parsedText = data.text;
-            } else {
-              throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
             }
             resumeText = parsedText;
+          } else if (ext === ".docx") {
+            const mammoth = await import("mammoth");
+            let parseFn: any = mammoth;
+            if (typeof mammoth.default === 'object' && mammoth.default !== null) {
+              parseFn = mammoth.default;
+            }
+            const result = await parseFn.extractRawText({ buffer: fileBuf });
+            resumeText = result.value;
+          } else {
+            resumeText = fileBuf.toString("utf8");
           }
-        } else {
-          resumeText = resumeBuffer.toString("utf8");
+        } catch (e: any) {
+          console.warn(`[Auto Screening] Failed reading local file ${foundLocalFile}:`, e.message);
         }
-      } catch (downloadErr: any) {
-        const errMsg: string = downloadErr.message || String(downloadErr);
-        
-        // 2c. Fallback: if Keka has no resume file or download fails, use zero-cost profile heuristic scoring
-        if (
-          errMsg.includes("No resume") || 
-          errMsg.includes("400") || 
-          errMsg.includes("404") || 
-          errMsg.includes("Fetch resume URL failed") ||
-          errMsg.includes("No valid PDF")
-        ) {
-          console.warn(`[Auto Screening] No resume file in Keka for ${candidate.name} (${errMsg}). Using zero-cost profile heuristic scoring...`);
-          isProfileOnly = true;
-          parsedResult = evaluateProfileHeuristic({
-            name: candidate.name,
-            role: candidate.role || candidate.keka_status,
-            experienceYears: candidate.experience_years || 0,
-            skills: candidate.skills,
-            education: candidate.education
-          });
-        } else {
-          // Re-throw unexpected errors so the caller can handle them
-          throw downloadErr;
+      }
+
+      if (!resumeText) {
+        // 2c. Try downloading from Keka
+        console.log(`Downloading resume for candidate ${candidateId}...`);
+        try {
+          const resumeBuffer = await kekaDocumentsService.downloadResume(candidateId);
+          
+          if (resumeBuffer.toString("utf8").startsWith("%PDF")) {
+            if (resumeBuffer.toString("utf8").includes("Mock Resume Contents")) {
+              // Mock adapter simulation
+              resumeText = `
+                Full Name: ${candidate.name || "Clark Kent"}
+                Email: ${candidate.email || "clark.kent@example.com"}
+                Phone: ${candidate.phone || "+91 99999 55555"}
+                Experience: 5 years of full stack software engineering. Worked on React, Node.js, TypeScript, PostgreSQL, AWS.
+                Education: Bachelor of Technology in Computer Science from Metropolis University.
+                Skills: React, Node.js, Express, JavaScript, TypeScript, HTML, CSS, SQL, Git, Docker.
+                Projects: Daily Planet News CMS - React frontend, Node.js backend.
+              `;
+            } else {
+              const pdfParse = require("pdf-parse");
+              let parsedText = "";
+              if (typeof pdfParse === 'function') {
+                const data = await (pdfParse as any)(resumeBuffer);
+                parsedText = data.text;
+              } else if (typeof (pdfParse as any).default === 'function') {
+                const data = await (pdfParse as any).default(resumeBuffer);
+                parsedText = data.text;
+              } else if (typeof (pdfParse as any).PDFParse === 'function') {
+                const parser = new (pdfParse as any).PDFParse({ data: resumeBuffer });
+                const data = await parser.getText();
+                parsedText = data.text;
+              } else {
+                throw new Error("No valid PDF parsing function or class constructor found in pdf-parse module.");
+              }
+              resumeText = parsedText;
+            }
+          } else {
+            resumeText = resumeBuffer.toString("utf8");
+          }
+        } catch (downloadErr: any) {
+          const errMsg: string = downloadErr.message || String(downloadErr);
+          
+          // 2d. Fallback: if Keka has no resume file or download fails, use zero-cost profile heuristic scoring
+          if (
+            errMsg.includes("No resume") || 
+            errMsg.includes("400") || 
+            errMsg.includes("404") || 
+            errMsg.includes("Fetch resume URL failed") ||
+            errMsg.includes("No valid PDF")
+          ) {
+            console.warn(`[Auto Screening] No resume file found for ${candidate.name} (${errMsg}). Using zero-cost profile heuristic scoring...`);
+            isProfileOnly = true;
+            parsedResult = evaluateProfileHeuristic({
+              name: candidate.name,
+              role: candidate.role || candidate.keka_status,
+              experienceYears: candidate.experience_years || 0,
+              skills: candidate.skills,
+              education: candidate.education
+            });
+          } else {
+            // Re-throw unexpected errors so the caller can handle them
+            throw downloadErr;
+          }
         }
       }
     }

@@ -36,6 +36,50 @@ router.get("/recruiters/list", async (req, res, next) => {
   }
 });
 
+// GET /api/candidates/stats - Get complete, accurate database-wide candidate and record totals for all time
+router.get("/stats", async (req, res, next) => {
+  try {
+    const [candCounts, inboxCounts] = await Promise.all([
+      queryTenant(`
+        SELECT 
+          COUNT(*)::int as total_applicants,
+          COUNT(CASE WHEN score > 0 THEN 1 END)::int as screened_count,
+          COUNT(CASE WHEN LOWER(status) IN ('shortlisted', 'qualified') THEN 1 END)::int as shortlisted_count,
+          COUNT(CASE WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
+          COUNT(CASE WHEN LOWER(status) IN ('interviewing', 'interview_scheduled') THEN 1 END)::int as interviewing_count,
+          COUNT(CASE WHEN LOWER(status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
+        FROM candidates
+        WHERE (tenant_id = :tenant_id OR tenant_id IS NULL);
+      `),
+      queryTenant(`
+        SELECT COUNT(*)::int as total_inbox_records
+        FROM resume_inbox
+        WHERE (tenant_id = :tenant_id OR tenant_id IS NULL);
+      `)
+    ]);
+
+    const stats = candCounts.rows[0] || {};
+    const totalInbox = inboxCounts.rows[0]?.total_inbox_records || 0;
+    const totalApplicants = stats.total_applicants || 0;
+    const totalRecords = Math.max(totalApplicants, totalInbox);
+
+    res.json({
+      success: true,
+      stats: {
+        totalApplicants,
+        totalRecords,
+        screened: stats.screened_count || 0,
+        shortlisted: stats.shortlisted_count || 0,
+        rejected: stats.rejected_count || 0,
+        interviewsScheduled: stats.interviewing_count || 0,
+        candidatesSelected: stats.selected_count || 0
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/candidates - Fetch candidates with search, filtering, and pagination
 router.get("/", async (req, res, next) => {
   try {

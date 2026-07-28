@@ -22,17 +22,20 @@ import {
   Award
 } from "lucide-react";
 
+import { CandidateStats } from "../../hooks/useCandidates";
+
 interface OverviewViewProps {
   candidates: Candidate[];
+  stats?: CandidateStats;
 }
 
-export function OverviewView({ candidates }: OverviewViewProps) {
+export function OverviewView({ candidates, stats }: OverviewViewProps) {
   const [activeStep, setActiveStep] = useState<number | null>(null);
 
   // Derived onboarding progress metrics
-  const hasCandidates = candidates.length > 0;
-  const hasScores = candidates.some((c) => (c.score || 0) > 0);
-  const hasInterviews = candidates.some((c) => 
+  const hasCandidates = (stats?.totalApplicants || candidates.length) > 0;
+  const hasScores = (stats?.screened || 0) > 0 || candidates.some((c) => (c.score || 0) > 0);
+  const hasInterviews = (stats?.interviewsScheduled || 0) > 0 || candidates.some((c) => 
     ["interviewing", "selected", "onboarded"].includes(c.status || "") || 
     c.interviewScheduledDate
   );
@@ -83,22 +86,22 @@ export function OverviewView({ candidates }: OverviewViewProps) {
   const completedCount = useMemo(() => steps.filter(s => s.done).length, [steps]);
 
   const metrics = useMemo(() => {
-    const total = candidates.length;
-    const screened = candidates.filter((c) => (c.score || 0) > 0).length;
-    const shortlisted = candidates.filter((c) => ["shortlisted", "interviewing"].includes(c.status || "")).length;
-    const rejected = candidates.filter((c) => ["rejected", "keka_rejected"].includes(c.status || "")).length;
-    const interviews = candidates.filter((c) => c.status === "interviewing").length;
-    const selected = candidates.filter((c) => ["selected", "onboarded"].includes(c.status || "")).length;
+    const total = Math.max(candidates.length, stats?.totalRecords || stats?.totalApplicants || 0);
+    const screened = stats?.screened ?? candidates.filter((c) => (c.score || 0) > 0).length;
+    const shortlisted = stats?.shortlisted ?? candidates.filter((c) => ["shortlisted", "interviewing"].includes(c.status || "")).length;
+    const rejected = stats?.rejected ?? candidates.filter((c) => ["rejected", "keka_rejected"].includes(c.status || "")).length;
+    const interviews = stats?.interviewsScheduled ?? candidates.filter((c) => c.status === "interviewing").length;
+    const selected = stats?.candidatesSelected ?? candidates.filter((c) => ["selected", "onboarded"].includes(c.status || "")).length;
 
     return [
-      { title: "Total Resumes Received", value: total, desc: "Cumulative uploaded resumes", color: "from-blue-500 via-blue-600 to-indigo-600", textAccent: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30", icon: FileText },
+      { title: "Total Resumes Received", value: total, desc: "Cumulative uploaded resumes & records", color: "from-blue-500 via-blue-600 to-indigo-600", textAccent: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30", icon: FileText },
       { title: "AI Screened", value: screened, desc: "Evaluated by AI parsing engine", color: "from-purple-500 via-violet-600 to-pink-600", textAccent: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30", icon: Sparkles },
       { title: "Shortlisted", value: shortlisted, desc: "Qualified match score candidates", color: "from-emerald-500 via-teal-600 to-emerald-600", textAccent: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30", icon: UserCheck },
       { title: "Rejected", value: rejected, desc: "Did not meet required thresholds", color: "from-rose-500 via-red-600 to-pink-600", textAccent: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30", icon: UserX },
       { title: "Interviews Scheduled", value: interviews, desc: "Scheduled or currently interviewing", color: "from-amber-500 via-orange-600 to-yellow-500", textAccent: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30", icon: CalendarDays },
       { title: "Candidates Selected", value: selected, desc: "Passed all stages and selected", color: "from-cyan-500 via-cyan-600 to-blue-600", textAccent: "text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/20 border-cyan-100 dark:border-cyan-900/30", icon: Award },
     ];
-  }, [candidates]);
+  }, [candidates, stats]);
 
   return (
     <motion.div

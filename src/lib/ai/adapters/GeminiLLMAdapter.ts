@@ -11,8 +11,8 @@ export class GeminiLLMAdapter implements LLMAdapter {
     const temperature = options?.temperature ?? 0.3;
     const maxTokens = options?.maxTokens ?? 1024;
 
-    // Direct Google Gemini API endpoint for gemini-2.5-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: "POST",
