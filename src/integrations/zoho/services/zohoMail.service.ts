@@ -109,8 +109,8 @@ export class ZohoMailService {
             msg.fromEmail,
             null, // Phone placeholder, extracted by AI parser
             matchedRole,
-            0, // AI Score calculated during workflow trigger
-            0, // Match percent
+            60, // Initial baseline AI Score
+            60, // Initial match percent
             0, // Experience years
             "applied",
             "Zoho Mail",

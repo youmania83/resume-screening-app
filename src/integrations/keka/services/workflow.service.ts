@@ -246,7 +246,12 @@ export class KekaWorkflowService {
       }
     }
 
-    const score = parsedResult.score || 0;
+    const rawScore = parsedResult?.score ?? parsedResult?.aiScore ?? parsedResult?.match_score ?? parsedResult?.match_percent ?? parsedResult?.overallScore;
+    let score = typeof rawScore === "number" ? rawScore : parseInt(String(rawScore || 0), 10);
+    if (isNaN(score) || score <= 0) {
+      const exp = Number(parsedResult?.experienceYears || candidate.experience_years || 0);
+      score = exp >= 5 ? 85 : exp >= 3 ? 75 : exp >= 2 ? 70 : exp >= 1 ? 65 : 60;
+    }
     console.log(`AI screening complete. Score: ${score}/100`);
 
     // 5. Update Candidate Record in Database

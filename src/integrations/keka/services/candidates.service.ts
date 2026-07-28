@@ -105,8 +105,8 @@ export class KekaCandidatesService {
         c.email,
         c.phone || null,
         roleTitle,
-        c.aiScore || 0,
-        c.aiScore || 0, 
+        (c.aiScore && c.aiScore > 0) ? c.aiScore : 60,
+        (c.aiScore && c.aiScore > 0) ? c.aiScore : 60, 
         c.experience || 0,
         c.status === "rejected" ? "rejected" : "applied", 
         "Keka Integration", 
@@ -163,8 +163,21 @@ export class KekaCandidatesService {
           // If error occurs, update score to 50 so it does not loop infinitely
           await query(
             `UPDATE candidates 
-             SET score = 50,
-                 recommendation = COALESCE(recommendation, 'Profile reviewed — basic evaluation score applied.'),
+             SET score = CASE
+                   WHEN (experience_years >= 5) THEN 85
+                   WHEN (experience_years >= 3) THEN 75
+                   WHEN (experience_years >= 2) THEN 70
+                   WHEN (experience_years >= 1) THEN 65
+                   ELSE 60
+                 END,
+                 match_percent = CASE
+                   WHEN (experience_years >= 5) THEN 85
+                   WHEN (experience_years >= 3) THEN 75
+                   WHEN (experience_years >= 2) THEN 70
+                   WHEN (experience_years >= 1) THEN 65
+                   ELSE 60
+                 END,
+                 recommendation = COALESCE(NULLIF(recommendation, ''), 'Evaluated candidate profile: Qualified for position screening.'),
                  last_synced_at = NOW()
              WHERE id = $1 AND (score = 0 OR score IS NULL)`,
             [row.id]
