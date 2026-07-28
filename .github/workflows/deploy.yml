@@ -101,6 +101,20 @@ jobs:
                   );
                   console.log('Moved to Under Review:', r3.rowCount);
 
+                  // Move a portion of 0-experience candidates to Hold/Rejected pool
+                  const r4 = await pool.query(
+                    \`UPDATE candidates SET status='rejected'
+                     WHERE status='applied' AND CAST(experience_years AS float) = 0
+                     AND score <= 60
+                     AND id IN (
+                       SELECT id FROM candidates
+                       WHERE status='applied' AND CAST(experience_years AS float) = 0 AND score <= 60
+                       ORDER BY created_at ASC
+                       LIMIT 150
+                     )\`
+                  );
+                  console.log('Moved to Rejected/Hold pool:', r4.rowCount);
+
                   // Summary
                   const summary = await pool.query(
                     \`SELECT status, COUNT(*)::int as count FROM candidates GROUP BY status ORDER BY count DESC\`
