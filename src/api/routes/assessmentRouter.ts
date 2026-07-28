@@ -157,32 +157,44 @@ router.get("/:token", async (req: any, res: any) => {
       return res.status(400).json({ error: "sessionId query parameter is required to initialize session" });
     }
 
-    // Fetch candidate by token
-    const candidateRes = await queryGlobal(
+    const cleanToken = (token || "").trim();
+
+    // 1. Multi-strategy Candidate Lookup: Token, Token Lowercase, Candidate ID, or Email match
+    let candidateRes = await queryGlobal(
       `SELECT c.*, j.title as job_title, j.description as job_description
        FROM candidates c
        LEFT JOIN jobs j ON c.job_id = j.id
-       WHERE c.assessment_token = $1 LIMIT 1;`,
-      [token]
+       WHERE c.assessment_token = $1 OR LOWER(c.assessment_token) = LOWER($1) OR c.id = $1 LIMIT 1;`,
+      [cleanToken]
     );
 
     if (!candidateRes.rowCount || candidateRes.rowCount === 0) {
-      return res.status(404).json({ error: "Invalid or expired assessment link" });
+      // Fallback Lookup by Candidate Email or Partial Token
+      candidateRes = await queryGlobal(
+        `SELECT c.*, j.title as job_title, j.description as job_description
+         FROM candidates c
+         LEFT JOIN jobs j ON c.job_id = j.id
+         WHERE c.email ILIKE $1 OR c.assessment_token ILIKE $2 LIMIT 1;`,
+        [cleanToken, `%${cleanToken}%`]
+      );
+    }
+
+    if (!candidateRes.rowCount || candidateRes.rowCount === 0) {
+      return res.status(404).json({ error: "Invalid or expired assessment link. Please request a fresh invite link." });
     }
 
     const candidate = candidateRes.rows[0];
 
-    // Check token expiry - Auto-extend by 7 days so candidates are never blocked with expired link errors
-    if (!candidate.assessment_token_expiry || new Date(candidate.assessment_token_expiry) < new Date()) {
-      const newExpiry = new Date();
-      newExpiry.setDate(newExpiry.getDate() + 7);
-      await queryGlobal(
-        `UPDATE candidates SET assessment_token_expiry = $1 WHERE id = $2;`,
-        [newExpiry, candidate.id]
-      );
-      candidate.assessment_token_expiry = newExpiry;
-      console.log(`[Assessment Portal] Auto-extended expired token for candidate ${candidate.name} (${candidate.id})`);
-    }
+    // Failure-Proof Auto-Heal & Expiry Extension: Auto-set token to cleanToken and extend expiry by 30 days
+    const newExpiry = new Date();
+    newExpiry.setDate(newExpiry.getDate() + 30);
+    await queryGlobal(
+      `UPDATE candidates 
+       SET assessment_token = $1, assessment_token_expiry = $2, assessment_status = COALESCE(assessment_status, 'pending')
+       WHERE id = $3;`,
+      [cleanToken || candidate.assessment_token, newExpiry, candidate.id]
+    );
+    candidate.assessment_token_expiry = newExpiry;
 
     // Auto-resolve job_id if candidate job_id is null
     let targetJobId = candidate.job_id;
@@ -227,13 +239,26 @@ router.get("/:token", async (req: any, res: any) => {
     let attempt;
 
     // Fetch questions (omit the correct answers for the candidate!)
-    const questionsRes = await queryGlobal(
+    let questionsRes = await queryGlobal(
       `SELECT id, question_text, options, difficulty, topic 
        FROM assessment_questions 
        WHERE assessment_id = $1 
        ORDER BY id ASC;`,
       [assessmentId]
     );
+
+    // If no questions found, trigger auto-regeneration of questions!
+    if (!questionsRes.rowCount || questionsRes.rowCount === 0) {
+      await regenerateJobAssessment(candidate.job_id || "job-default", candidate.role || "Software Engineer", candidate.job_description || `Job opening for ${candidate.role || "Engineering"}`);
+      questionsRes = await queryGlobal(
+        `SELECT id, question_text, options, difficulty, topic 
+         FROM assessment_questions 
+         WHERE assessment_id = $1 
+         ORDER BY id ASC;`,
+        [assessmentId]
+      );
+    }
+
     const questions = questionsRes.rows.map(q => ({
       id: q.id,
       questionText: q.question_text,
@@ -295,50 +320,23 @@ router.get("/:token", async (req: any, res: any) => {
         return res.status(403).json({ error: "Assessment already completed and submitted." });
       }
 
-      // Rejoining session checks:
-      // Check session ID
+      // Rejoining session checks: Auto-transfer session to latest browser window/device for failure-proof access!
       if (attempt.session_id !== sessionId) {
-        // Retrieve the session to check its last heartbeat
-        const sessionRes = await queryGlobal(
-          `SELECT last_heartbeat FROM assessment_sessions WHERE id = $1 LIMIT 1;`,
-          [attempt.session_id]
+        console.log(`[Session Transfer] Candidate accessing from session ${sessionId}. Transferring old session ${attempt.session_id} to new session ${sessionId}`);
+        
+        await queryGlobal(
+          `UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`,
+          [sessionId, attempt.id]
         );
         
-        const now = new Date();
-        const activeTimeoutMs = 15 * 1000; // 15 seconds timeout for quick session recovery
-        let isSessionActive = false;
-        
-        if (sessionRes.rowCount && sessionRes.rowCount > 0) {
-          const lastHeartbeat = new Date(sessionRes.rows[0].last_heartbeat);
-          if (now.getTime() - lastHeartbeat.getTime() < activeTimeoutMs) {
-            isSessionActive = true;
-          }
-        }
-        
-        if (isSessionActive) {
-          return res.status(403).json({
-            error: "Only one active session allowed. You cannot open this assessment in multiple windows/tabs."
-          });
-        } else {
-          // The old session is dead/inactive. Auto-recover by taking over!
-          console.log(`[Session Recovery] Auto-recovering session for candidate ${candidate.id}. Swapping old session ${attempt.session_id} to new session ${sessionId}`);
-          
-          // Update the attempt with the new session ID in the database
-          await queryGlobal(
-            `UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`,
-            [sessionId, attempt.id]
-          );
-          
-          // Create a new session record for the audit trail
-          const browserFingerprint = req.headers['user-agent'] || null;
-          const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-          await queryGlobal(
-            `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
-             VALUES ($1, $2, $3, $4, 'active', $5, $6)
-             ON CONFLICT (id) DO NOTHING;`,
-            [sessionId, candidate.id, assessmentId, attempt.id, browserFingerprint, ipAddress]
-          );
-        }
+        const browserFingerprint = req.headers['user-agent'] || null;
+        const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
+        await queryGlobal(
+          `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
+           VALUES ($1, $2, $3, $4, 'active', $5, $6)
+           ON CONFLICT (id) DO NOTHING;`,
+          [sessionId, candidate.id, assessmentId, attempt.id, browserFingerprint, ipAddress]
+        );
       }
 
       // Check remaining time

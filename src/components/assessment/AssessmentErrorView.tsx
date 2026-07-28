@@ -37,23 +37,20 @@ export default function AssessmentErrorView({
               : error}
           </p>
         </div>
-        {isSessionMismatch ? (
+        <div className="pt-2 space-y-3">
           <button
             onClick={handleForceResume}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-sm transition-colors cursor-pointer shadow-md"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs transition-colors cursor-pointer shadow-md"
           >
-            Resume Assessment Here
+            Resume / Start Assessment Session
           </button>
-        ) : (
-          <div className="pt-2">
-            <a
-              href="mailto:hr@techsolengineers.com?subject=Assessment%20Link%20Help"
-              className="inline-block w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs transition-colors shadow-md"
-            >
-              Contact Recruitment HR
-            </a>
-          </div>
-        )}
+          <a
+            href="mailto:hr@techsolengineers.com?subject=Assessment%20Link%20Help"
+            className="inline-block w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-lg text-xs transition-colors border border-slate-300"
+          >
+            Contact Recruitment HR
+          </a>
+        </div>
         <div className="text-xs text-slate-400 border-t border-border pt-4">
           Security logs recorded. IP & active session identifiers are mapped.
         </div>
