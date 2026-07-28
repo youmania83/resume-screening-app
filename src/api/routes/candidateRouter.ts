@@ -168,7 +168,7 @@ router.get("/", async (req, res, next) => {
          FROM candidates
          LEFT JOIN jobs j ON candidates.job_id = j.id
          WHERE ${whereClause}
-         ORDER BY candidates.${sortBy} ${sortOrder}
+         ORDER BY (CASE WHEN LOWER(candidates.status) IN ('interviewing', 'interview_scheduled') THEN 0 ELSE 1 END), candidates.${sortBy} ${sortOrder}
          LIMIT ${limit} OFFSET ${offset};`,
         queryParams
       ),
