@@ -200,6 +200,16 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
   });
 });
 
+// Auto rescreen zero-score candidates on server startup
+setTimeout(() => {
+  import("../integrations/keka/services/candidates.service.js")
+    .then(({ kekaCandidatesService }) => {
+      console.log("🚀 [Startup] Running auto-rescreening for unscreened zero-score candidates...");
+      return kekaCandidatesService.screenUnscreenedCandidates();
+    })
+    .catch(err => console.error("🚨 [Startup] Rescreen error:", err));
+}, 5000);
+
 // Daily background job to send assessment reminders at 9:00 AM (Lock TTL = 12 hours)
 cron.schedule("0 9 * * *", () => {
   runWithLock("cron:assessment-reminders", 43200, async () => {
