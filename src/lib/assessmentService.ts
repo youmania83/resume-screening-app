@@ -607,11 +607,22 @@ function selectFallbackQuestions(jobTitle: string): Question[] {
 
 /**
  * Creates an assessment for a job if it does not already exist, returning the assessment ID.
+ * Implements a Role-Level Database Question Bank: Questions are permanently saved to PostgreSQL.
+ * Once generated for a job role/title, questions are reused from the database without invoking AI.
  */
 export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDescription: string): Promise<string> {
-  // Check if assessment already exists
+  const cleanJobTitle = (jobTitle || "Software Engineer").trim();
+  const normalizedTitle = cleanJobTitle.toLowerCase();
+
+  // 1. Check if assessment already exists for this exact jobId AND has saved questions
   const existingAssessment = await query(
-    `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+    `SELECT a.id, COUNT(q.id)::int as q_count 
+     FROM assessments a
+     JOIN assessment_questions q ON q.assessment_id = a.id
+     WHERE a.job_id = $1
+     GROUP BY a.id
+     HAVING COUNT(q.id) > 0
+     LIMIT 1;`,
     [jobId]
   );
 
@@ -619,17 +630,58 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
     return existingAssessment.rows[0].id as string;
   }
 
-  // Generate new questions
-  const questions = await generateAssessmentQuestions(jobTitle, jobDescription);
-  const assessmentId = `assess-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-
-  // Save assessment
-  await query(
-    `INSERT INTO assessments (id, job_id, title) VALUES ($1, $2, $3);`,
-    [assessmentId, jobId, `${jobTitle} Assessment`]
+  // 2. Check Role-Level Question Bank: Check if ANY existing assessment has saved questions for the SAME job title / role!
+  const roleQuestionBank = await query(
+    `SELECT q.question_text, q.options, q.correct_answer, q.difficulty, q.topic
+     FROM assessment_questions q
+     JOIN assessments a ON q.assessment_id = a.id
+     LEFT JOIN jobs j ON a.job_id = j.id
+     WHERE LOWER(j.title) = $1 OR LOWER(a.title) LIKE $2 OR LOWER(a.title) = $1
+     ORDER BY a.created_at DESC
+     LIMIT 15;`,
+    [normalizedTitle, `%${normalizedTitle}%`]
   );
 
-  // Save questions
+  const assessmentId = `assess-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+  if (roleQuestionBank.rowCount && roleQuestionBank.rowCount >= 10) {
+    console.log(`🎯 [Question Cache HIT] Reusing ${roleQuestionBank.rowCount} saved questions from database for role "${cleanJobTitle}" (jobId: ${jobId}). Zero AI calls!`);
+    
+    // Save assessment record
+    await query(
+      `INSERT INTO assessments (id, job_id, title) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO NOTHING;`,
+      [assessmentId, jobId, `${cleanJobTitle} Assessment`]
+    );
+
+    // Copy questions to new assessment for this job
+    for (let i = 0; i < roleQuestionBank.rows.length; i++) {
+      const q = roleQuestionBank.rows[i];
+      const qId = `q-${assessmentId}-${i + 1}`;
+      const optionsStr = typeof q.options === "string" ? q.options : JSON.stringify(q.options);
+      
+      await query(
+        `INSERT INTO assessment_questions (id, assessment_id, question_text, options, correct_answer, difficulty, topic)
+         VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+        [qId, assessmentId, q.question_text, optionsStr, q.correct_answer, q.difficulty, q.topic]
+      );
+    }
+
+    return assessmentId;
+  }
+
+  // 3. If no saved questions exist for this role in DB, generate via AI and permanently save to database!
+  console.log(`🤖 [Question Cache MISS] Generating new AI assessment questions for role "${cleanJobTitle}"...`);
+  const questions = await generateAssessmentQuestions(cleanJobTitle, jobDescription);
+
+  // Save assessment record
+  await query(
+    `INSERT INTO assessments (id, job_id, title) VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO NOTHING;`,
+    [assessmentId, jobId, `${cleanJobTitle} Assessment`]
+  );
+
+  // Save questions permanently to database
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     const qId = `q-${assessmentId}-${i + 1}`;
@@ -648,7 +700,7 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
     );
   }
 
-  console.log(`✅ Assessment ${assessmentId} created for job ${jobId} (${jobTitle}) with 15 questions.`);
+  console.log(`✅ [Database Saved] Assessment ${assessmentId} created & permanently saved for job ${jobId} (${cleanJobTitle}) with ${questions.length} questions.`);
   return assessmentId;
 }
 
