@@ -62,6 +62,58 @@ jobs:
             echo "🔄 Restarting services..."
             pm2 restart ecosystem.config.cjs --env production
 
+            # 4b. One-time pipeline stage migration (populate Under Review / Shortlisted / Interviewing)
+            echo "🗄️ Running pipeline stage migration..."
+            cd /var/www/resume-screening-app
+            node -e "
+              require('dotenv').config();
+              const { Pool } = require('pg');
+              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              (async () => {
+                try {
+                  // Restore 5 known interviewing candidates from screenshot
+                  const interviewingEmails = [
+                    'rajeshh.sharma@hotmail.com',
+                    'sharathbabubdn@gmail.com',
+                    'vanirameshbabu82@gmail.com',
+                    'ashishphilipvarghese@gmail.com',
+                    'darshan.j@gmail.com'
+                  ];
+                  const r1 = await pool.query(
+                    \`UPDATE candidates SET status='interviewing', keka_status='HR Interview'
+                     WHERE email = ANY(\\\$1::text[]) AND status NOT IN ('rejected')
+                     RETURNING name\`,
+                    [interviewingEmails]
+                  );
+                  console.log('Interviewing restored:', r1.rowCount, r1.rows.map(r=>r.name));
+
+                  // Move 10+ yrs experience to Shortlisted (if still applied)
+                  const r2 = await pool.query(
+                    \`UPDATE candidates SET status='shortlisted'
+                     WHERE status='applied' AND CAST(experience_years AS float) >= 10\`
+                  );
+                  console.log('Moved to Shortlisted:', r2.rowCount);
+
+                  // Move 5-9 yrs experience to Under Review (if still applied)
+                  const r3 = await pool.query(
+                    \`UPDATE candidates SET status='review'
+                     WHERE status='applied' AND CAST(experience_years AS float) >= 5 AND CAST(experience_years AS float) < 10\`
+                  );
+                  console.log('Moved to Under Review:', r3.rowCount);
+
+                  // Summary
+                  const summary = await pool.query(
+                    \`SELECT status, COUNT(*)::int as count FROM candidates GROUP BY status ORDER BY count DESC\`
+                  );
+                  console.table(summary.rows);
+                } catch(e) {
+                  console.error('Migration error:', e.message);
+                } finally {
+                  pool.end();
+                }
+              })();
+            " || echo "⚠️ Migration script failed (non-blocking)"
+
             # 5. Automated Health Check & Verification Loop
             echo "🧪 Verifying service readiness..."
             
