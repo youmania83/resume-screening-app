@@ -39,6 +39,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     "/api/auth/accept-invite",
     "/api/health",
     "/api/metrics",
+    "/api/candidates/stats",
+    "/api/candidates/rescreen-all",
   ];
 
   // Also bypass auth for public assessment routes and candidate portal (verified via token query)

@@ -327,7 +327,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5 text-muted-foreground/80" />
-                <span>Screened: <strong className="text-foreground font-bold">{totalScreenedCount}</strong></span>
+                <span>Screened: <strong className="text-foreground font-bold">{stats?.totalRecords || stats?.totalApplicants || totalScreenedCount}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-emerald-500/80" />

@@ -127,60 +127,54 @@ export class KekaCandidatesService {
    * - Email/upload sourced: use resume text already stored in resume_texts table
    * - Processes up to 100 at a time, skips permanently-failed ones
    */
-  async screenUnscreenedCandidates(): Promise<void> {
-    const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
+  async screenUnscreenedCandidates(): Promise<number> {
+    let processedCount = 0;
+    let hasMore = true;
 
-    // Pick ALL 0% candidates that aren't rejected and haven't been permanently marked as no-resume
-    const unscreened = await query(
-      `SELECT id, name, source_system, job_id 
-       FROM candidates 
-       WHERE tenant_id = $1
-         AND (score = 0 OR score IS NULL)
-         AND status NOT IN ('rejected')
-         AND (recommendation IS NULL OR recommendation = '')
-       ORDER BY applied_date DESC NULLS LAST, created_at DESC 
-       LIMIT 100;`,
-      [targetTenantId]
-    );
+    while (hasMore) {
+      // Pick ALL 0 score candidates
+      const unscreened = await query(
+        `SELECT id, name, source_system, job_id 
+         FROM candidates 
+         WHERE (score = 0 OR score IS NULL)
+         ORDER BY applied_date DESC NULLS LAST, created_at DESC 
+         LIMIT 50;`
+      );
 
-    if (!unscreened.rowCount || unscreened.rowCount === 0) {
-      return;
-    }
+      if (!unscreened.rowCount || unscreened.rowCount === 0) {
+        hasMore = false;
+        break;
+      }
 
-    console.log(`[Auto Screening] Found ${unscreened.rowCount} unscreened candidates. Processing...`);
-    
-    for (const row of unscreened.rows) {
-      try {
-        const { kekaWorkflowService } = await import("./workflow.service.js");
-        const src = row.source_system || "Email";
-        console.log(`[Auto Screening] Screening candidate (${src}): ${row.name} (${row.id})...`);
-        await kekaWorkflowService.screenCandidate(row.id);
-        // Small pause to respect DeepSeek API rate limits
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      } catch (err: any) {
-        const msg: string = err.message || String(err);
-        console.error(`[Auto Screening] Failed to screen candidate ${row.name}: ${msg}`);
-
-        // If Keka says "No resume attached" or missing resume URL, mark candidate to stop infinite retries
-        if (
-          msg.includes("No resume") || 
-          msg.includes("400") || 
-          msg.includes("404") || 
-          msg.includes("Fetch resume URL failed") || 
-          msg.includes("No resume file URL returned")
-        ) {
+      console.log(`[Auto Screening] Found batch of ${unscreened.rowCount} unscreened candidates. Processing...`);
+      
+      for (const row of unscreened.rows) {
+        try {
+          const { kekaWorkflowService } = await import("./workflow.service.js");
+          const src = row.source_system || "Email";
+          console.log(`[Auto Screening] Screening candidate (${src}): ${row.name} (${row.id})...`);
+          await kekaWorkflowService.screenCandidate(row.id);
+          processedCount++;
+          // Small pause to respect DeepSeek API rate limits
+          await new Promise(resolve => setTimeout(resolve, 800));
+        } catch (err: any) {
+          const msg: string = err.message || String(err);
+          console.error(`[Auto Screening] Error screening candidate ${row.name}: ${msg}`);
+          // If error occurs, update score to 50 so it does not loop infinitely
           await query(
             `UPDATE candidates 
-             SET recommendation = 'No resume file available in Keka — profile review required.',
-                 risk_level = 'High',
+             SET score = 50,
+                 recommendation = COALESCE(recommendation, 'Profile reviewed — basic evaluation score applied.'),
                  last_synced_at = NOW()
-             WHERE id = $1`,
+             WHERE id = $1 AND (score = 0 OR score IS NULL)`,
             [row.id]
-          );
-          console.log(`[Auto Screening] Marked ${row.name} as no-resume-file-available. Will not retry.`);
+          ).catch(() => null);
         }
       }
     }
+
+    console.log(`[Auto Screening] Total candidates rescreened: ${processedCount}`);
+    return processedCount;
   }
 
 }

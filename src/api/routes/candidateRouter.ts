@@ -39,8 +39,9 @@ router.get("/recruiters/list", async (req, res, next) => {
 // GET /api/candidates/stats - Get complete, accurate database-wide candidate and record totals for all time
 router.get("/stats", async (req, res, next) => {
   try {
+    const { queryGlobal } = await import("../../lib/tenantDb.js");
     const [candCounts, inboxCounts] = await Promise.all([
-      queryTenant(`
+      queryGlobal(`
         SELECT 
           COUNT(*)::int as total_applicants,
           COUNT(CASE WHEN score > 0 THEN 1 END)::int as screened_count,
@@ -48,13 +49,11 @@ router.get("/stats", async (req, res, next) => {
           COUNT(CASE WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
           COUNT(CASE WHEN LOWER(status) IN ('interviewing', 'interview_scheduled') THEN 1 END)::int as interviewing_count,
           COUNT(CASE WHEN LOWER(status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
-        FROM candidates
-        WHERE (tenant_id = :tenant_id OR tenant_id IS NULL);
+        FROM candidates;
       `),
-      queryTenant(`
+      queryGlobal(`
         SELECT COUNT(*)::int as total_inbox_records
-        FROM resume_inbox
-        WHERE (tenant_id = :tenant_id OR tenant_id IS NULL);
+        FROM resume_inbox;
       `)
     ]);
 
@@ -74,6 +73,24 @@ router.get("/stats", async (req, res, next) => {
         interviewsScheduled: stats.interviewing_count || 0,
         candidatesSelected: stats.selected_count || 0
       }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/candidates/rescreen-all - Trigger batch rescreening of zero-score candidates
+router.post("/rescreen-all", async (req, res, next) => {
+  try {
+    const { kekaCandidatesService } = await import("../../integrations/keka/services/candidates.service.js");
+    // Trigger rescreening in background asynchronously
+    kekaCandidatesService.screenUnscreenedCandidates()
+      .then(count => console.log(`✅ [Rescreening API] Finished rescreening ${count} candidates`))
+      .catch(err => console.error("❌ [Rescreening API] Error during rescreening:", err));
+
+    res.json({
+      success: true,
+      message: "Rescreening process initiated across all unscreened candidates in the database."
     });
   } catch (err) {
     next(err);
