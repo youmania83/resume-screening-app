@@ -27,7 +27,8 @@ module.exports = {
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       env_production: {
         NODE_ENV: "production",
-        PORT: 4000
+        PORT: 4000,
+        SKIP_STARTUP_SYNC: "true"
       }
     },
     {

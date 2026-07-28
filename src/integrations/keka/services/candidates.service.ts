@@ -77,8 +77,9 @@ export class KekaCandidatesService {
           -- score = EXCLUDED.score,
           -- match_percent = EXCLUDED.match_percent,
           experience_years = EXCLUDED.experience_years,
-          -- Keep our shortlisted / Review statuses on conflict unless Keka marks as rejected
+          -- NEVER overwrite manually-set pipeline stages (review, shortlisted, interviewing, offer, hired)
           status = CASE 
+            WHEN candidates.status NOT IN ('applied') THEN candidates.status
             WHEN EXCLUDED.status = 'rejected' THEN 'rejected'
             ELSE candidates.status 
           END,
