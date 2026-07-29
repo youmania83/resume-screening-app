@@ -178,7 +178,17 @@ export class EmailSyncService {
         }
       ];
 
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
       for (const email of emails) {
+        if (email.date) {
+          const emailTime = new Date(email.date).getTime();
+          if (emailTime < todayStart.getTime()) {
+            console.log(`[Email Sync] Skipping older email received before today: "${email.subject}" (${email.date})`);
+            continue;
+          }
+        }
         const subject = email.subject || "";
         const body = email.bodyText || email.bodyHtml || "";
         
