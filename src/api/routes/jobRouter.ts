@@ -9,6 +9,7 @@ import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
 import { detectPromptInjection } from "../../lib/guardrails.js";
 import { rateLimiter } from "../middleware/security.js";
+import { ensureJobAssessment } from "../../lib/assessmentService.js";
 
 const router = Router();
 
@@ -81,6 +82,11 @@ router.post("/", rateLimiter(1 * 60 * 1000, 15), creditCheck("job_create"), asyn
 
     const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
     await TenantUsageService.incrementMetric(tenantId, "active_jobs", 1);
+
+    // Fire-and-forget: Dynamically generate & store 15 MCQ assessment for the new job
+    ensureJobAssessment(jobId, title, description).catch(err => {
+      console.error(`⚠️ Failed to generate initial assessment for new job ${jobId}:`, err);
+    });
 
     res.status(201).json({ success: true, jobId, title, description });
   } catch (err) {

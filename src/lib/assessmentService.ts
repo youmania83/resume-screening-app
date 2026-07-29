@@ -114,7 +114,7 @@ const COMMON_SELF_INTRO_QUESTIONS: Question[] = [
   }
 ];
 
-// Fallback technical questions for SCM Executive (6 questions)
+// Fallback technical questions for SCM & Logistics (6 questions)
 const SCM_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "Which of the following is the primary objective of strategic procurement?",
@@ -148,7 +148,7 @@ const SCM_TECHNICAL_QUESTIONS: Question[] = [
     topic: "technical"
   },
   {
-    questionText: "In SAP ERP, which module is primarily used for Materials Management and purchasing activities?",
+    questionText: "In ERP systems, which module is primarily used for Materials Management and purchasing activities?",
     options: ["SAP FI", "SAP MM", "SAP SD", "SAP HR"],
     correctAnswer: "SAP MM",
     difficulty: "medium",
@@ -180,7 +180,235 @@ const SCM_TECHNICAL_QUESTIONS: Question[] = [
   }
 ];
 
-// Fallback technical questions for Frontend (6 questions)
+// Fallback technical questions for Engineering & Construction/Projects (6 questions)
+const ENGINEERING_TECHNICAL_QUESTIONS: Question[] = [
+  {
+    questionText: "In project management, what is the primary purpose of defining the Critical Path?",
+    options: [
+      "To identify the sequence of crucial tasks that determines the total minimum project duration",
+      "To calculate the total financial budget of the project",
+      "To assign daily attendance to site workers",
+      "To procure raw materials at the lowest price"
+    ],
+    correctAnswer: "To identify the sequence of crucial tasks that determines the total minimum project duration",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "What does 'EHS' stand for in engineering site operations?",
+    options: [
+      "Environment, Health, and Safety",
+      "Engineering Hardware System",
+      "Electrical Heating Specifications",
+      "Equipment Handling Standard"
+    ],
+    correctAnswer: "Environment, Health, and Safety",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "Which document specifies technical quality, material standards, and compliance criteria for engineering site execution?",
+    options: [
+      "Bill of Quantities (BOQ) / Technical Specification Sheet",
+      "Employee Payslip",
+      "Vendor Marketing Brochure",
+      "Office Attendance Register"
+    ],
+    correctAnswer: "Bill of Quantities (BOQ) / Technical Specification Sheet",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "In industrial electrical installations, what is the main purpose of earthing (grounding)?",
+    options: [
+      "To reduce electrical power consumption",
+      "To protect equipment and personnel from dangerous shock by providing a low-resistance path for fault currents",
+      "To increase voltage supply to machines",
+      "To measure electrical current flow"
+    ],
+    correctAnswer: "To protect equipment and personnel from dangerous shock by providing a low-resistance path for fault currents",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "What does 'HVAC' stand for in building engineering services?",
+    options: [
+      "Heating, Ventilation, and Air Conditioning",
+      "High Voltage Alternating Current",
+      "Heavy Vehicle Automated Control",
+      "Hydraulic Valve and Cable"
+    ],
+    correctAnswer: "Heating, Ventilation, and Air Conditioning",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "During quality control inspections for fabrication or structural welding, which Non-Destructive Testing (NDT) method is best suited for subsurface flaw detection?",
+    options: [
+      "Visual Inspection",
+      "Ultrasonic Testing (UT) / Radiographic Testing (RT)",
+      "Hammer Tapping",
+      "Color Coating Test"
+    ],
+    correctAnswer: "Ultrasonic Testing (UT) / Radiographic Testing (RT)",
+    difficulty: "hard",
+    topic: "technical"
+  }
+];
+
+// Fallback technical questions for Finance & CFO (6 questions)
+const FINANCE_TECHNICAL_QUESTIONS: Question[] = [
+  {
+    questionText: "Which financial statement provides a snapshot of a company's assets, liabilities, and equity at a specific point in time?",
+    options: [
+      "Income Statement (P&L)",
+      "Balance Sheet",
+      "Cash Flow Statement",
+      "Statement of Retained Earnings"
+    ],
+    correctAnswer: "Balance Sheet",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "What does 'EBITDA' measure in corporate financial performance?",
+    options: [
+      "Earnings Before Interest, Taxes, Depreciation, and Amortization",
+      "Equity Balance In Total Dollar Amounts",
+      "Expected Business Income Tax Deductions Allowed",
+      "Estimated Bank Interest and Tax Debt Balances"
+    ],
+    correctAnswer: "Earnings Before Interest, Taxes, Depreciation, and Amortization",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "In financial management, what does a Working Capital Ratio (Current Assets / Current Liabilities) less than 1.0 indicate?",
+    options: [
+      "The company has excess cash reserves",
+      "The company may face short-term liquidity difficulties meeting immediate obligations",
+      "The company is operating with zero debt",
+      "The company has high inventory turnover"
+    ],
+    correctAnswer: "The company may face short-term liquidity difficulties meeting immediate obligations",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "Which capital budgeting metric calculates the discount rate at which the Net Present Value (NPV) of a project equals zero?",
+    options: [
+      "Internal Rate of Return (IRR)",
+      "Payback Period",
+      "Return on Investment (ROI)",
+      "Debt-to-Equity Ratio"
+    ],
+    correctAnswer: "Internal Rate of Return (IRR)",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "In GAAP/IFRS accounting, what is the core difference between Cash Accounting and Accrual Accounting?",
+    options: [
+      "Accrual accounting records revenues and expenses when earned/incurred, while cash accounting records them when cash changes hands",
+      "Cash accounting is mandatory for publicly listed companies",
+      "Accrual accounting ignores accounts payable",
+      "There is no practical difference between them"
+    ],
+    correctAnswer: "Accrual accounting records revenues and expenses when earned/incurred, while cash accounting records them when cash changes hands",
+    difficulty: "hard",
+    topic: "technical"
+  },
+  {
+    questionText: "Which ratio is used by lenders and investors to evaluate a company's ability to cover its debt interest payments from operating income?",
+    options: [
+      "Interest Coverage Ratio (EBIT / Interest Expense)",
+      "Quick Ratio",
+      "Asset Turnover Ratio",
+      "Price-to-Earnings Ratio"
+    ],
+    correctAnswer: "Interest Coverage Ratio (EBIT / Interest Expense)",
+    difficulty: "hard",
+    topic: "technical"
+  }
+];
+
+// Fallback technical questions for Admin & HR (6 questions)
+const ADMIN_HR_TECHNICAL_QUESTIONS: Question[] = [
+  {
+    questionText: "What is the primary function of an Applicant Tracking System (ATS) in talent acquisition?",
+    options: [
+      "To manage employee payroll and tax deductions",
+      "To organize, track, and manage job applications and candidate recruitment workflows",
+      "To schedule company vehicle maintenance",
+      "To design marketing campaigns"
+    ],
+    correctAnswer: "To organize, track, and manage job applications and candidate recruitment workflows",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "Which document is essential for maintaining proper records of visitor management and front desk security in corporate offices?",
+    options: [
+      "Visitor Entry Log / Access Pass Register",
+      "Annual Financial Audit Report",
+      "Vendor Invoice Voucher",
+      "Project Gantt Chart"
+    ],
+    correctAnswer: "Visitor Entry Log / Access Pass Register",
+    difficulty: "easy",
+    topic: "technical"
+  },
+  {
+    questionText: "In HR management, what does 'Onboarding' refer to?",
+    options: [
+      "The process of conducting exit interviews for departing staff",
+      "The process of integrating a new employee into an organization and equipping them with necessary tools/knowledge",
+      "The annual performance appraisal review meeting",
+      "The calculation of monthly overtime wages"
+    ],
+    correctAnswer: "The process of integrating a new employee into an organization and equipping them with necessary tools/knowledge",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "Which communication practice is best suited for resolving administrative conflicts between internal departments?",
+    options: [
+      "Ignoring the conflict until it resolves itself",
+      "Scheduling a structured alignment meeting, understanding mutual operational bottlenecks, and documenting agreed action items",
+      "Escalating directly to external legal counsel",
+      "Sending mass email warnings to all office employees"
+    ],
+    correctAnswer: "Scheduling a structured alignment meeting, understanding mutual operational bottlenecks, and documenting agreed action items",
+    difficulty: "medium",
+    topic: "technical"
+  },
+  {
+    questionText: "When managing office procurement for administrative supplies, what is the primary benefit of maintaining a preferred vendor list (PVL)?",
+    options: [
+      "Ensuring consistent pricing, pre-negotiated service level agreements (SLAs), and reliable delivery times",
+      "Restricting office staff from requesting any supplies",
+      "Eliminating the need for purchase approvals",
+      "Doubling vendor payment costs"
+    ],
+    correctAnswer: "Ensuring consistent pricing, pre-negotiated service level agreements (SLAs), and reliable delivery times",
+    difficulty: "hard",
+    topic: "technical"
+  },
+  {
+    questionText: "Which key metric helps HR teams measure employee retention and organizational workforce stability over a given period?",
+    options: [
+      "Employee Attrition / Turnover Rate",
+      "Cost Per Click (CPC)",
+      "Return on Equity (ROE)",
+      "Gross Margin Percentage"
+    ],
+    correctAnswer: "Employee Attrition / Turnover Rate",
+    difficulty: "hard",
+    topic: "technical"
+  }
+];
+
+// Fallback technical questions for Frontend & Software (6 questions)
 const FRONTEND_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "Which hook should be used in React to perform side effects?",
@@ -246,73 +474,7 @@ const FRONTEND_TECHNICAL_QUESTIONS: Question[] = [
   }
 ];
 
-// Fallback technical questions for DevOps (6 questions)
-const DEVOPS_TECHNICAL_QUESTIONS: Question[] = [
-  {
-    questionText: "What is the primary benefit of infrastructure as code (IaC)?",
-    options: [
-      "It eliminates the need for any cloud provider accounts",
-      "It allows managing and provisioning infrastructure through machine-readable definition files, enabling version control",
-      "It automatically optimizes database query speed",
-      "It makes physical server hardware redundant"
-    ],
-    correctAnswer: "It allows managing and provisioning infrastructure through machine-readable definition files, enabling version control",
-    difficulty: "easy",
-    topic: "technical"
-  },
-  {
-    questionText: "Which containerization tool is most widely used to package applications and their dependencies?",
-    options: ["Docker", "Kubernetes", "VirtualBox", "Terraform"],
-    correctAnswer: "Docker",
-    difficulty: "easy",
-    topic: "technical"
-  },
-  {
-    questionText: "In Terraform, what is the purpose of the state file (terraform.tfstate)?",
-    options: [
-      "To store secret environment credentials only",
-      "To map real-world resources to your configuration and keep track of metadata",
-      "To write bash commands for execution on VMs",
-      "To cache downloaded provider binaries"
-    ],
-    correctAnswer: "To map real-world resources to your configuration and keep track of metadata",
-    difficulty: "medium",
-    topic: "technical"
-  },
-  {
-    questionText: "Which of the following describes the core objective of a CI/CD pipeline?",
-    options: [
-      "To guarantee 100% server uptime at all times",
-      "To automate the building, testing, and deployment of code changes",
-      "To write documentation automatically using AI",
-      "To screen candidates using automated assessment tests"
-    ],
-    correctAnswer: "To automate the building, testing, and deployment of code changes",
-    difficulty: "medium",
-    topic: "technical"
-  },
-  {
-    questionText: "In Kubernetes, which component is responsible for maintaining network rules on nodes, allowing communication to your Pods?",
-    options: ["kube-apiserver", "kube-proxy", "kube-scheduler", "etcd"],
-    correctAnswer: "kube-proxy",
-    difficulty: "hard",
-    topic: "technical"
-  },
-  {
-    questionText: "In a GitOps workflow utilizing ArgoCD, what happens when a manual change is made directly to a live Kubernetes cluster resource via kubectl?",
-    options: [
-      "ArgoCD will automatically delete the cluster",
-      "ArgoCD will detect a 'OutOfSync' state and, if self-healing is enabled, automatically revert the change to match the Git repository",
-      "The Git repository is automatically updated with the manual changes",
-      "The cluster crashes immediately due to validation errors"
-    ],
-    correctAnswer: "ArgoCD will detect a 'OutOfSync' state and, if self-healing is enabled, automatically revert the change to match the Git repository",
-    difficulty: "hard",
-    topic: "technical"
-  }
-];
-
-// Fallback technical questions for Sales/Business (6 questions)
+// Fallback technical questions for Sales & Business (6 questions)
 const SALES_TECHNICAL_QUESTIONS: Question[] = [
   {
     questionText: "What is the primary goal of a sales pipeline?",
@@ -462,7 +624,7 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
   const hasAPIKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
 
   if (provider === "mock" || (!provider && !hasAPIKey)) {
-    console.warn("⚠️ No active AI provider API key configured or AI_PROVIDER is mock. Falling back to default questions.");
+    console.warn("⚠️ No active AI provider API key configured or AI_PROVIDER is mock. Using domain-specific fallback questions.");
     return selectFallbackQuestions(jobTitle);
   }
 
@@ -470,7 +632,7 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
  
  Job Title: ${jobTitle}
  Job Description:
- ${jobDescription}
+ ${jobDescription || jobTitle}
  
  Generate exactly 15 questions meeting these requirements:
  - Options: Exactly 4 options per question.
@@ -481,23 +643,21 @@ export async function generateAssessmentQuestions(jobTitle: string, jobDescripti
    * Behavioral (Situational judgment, communication, and interpersonal skills) (3 questions, topic: 'behavioral')
    * Self-introduction (Professional profile matching, background introduction, career motivation/goals) (3 questions, topic: 'self-introduction')
  - Difficulty distribution:
-   * Easy (6 questions, covering self-introduction and straightforward IQ/behavioral/technical scenarios)
-   * Medium (6 questions, covering standard core concepts)
-   * Hard (3 questions, covering slightly more advanced scenarios)
+   * Easy (6 questions)
+   * Medium (6 questions)
+   * Hard (3 questions)
  
- CRITICAL RULES FOR QUESTION & OPTION QUALITY (MOST IMPORTANT):
- 1. BALANCED QUESTIONS: Design practical, day-to-day work scenarios and standard job competencies. Do not make the questions excessively complex, tricky, or purely theoretical; they should test general, practical proficiency.
+ CRITICAL RULES FOR QUESTION & OPTION QUALITY:
+ 1. BALANCED QUESTIONS: Design practical, day-to-day work scenarios and standard job competencies.
  2. DISTRACTORS MUST BE PLAUSIBLE: Wrong answers must represent common mistakes or plausible misunderstandings.
- 3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure, detail level, and length. The correct answer must NOT be longer or more detailed than the distractors.
+ 3. OPTIONS MUST MATCH IN LENGTH AND TONE: Ensure all 4 options have similar sentence structure and detail level.
  4. INCORRECT OPTIONS MUST BE REAL TERMS/CONCEPTS: Never use made-up words or joke choices.
- 5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D) across questions.
- 6. NO GIVEAWAY PATTERNS: Do not use words like 'never', 'always', 'all of the above', or 'none of the above' in wrong answers.
+ 5. RANDOMIZE CORRECT ANSWER POSITION: The correct answer should appear in different positions (A, B, C, or D).
 
 CRITICAL RULES FOR JSON VALIDITY:
-1. Do NOT use double quotes inside your question texts or options (e.g., instead of "What does "SCM" mean?", write "What does 'SCM' mean?"). If you need quotes inside the text, use single quotes.
-2. Return ONLY a valid, parseable JSON object matching the structure below. Do not include markdown code block formatting (such as \`\`\`json), and do not include any text outside of the JSON.
+1. Do NOT use double quotes inside your question texts or options (use single quotes instead).
+2. Return ONLY a valid, parseable JSON object matching the structure below:
 
-JSON Structure:
 {
   "questions": [
     {
@@ -508,9 +668,7 @@ JSON Structure:
       "topic": "technical"
     }
   ]
-}
-
-Ensure the questions are highly specific to the requirements mentioned in the Job Description, challenging, and professionally written.`;
+}`;
 
   try {
     const rawResponse = await callDeepSeek(prompt, { maxTokens: 3500, temperature: 0.35 });
@@ -523,31 +681,25 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
 
-    // Strip trailing commas before closing braces/brackets to prevent JSON parse errors
     cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
-    // Strip comments if any
     cleaned = cleaned.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
 
     const parsed = JSON.parse(cleaned) as { questions: Question[] };
-    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length === 15) {
-      // Basic validation of keys
-      const validated = parsed.questions.map(q => {
+    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length >= 10) {
+      const validated = parsed.questions.slice(0, 15).map(q => {
         const difficulty = ["easy", "medium", "hard"].includes(q.difficulty) ? q.difficulty : "medium";
         const topic = ["iq", "technical", "behavioral", "self-introduction"].includes(q.topic) ? q.topic : "technical";
         
-        // Ensure options list has exactly 4 items
         let options = q.options;
         if (!Array.isArray(options) || options.length !== 4) {
           options = ["Option A", "Option B", "Option C", "Option D"];
         }
         
-        // Ensure correct answer is exactly one of the options
         let correctAnswer = q.correctAnswer;
         if (!options.includes(correctAnswer)) {
           correctAnswer = options[0];
         }
 
-        // Shuffle options (Fisher-Yates) to randomize correct answer position
         const shuffled = [...options];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -562,41 +714,55 @@ Ensure the questions are highly specific to the requirements mentioned in the Jo
           topic
         } as Question;
       });
+
+      // Top up to 15 questions if fewer than 15 returned by AI
+      if (validated.length < 15) {
+        const fallback = selectFallbackQuestions(jobTitle);
+        const needed = 15 - validated.length;
+        validated.push(...fallback.slice(0, needed));
+      }
+
       return validated;
     } else {
-      throw new Error(`AI generated ${parsed?.questions?.length || 0} questions instead of 15`);
+      throw new Error(`AI generated invalid questions structure`);
     }
   } catch (err: any) {
-    console.error("❌ DeepSeek question generation failed, falling back to mock questions:", err.message);
+    console.error("❌ DeepSeek question generation failed, falling back to domain questions:", err.message);
     return selectFallbackQuestions(jobTitle);
   }
 }
 
 /**
- * Match a role and select fallback questions
+ * Match a role and select failure-proof fallback questions
  */
 function selectFallbackQuestions(jobTitle: string): Question[] {
-  const title = jobTitle.toLowerCase();
+  const title = (jobTitle || "").toLowerCase();
   let techQuestions: Question[] = [];
 
-  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("operations") || title.includes("logistics") || title.includes("warehouse")) {
-    console.log("Using SCM Executive fallback technical questions");
+  if (title.includes("scm") || title.includes("procurement") || title.includes("supply chain") || title.includes("logistics") || title.includes("warehouse")) {
+    console.log("Using SCM & Logistics fallback technical questions");
     techQuestions = SCM_TECHNICAL_QUESTIONS;
-  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("ui") || title.includes("angular") || title.includes("vue")) {
-    console.log("Using Frontend Engineer fallback technical questions");
+  } else if (title.includes("civil") || title.includes("engineer") || title.includes("project") || title.includes("site") || title.includes("welder") || title.includes("fabrication") || title.includes("electrical")) {
+    console.log("Using Engineering & Construction fallback technical questions");
+    techQuestions = ENGINEERING_TECHNICAL_QUESTIONS;
+  } else if (title.includes("cfo") || title.includes("finance") || title.includes("accounts") || title.includes("audit") || title.includes("commercial")) {
+    console.log("Using Finance & CFO fallback technical questions");
+    techQuestions = FINANCE_TECHNICAL_QUESTIONS;
+  } else if (title.includes("admin") || title.includes("front desk") || title.includes("hr") || title.includes("recruiter") || title.includes("talent") || title.includes("assistant")) {
+    console.log("Using Admin & HR fallback technical questions");
+    techQuestions = ADMIN_HR_TECHNICAL_QUESTIONS;
+  } else if (title.includes("frontend") || title.includes("react") || title.includes("web") || title.includes("software") || title.includes("devops") || title.includes("code")) {
+    console.log("Using Software/Frontend fallback technical questions");
     techQuestions = FRONTEND_TECHNICAL_QUESTIONS;
-  } else if (title.includes("devops") || title.includes("cloud") || title.includes("aws") || title.includes("sre") || title.includes("infrastructure") || title.includes("platform")) {
-    console.log("Using DevOps Engineer fallback technical questions");
-    techQuestions = DEVOPS_TECHNICAL_QUESTIONS;
-  } else if (title.includes("sales") || title.includes("marketing") || title.includes("business") || title.includes("account") || title.includes("automobile") || title.includes("automotive") || title.includes("bdm") || title.includes("bde") || title.includes("hr") || title.includes("recruiter") || title.includes("manager") || title.includes("executive") || title.includes("retail") || title.includes("customer")) {
-    console.log("Using Sales/Business fallback technical questions");
+  } else if (title.includes("sales") || title.includes("business") || title.includes("marketing") || title.includes("account manager")) {
+    console.log("Using Sales & Business fallback technical questions");
     techQuestions = SALES_TECHNICAL_QUESTIONS;
   } else {
     console.log("Using Generic fallback technical questions");
     techQuestions = GENERIC_TECHNICAL_QUESTIONS;
   }
 
-  // Combine to create a full 15 question assessment (3 IQ + 6 Technical + 3 Behavioral + 3 Self-Intro)
+  // Combine to create a complete 15 question assessment (3 IQ + 6 Technical + 3 Behavioral + 3 Self-Intro)
   return [
     ...COMMON_IQ_QUESTIONS,
     ...techQuestions,
@@ -614,14 +780,14 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
   const cleanJobTitle = (jobTitle || "Software Engineer").trim();
   const normalizedTitle = cleanJobTitle.toLowerCase();
 
-  // 1. Check if assessment already exists for this exact jobId AND has saved questions
+  // 1. Check if assessment already exists for this exact jobId AND has 15 saved questions
   const existingAssessment = await query(
     `SELECT a.id, COUNT(q.id)::int as q_count 
      FROM assessments a
      JOIN assessment_questions q ON q.assessment_id = a.id
      WHERE a.job_id = $1
      GROUP BY a.id
-     HAVING COUNT(q.id) > 0
+     HAVING COUNT(q.id) >= 15
      LIMIT 1;`,
     [jobId]
   );
@@ -630,7 +796,11 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
     return existingAssessment.rows[0].id as string;
   }
 
-  // 2. Check Role-Level Question Bank: Check if ANY existing assessment has saved questions for the SAME job title / role!
+  // If assessment exists but has fewer than 15 questions, clean it up before regenerating
+  await query(`DELETE FROM assessment_questions WHERE assessment_id IN (SELECT id FROM assessments WHERE job_id = $1);`, [jobId]);
+  await query(`DELETE FROM assessments WHERE job_id = $1;`, [jobId]);
+
+  // 2. Check Role-Level Question Bank: Check if ANY existing assessment has 15 saved questions for the SAME job title / role!
   const roleQuestionBank = await query(
     `SELECT q.question_text, q.options, q.correct_answer, q.difficulty, q.topic
      FROM assessment_questions q
@@ -644,8 +814,8 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
 
   const assessmentId = `assess-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 
-  if (roleQuestionBank.rowCount && roleQuestionBank.rowCount >= 10) {
-    console.log(`🎯 [Question Cache HIT] Reusing ${roleQuestionBank.rowCount} saved questions from database for role "${cleanJobTitle}" (jobId: ${jobId}). Zero AI calls!`);
+  if (roleQuestionBank.rowCount && roleQuestionBank.rowCount >= 15) {
+    console.log(`🎯 [Question Cache HIT] Reusing 15 saved questions from database for role "${cleanJobTitle}" (jobId: ${jobId}). Zero AI calls!`);
     
     // Save assessment record
     await query(
@@ -671,7 +841,7 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
   }
 
   // 3. If no saved questions exist for this role in DB, generate via AI and permanently save to database!
-  console.log(`🤖 [Question Cache MISS] Generating new AI assessment questions for role "${cleanJobTitle}"...`);
+  console.log(`🤖 [Question Cache MISS] Generating 15 new AI assessment MCQs for role "${cleanJobTitle}"...`);
   const questions = await generateAssessmentQuestions(cleanJobTitle, jobDescription);
 
   // Save assessment record
@@ -706,10 +876,8 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
 
 /**
  * Regenerates assessment questions for a job by deleting old ones and creating fresh ones.
- * Use when existing questions were generated incorrectly or need to be refreshed.
  */
 export async function regenerateJobAssessment(jobId: string, jobTitle: string, jobDescription: string): Promise<string> {
-  // Delete existing assessment questions and assessment record for this job
   const existingAssessment = await query(
     `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
     [jobId]
@@ -717,13 +885,10 @@ export async function regenerateJobAssessment(jobId: string, jobTitle: string, j
 
   if (existingAssessment.rowCount && existingAssessment.rowCount > 0) {
     const oldAssessmentId = existingAssessment.rows[0].id;
-    // Delete questions first (FK constraint)
     await query(`DELETE FROM assessment_questions WHERE assessment_id = $1;`, [oldAssessmentId]);
-    // Delete assessment
     await query(`DELETE FROM assessments WHERE id = $1;`, [oldAssessmentId]);
     console.log(`🗑️ Deleted old assessment ${oldAssessmentId} for job ${jobId}`);
   }
 
-  // Now create fresh assessment
   return ensureJobAssessment(jobId, jobTitle, jobDescription);
 }
