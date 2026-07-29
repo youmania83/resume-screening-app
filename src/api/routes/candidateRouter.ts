@@ -45,6 +45,7 @@ router.get("/stats", async (req, res, next) => {
         SELECT 
           COUNT(*)::int as total_applicants,
           COUNT(CASE WHEN candidates.score > 0 THEN 1 END)::int as screened_count,
+          COUNT(CASE WHEN candidates.assessment_status = 'passed' THEN 1 END)::int as assessment_passed_count,
           COUNT(CASE WHEN LOWER(candidates.status) IN ('shortlisted', 'qualified', 'assessment') THEN 1 END)::int as shortlisted_count,
           COUNT(CASE WHEN LOWER(candidates.status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
           COUNT(CASE WHEN LOWER(candidates.status) IN ('interviewing', 'interview_scheduled', 'interview') OR candidates.keka_status ILIKE '%interview%' THEN 1 END)::int as interviewing_count,
@@ -70,6 +71,7 @@ router.get("/stats", async (req, res, next) => {
         totalApplicants,
         totalRecords,
         screened: stats.screened_count || 0,
+        assessmentPassed: stats.assessment_passed_count || 0,
         shortlisted: stats.shortlisted_count || 0,
         rejected: stats.rejected_count || 0,
         interviewsScheduled: stats.interviewing_count || 0,

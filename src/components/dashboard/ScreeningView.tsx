@@ -83,13 +83,13 @@ export function ScreeningView(props: ScreeningViewProps) {
       return {
         total: props.stats.totalApplicants,
         shortlisted: props.stats.shortlisted,
-        assessmentPassed: props.stats.screened,
+        assessmentPassed: props.stats.assessmentPassed !== undefined ? props.stats.assessmentPassed : props.candidates.filter(c => (c as any).assessment_status === "passed").length,
         interviewing: props.stats.interviewsScheduled
       };
     }
     const total = props.candidates.length;
     const shortlisted = props.candidates.filter(c => (c.score || 0) >= 80 || c.status === "shortlisted").length;
-    const assessmentPassed = props.candidates.filter(c => (c as any).assessment_status === "passed" || c.status === "qualified").length;
+    const assessmentPassed = props.candidates.filter(c => (c as any).assessment_status === "passed").length;
     const interviewing = props.candidates.filter(c => c.status === "interviewing" || c.status === "interview_scheduled").length;
     return { total, shortlisted, assessmentPassed, interviewing };
   }, [props.candidates, props.stats]);
