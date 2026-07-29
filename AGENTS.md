@@ -18,6 +18,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 * **Project Directory Optimization:** Conducted a file cleanup audit deleting duplicate `next.config.ts` (keeping ESM-compliant `next.config.js`), outdated CommonJS `initDb.js`, and root-level `test_resume.txt` scratch files.
 
 ## Live Production Environments
-* **Vercel URL (Frontend Client):** https://resume-screening-app-sage.vercel.app
-* **Railway URL (Backend API & Worker):** https://resume-screening-app-databaseurl.up.railway.app
-* **Linux VPS Host IP:** 129.121.97.152 (SSH user: `root`, password: `Yogesh@8865`)
+* **Primary Host (VPS):** ALL frontend and backend services run on VPS `129.121.97.152` (SSH user: `root`, password: `Yogesh@8865`).
+  - **VPS Frontend URL:** https://app.risonaitech.com (or https://app.techsolengineers.com)
+  - **VPS Backend API:** https://api.risonaitech.com (or https://api.techsolengineers.com)
+* **Legacy Server Backup URLs:**
+  - Vercel URL (Frontend): https://resume-screening-app-sage.vercel.app
+  - Railway URL (Backend): https://resume-screening-app-databaseurl.up.railway.app
