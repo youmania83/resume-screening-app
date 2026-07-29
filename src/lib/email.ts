@@ -252,6 +252,69 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
 }
 
 /**
+ * Anti-Spam & Rate Limiting Guard: Enforces a hard cap of MAX 5 emails per candidate across their entire lifecycle,
+ * and prevents sending duplicate email templates to the same candidate within 24 hours.
+ */
+export async function canSendEmailToCandidate(candidateEmail: string, templateName: string, candidateId?: string): Promise<{ canSend: boolean; reason?: string }> {
+  if (!candidateEmail || !candidateEmail.trim()) {
+    return { canSend: false, reason: "No recipient email address" };
+  }
+
+  const emailClean = candidateEmail.trim().toLowerCase();
+
+  try {
+    // 1. Hard cap: Max 5 emails total per candidate across their entire lifecycle
+    const totalEmailsRes = await query(
+      `SELECT COUNT(*)::int as count 
+       FROM email_logs 
+       WHERE LOWER(recipient) = $1 OR (candidate_id IS NOT NULL AND candidate_id = $2);`,
+      [emailClean, candidateId || "non-existent"]
+    );
+
+    const totalSent = totalEmailsRes.rows[0]?.count || 0;
+    if (totalSent >= 5) {
+      return { canSend: false, reason: `Max email limit reached for candidate (${totalSent}/5 total emails sent). Anti-spam protection active.` };
+    }
+
+    // 2. Idempotency: Do not send the same template to the candidate within 24 hours
+    const recentTemplateRes = await query(
+      `SELECT COUNT(*)::int as count 
+       FROM email_logs 
+       WHERE (LOWER(recipient) = $1 OR (candidate_id IS NOT NULL AND candidate_id = $2))
+         AND template = $3
+         AND sent_time > (CURRENT_TIMESTAMP - INTERVAL '24 hours');`,
+      [emailClean, candidateId || "non-existent", templateName]
+    );
+
+    const recentCount = recentTemplateRes.rows[0]?.count || 0;
+    if (recentCount > 0) {
+      return { canSend: false, reason: `Duplicate template '${templateName}' sent to candidate within last 24 hours.` };
+    }
+
+    return { canSend: true };
+  } catch (err: any) {
+    console.error("⚠️ Error checking email rate limits:", err.message);
+    return { canSend: true }; // Permissive fallback on DB error
+  }
+}
+
+/**
+ * Records an email sending log in PostgreSQL database for anti-spam tracking.
+ */
+export async function recordEmailLog(candidateId: string | null, recipient: string, subject: string, template: string, tenantId?: string, status: string = 'sent', errorMessage?: string) {
+  try {
+    const id = `email-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    await query(
+      `INSERT INTO email_logs (id, candidate_id, recipient, subject, template, delivery_status, error_message, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+      [id, candidateId, recipient, subject, template, status, errorMessage || null, tenantId || null]
+    );
+  } catch (err: any) {
+    console.error("⚠️ Failed to record email log:", err.message);
+  }
+}
+
+/**
  * Send candidate decision notification email (selected, rejected, shortlisted, hold, interviewing)
  */
 export async function sendCandidateDecisionEmail(params: {

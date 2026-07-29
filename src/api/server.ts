@@ -306,46 +306,19 @@ async function processAssessmentReminders(tag: string = "Cron") {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🤖 AUTONOMOUS PIPELINE: Email Sync (every 5 minutes) + Inline Resume Worker
+// 🤖 AUTONOMOUS PIPELINE: 30-Minute Recurring Recruitment Sync
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Email sync runs every 30 minutes for ingestion (Lock TTL = 28 min)
+// Autonomous Recruitment Sync runs every 30 minutes (Lock TTL = 28 min)
 cron.schedule("*/30 * * * *", () => {
-  runWithLock("cron:email-sync-all-tenants", 1700, async () => {
+  runWithLock("cron:autonomous-30min-recruitment-sync", 1700, async () => {
     try {
-      const { queryGlobal } = await import("../lib/tenantDb.js");
-      const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
-      
-      const tenantsRes = await queryGlobal(
-        "SELECT id, email_config FROM tenants WHERE email_config IS NOT NULL;"
-      );
-      
-      let totalIngested = 0;
-      
-      for (const tenant of tenantsRes.rows) {
-        const tenantId = tenant.id;
-        const config = tenant.email_config;
-        const incomingSyncEnabled = config?.incomingSyncEnabled === true;
-        const incomingProvider = config?.incomingProvider;
-        
-        if (incomingSyncEnabled && incomingProvider) {
-          try {
-            const count = await EmailSyncService.syncMailbox(tenantId, incomingProvider);
-            if (count > 0) {
-              console.log(`✉️ [Auto-Sync] Ingested ${count} item(s) for tenant ${tenantId} via ${incomingProvider}`);
-            }
-            totalIngested += count;
-          } catch (err: any) {
-            console.error(`🚨 [Auto-Sync] Failed for tenant ${tenantId}:`, err.message || err);
-          }
-        }
-      }
-      
-      if (totalIngested > 0) {
-        console.log(`✉️ [Auto-Sync] Cycle complete. Total ingested: ${totalIngested}`);
-      }
-    } catch (err) {
-      console.error("🚨 [Auto-Sync] Email sync cycle failed:", err);
+      const { AutonomousRecruitmentService } = await import("../services/AutonomousRecruitmentService.js");
+      console.log("⏰ [Cron] Starting 30-Minute Autonomous Recruitment Sync...");
+      const result = await AutonomousRecruitmentService.run30MinCycle();
+      console.log(`✅ [Cron] Autonomous 30-min sync complete. Ingested: ${result.ingested}, Screened: ${result.screened}, Assessment Invites: ${result.invited}, Promoted: ${result.promoted}`);
+    } catch (err: any) {
+      console.error("🚨 [Cron] Autonomous 30-min recruitment sync failed:", err.message || err);
     }
   });
 });
