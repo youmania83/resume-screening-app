@@ -88,15 +88,23 @@ export class RealZohoMailAdapter implements ZohoMailAdapter {
       mailOptions.attachments = attachments;
     }
 
-    await zohoSmtpBreaker.execute(async () => {
-      return retryWithBackoff(async () => {
-        console.log(`🔌 [RealZohoMailAdapter] Verifying SMTP connection...`);
-        await transporter.verify();
-        console.log(`✉️ [RealZohoMailAdapter] Sending email to ${to} (Subject: "${subject}")`);
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ [RealZohoMailAdapter] Email successfully sent to ${to}`);
-      }, 2, 1000, 2);
-    });
+    try {
+      await zohoSmtpBreaker.execute(async () => {
+        return retryWithBackoff(async () => {
+          console.log(`🔌 [RealZohoMailAdapter] Verifying SMTP connection...`);
+          await transporter.verify();
+          console.log(`✉️ [RealZohoMailAdapter] Sending email to ${to} (Subject: "${subject}")`);
+          await transporter.sendMail(mailOptions);
+          console.log(`✅ [RealZohoMailAdapter] Email successfully sent to ${to}`);
+        }, 2, 1000, 2);
+      });
+    } catch (err: any) {
+      if (err.message && (err.message.includes("Unusual sending activity") || err.message.includes("550 5.4.6"))) {
+        console.error("🚨 [Zoho SMTP Error] Account blocked by Zoho for rapid sending. Visit https://mail.zoho.com/UnblockMe to unblock.");
+        throw new Error("Zoho Mail account rate limited by Zoho. Unblock at https://mail.zoho.com/UnblockMe");
+      }
+      throw err;
+    }
   }
 
   /**
