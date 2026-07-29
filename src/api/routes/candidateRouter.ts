@@ -123,7 +123,7 @@ router.post("/rescreen-all", async (req, res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 500));
+    const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit as string) || 500));
     const offset = (page - 1) * limit;
 
     const sortBy = ["created_at", "score", "name", "applied_date", "final_score"].includes(req.query.sortBy as string)
@@ -138,8 +138,19 @@ router.get("/", async (req, res, next) => {
     // Filter by dynamic ATS Stage
     const stageId = req.query.stageId as string;
     if (stageId) {
-      whereClause += ` AND candidates.status = $${paramIndex++}`;
-      queryParams.push(stageId);
+      const sLower = stageId.toLowerCase();
+      if (sLower === "rejected") {
+        whereClause += ` AND LOWER(candidates.status) IN ('rejected', 'keka_rejected')`;
+      } else if (sLower === "interviewing") {
+        whereClause += ` AND LOWER(candidates.status) IN ('interviewing', 'interview_scheduled', 'interview')`;
+      } else if (sLower === "shortlisted") {
+        whereClause += ` AND LOWER(candidates.status) IN ('shortlisted', 'qualified', 'assessment')`;
+      } else if (sLower === "review" || sLower === "hold") {
+        whereClause += ` AND LOWER(candidates.status) IN ('review', 'under_review', 'under review', 'hold')`;
+      } else {
+        whereClause += ` AND LOWER(candidates.status) = $${paramIndex++}`;
+        queryParams.push(sLower);
+      }
     }
 
     // Filter by Recruiter Owner

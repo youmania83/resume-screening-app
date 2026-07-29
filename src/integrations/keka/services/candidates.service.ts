@@ -60,6 +60,10 @@ export class KekaCandidatesService {
         }
       }
 
+      const initialScore = (c.aiScore && c.aiScore > 0)
+        ? c.aiScore
+        : (c.experience && c.experience >= 5 ? 84 : c.experience && c.experience >= 3 ? 76 : c.experience && c.experience >= 1 ? 68 : 64);
+
       await query(`
         INSERT INTO candidates (
           id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
@@ -73,11 +77,7 @@ export class KekaCandidatesService {
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
           role = CASE WHEN candidates.role = 'Candidate' THEN EXCLUDED.role ELSE candidates.role END,
-          -- NEVER overwrite AI-computed scores — keep whatever our pipeline calculated
-          -- score = EXCLUDED.score,
-          -- match_percent = EXCLUDED.match_percent,
           experience_years = EXCLUDED.experience_years,
-          -- NEVER overwrite manually-set pipeline stages (review, shortlisted, interviewing, offer, hired)
           status = CASE 
             WHEN candidates.status NOT IN ('applied') THEN candidates.status
             WHEN EXCLUDED.status = 'rejected' THEN 'rejected'
@@ -86,12 +86,9 @@ export class KekaCandidatesService {
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
           keka_status = EXCLUDED.keka_status,
-          -- Preserve original applied_date; don't reset it on every sync
           applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
-          -- Only update job_id if valid or preserve existing
           job_id = COALESCE(EXCLUDED.job_id, candidates.job_id),
           external_id = EXCLUDED.external_id,
-          -- NEVER overwrite source_system if candidate already has email-pipeline data (resume_inbox record)
           source_system = CASE
             WHEN EXISTS (SELECT 1 FROM resume_inbox WHERE candidate_id = candidates.id LIMIT 1)
             THEN candidates.source_system
@@ -106,8 +103,8 @@ export class KekaCandidatesService {
         c.email,
         c.phone || null,
         roleTitle,
-        (c.aiScore && c.aiScore > 0) ? c.aiScore : 60,
-        (c.aiScore && c.aiScore > 0) ? c.aiScore : 60, 
+        initialScore,
+        initialScore, 
         c.experience || 0,
         c.status === "rejected" ? "rejected" : "applied", 
         "Keka Integration", 

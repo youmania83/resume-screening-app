@@ -434,7 +434,21 @@ export function useCandidates(isLoggedIn?: boolean) {
 
       let statusMatch = true;
       if (statusFilter !== "all") {
-        statusMatch = candidate.status.toLowerCase() === statusFilter.toLowerCase();
+        const s = (candidate.status || "").toLowerCase();
+        const sf = statusFilter.toLowerCase();
+        if (sf === "rejected") {
+          statusMatch = ["rejected", "keka_rejected"].includes(s);
+        } else if (sf === "interviewing") {
+          statusMatch = ["interviewing", "interview_scheduled", "interview"].includes(s);
+        } else if (sf === "shortlisted") {
+          statusMatch = ["shortlisted", "qualified", "assessment"].includes(s);
+        } else if (sf === "review" || sf === "hold") {
+          statusMatch = ["review", "under_review", "under review", "hold"].includes(s);
+        } else if (sf === "talent_pool") {
+          statusMatch = ["talent_pool", "talent pool"].includes(s);
+        } else {
+          statusMatch = s === sf;
+        }
       }
 
       let assessmentMatch = true;

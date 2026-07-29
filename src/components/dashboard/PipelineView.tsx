@@ -22,9 +22,9 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
 
   const appliedList = filterByStatus(["applied"]);
   const reviewList = filterByStatus(["review", "under_review", "under review"]);
-  const shortlistedList = filterByStatus(["shortlisted"]);
-  const interviewingList = filterByStatus(["interviewing"]);
-  const inactiveList = filterByStatus(["hold", "rejected", "talent_pool"]);
+  const shortlistedList = filterByStatus(["shortlisted", "qualified", "assessment"]);
+  const interviewingList = filterByStatus(["interviewing", "interview_scheduled", "interview"]);
+  const inactiveList = filterByStatus(["hold", "rejected", "keka_rejected", "talent_pool", "talent pool"]);
 
   return (
     <motion.div

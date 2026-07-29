@@ -70,8 +70,12 @@ export function AssessmentsView({
     }
   };
 
-  // Only show candidates who qualify (Resume Score >= 80%) OR have already been invited to keep the list clean
-  const eligibleCandidates = candidates.filter(c => (c.score || 0) >= 80 || !!c.assessmentToken);
+  // Include candidates who qualify (Resume Score >= 70%), are in shortlisted/review/interviewing stages, or have assessment tokens
+  const eligibleCandidates = candidates.filter(c => 
+    (c.score || 0) >= 70 || 
+    !!c.assessmentToken || 
+    ["shortlisted", "qualified", "review", "under_review", "under review", "interviewing", "interview_scheduled", "assessment"].includes((c.status || "").toLowerCase())
+  );
 
   const invitedCandidates = eligibleCandidates.filter(c => c.assessmentToken);
   const completedCandidates = eligibleCandidates.filter(c => c.assessmentStatus === "passed" || c.assessmentStatus === "failed");
