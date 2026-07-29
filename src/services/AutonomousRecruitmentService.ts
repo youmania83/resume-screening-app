@@ -72,20 +72,34 @@ export class AutonomousRecruitmentService {
         console.error("🚨 [Autonomous Cycle] Screening queue error:", screenErr.message);
       }
 
-      // 3. Automated Assessment Dispatches for Shortlisted Candidates
+      // 2.5 Auto-promote candidates with score >= 80% to 'shortlisted' status
+      try {
+        const promoteRes = await queryGlobal(
+          `UPDATE candidates 
+           SET status = 'shortlisted' 
+           WHERE score >= 80 
+             AND LOWER(status) IN ('applied', 'review', 'talent_pool', 'under_review', 'under review', 'not specified');`
+        );
+        if (promoteRes.rowCount && promoteRes.rowCount > 0) {
+          console.log(`✨ [Autonomous Cycle] Auto-promoted ${promoteRes.rowCount} high-scoring (≥80%) candidates to 'shortlisted'.`);
+        }
+      } catch (promoteErr: any) {
+        console.error("🚨 [Autonomous Cycle] Candidate promotion error:", promoteErr.message);
+      }
+
+      // 3. Automated Assessment Dispatches for Shortlisted & High-Scoring Candidates
       try {
         const shortlistedRes = await queryGlobal(
-          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, j.title as job_title, j.description as job_desc
+          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc
            FROM candidates c
            LEFT JOIN jobs j ON c.job_id = j.id
-           WHERE LOWER(c.status) IN ('shortlisted', 'qualified')
+           WHERE (LOWER(c.status) IN ('shortlisted', 'qualified', 'talent_pool') OR c.score >= 80)
              AND (c.assessment_token IS NULL OR c.assessment_status IS NULL OR c.assessment_status = 'pending')
              AND c.assessment_status IS DISTINCT FROM 'passed'
              AND c.assessment_status IS DISTINCT FROM 'completed'
-             AND (c.assessment_token_expiry IS NULL OR c.assessment_token_expiry > CURRENT_TIMESTAMP)
              AND c.email IS NOT NULL AND c.email LIKE '%@%'
            ORDER BY c.created_at ASC
-           LIMIT 20;`
+           LIMIT 500;`
         );
 
         for (const candidate of shortlistedRes.rows) {
@@ -107,7 +121,7 @@ export class AutonomousRecruitmentService {
 
               await queryGlobal(
                 `UPDATE candidates 
-                 SET assessment_token = $1, assessment_token_expiry = $2, assessment_status = 'pending' 
+                 SET status = 'shortlisted', assessment_token = $1, assessment_token_expiry = $2, assessment_status = 'pending' 
                  WHERE id = $3;`,
                 [token, expiry, candidate.id]
               );
