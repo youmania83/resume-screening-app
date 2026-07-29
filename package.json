@@ -28,7 +28,7 @@
     "adm-zip": "^0.5.17",
     "autoprefixer": "^10.5.0",
     "aws-sdk": "^2.1693.0",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.78.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -71,7 +71,7 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
