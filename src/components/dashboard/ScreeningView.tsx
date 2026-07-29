@@ -24,10 +24,12 @@ import {
 import { AiScreeningConsole } from "./screening/AiScreeningConsole";
 import { ManualIngestionModal } from "./screening/ManualIngestionModal";
 import { Candidate, StructuredJD } from "../../types/index";
+import { CandidateStats } from "../../hooks/useCandidates";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
 interface ScreeningViewProps {
+  stats?: CandidateStats;
   importTab: "url" | "file" | "text";
   setImportTab: (tab: "url" | "file" | "text") => void;
   importUrl: string;
@@ -83,14 +85,22 @@ export function ScreeningView(props: ScreeningViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  // Compute KPI metrics dynamically
+  // Compute KPI metrics dynamically from backend stats or candidate list
   const metrics = useMemo(() => {
+    if (props.stats && props.stats.totalApplicants > 0) {
+      return {
+        total: props.stats.totalApplicants,
+        shortlisted: props.stats.shortlisted,
+        assessmentPassed: props.stats.screened,
+        interviewing: props.stats.interviewsScheduled
+      };
+    }
     const total = props.candidates.length;
     const shortlisted = props.candidates.filter(c => (c.score || 0) >= 80 || c.status === "shortlisted").length;
     const assessmentPassed = props.candidates.filter(c => (c as any).assessment_status === "passed" || c.status === "qualified").length;
     const interviewing = props.candidates.filter(c => c.status === "interviewing" || c.status === "interview_scheduled").length;
     return { total, shortlisted, assessmentPassed, interviewing };
-  }, [props.candidates]);
+  }, [props.candidates, props.stats]);
 
   // Filter candidates based on search & tab selection
   const filteredCandidates = useMemo(() => {

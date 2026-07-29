@@ -15,7 +15,7 @@ export interface CandidateStats {
 }
 
 export function useCandidates(isLoggedIn?: boolean) {
-  const [candidates, setCandidates] = useState<Candidate[]>(INITIAL_CANDIDATES);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [stats, setStats] = useState<CandidateStats>({
     totalApplicants: 0,
     totalRecords: 0,
@@ -114,14 +114,12 @@ export function useCandidates(isLoggedIn?: boolean) {
   }, [apiBase]);
 
   useEffect(() => {
-    if (isLoggedIn) {
+    loadCandidates();
+    const interval = setInterval(() => {
       loadCandidates();
-      const interval = setInterval(() => {
-        loadCandidates();
-      }, 5000); // 5s real-time refresh interval
-      return () => clearInterval(interval);
-    }
-  }, [loadCandidates, isLoggedIn]);
+    }, 3000); // 3s real-time refresh interval
+    return () => clearInterval(interval);
+  }, [loadCandidates]);
 
   const handleAssessmentSubmit = async (id: string, score: number) => {
     setIsAssessmentSubmitting(true);

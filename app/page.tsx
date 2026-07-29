@@ -345,6 +345,7 @@ export default function Dashboard() {
         <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">
           {activeTab === "screening" && (
             <ScreeningView
+              stats={stats}
               importTab={importTab}
               setImportTab={setImportTab}
               importUrl={importUrl}
