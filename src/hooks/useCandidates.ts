@@ -2,7 +2,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Candidate } from "../types/index";
-import { INITIAL_CANDIDATES } from "../lib/mockData";
 
 export interface CandidateStats {
   totalApplicants: number;
@@ -16,6 +15,8 @@ export interface CandidateStats {
 
 export function useCandidates(isLoggedIn?: boolean) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [stats, setStats] = useState<CandidateStats>({
     totalApplicants: 0,
     totalRecords: 0,
@@ -45,7 +46,7 @@ export function useCandidates(isLoggedIn?: boolean) {
   const loadCandidates = useCallback(async () => {
     try {
       const [resp, statsResp] = await Promise.all([
-        fetch(`${apiBase}/candidates?limit=15000`, { credentials: "include" }),
+        fetch(`${apiBase}/candidates?limit=200`, { credentials: "include" }),
         fetch(`${apiBase}/candidates/stats`, { credentials: "include" }).catch(() => null)
       ]);
 
@@ -101,15 +102,21 @@ export function useCandidates(isLoggedIn?: boolean) {
             jobLocation: c.job_location || undefined
           }));
           setCandidates(mapped);
+          setFetchError(null);
           setSelectedCandidate(prev => {
             if (!prev) return null;
             const match = mapped.find(c => c.id === prev.id);
             return match || prev;
           });
         }
+      } else {
+        setFetchError("Failed to load candidates from server.");
       }
     } catch (e) {
-      console.warn("Failed to fetch candidates from backend, using mocks:", e);
+      console.error("Failed to fetch candidates from backend:", e);
+      setFetchError("Network error loading candidates.");
+    } finally {
+      setIsLoading(false);
     }
   }, [apiBase]);
 
@@ -117,7 +124,7 @@ export function useCandidates(isLoggedIn?: boolean) {
     loadCandidates();
     const interval = setInterval(() => {
       loadCandidates();
-    }, 3000); // 3s real-time refresh interval
+    }, 10000); // 10s production-safe refresh interval
     return () => clearInterval(interval);
   }, [loadCandidates]);
 
@@ -127,42 +134,6 @@ export function useCandidates(isLoggedIn?: boolean) {
 
     const previousCandidates = [...candidates];
     const previousSelectedCandidate = selectedCandidate;
-
-    // Local Fallback Simulation values for optimistic update
-    const status = score >= 70 ? "interviewing" : "rejected";
-    const kekaStatus = score >= 70 ? "active" : "rejected_pool";
-    const assessmentStatus = score >= 70 ? "passed" : "failed";
-    const date = new Date();
-    date.setDate(date.getDate() + 2);
-    const interviewScheduledDate = score >= 70 ? date.toISOString() : null;
-    const logMessage = score >= 70 
-      ? `Candidate passed assessment with score ${score}/100. HR Interview scheduled.` 
-      : `Candidate failed assessment with score ${score}/100. Moved to Rejected Pool in Keka HRMS.`;
-
-    // Optimistically update candidate in UI
-    setCandidates(prev => prev.map(c => {
-      if (c.id === id) {
-        const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: logMessage }];
-        return {
-          ...c,
-          status,
-          kekaStatus,
-          assessmentStatus,
-          assessmentScore: score,
-          interviewScheduledDate,
-          activityLogs: updatedLogs
-        };
-      }
-      return c;
-    }));
-
-    setTimeout(() => {
-      setCandidates(prev => {
-        const match = prev.find(c => c.id === id);
-        if (match) setSelectedCandidate(match);
-        return prev;
-      });
-    }, 100);
 
     try {
       const resp = await fetch(`${apiBase}/candidates/${id}/submit-assessment`, {
@@ -177,7 +148,6 @@ export function useCandidates(isLoggedIn?: boolean) {
         if (data && data.success) {
           setCandidates(prev => prev.map(c => {
             if (c.id === id) {
-              const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: data.logMessage }];
               return {
                 ...c,
                 status: data.status,
@@ -185,13 +155,12 @@ export function useCandidates(isLoggedIn?: boolean) {
                 assessmentStatus: data.assessmentStatus,
                 assessmentScore: data.assessmentScore,
                 interviewScheduledDate: data.interviewScheduledDate,
-                activityLogs: updatedLogs
+                activityLogs: data.activityLogs || c.activityLogs
               };
             }
             return c;
           }));
           toast.success(score >= 70 ? "Candidate passed assessment! HR Interview scheduled." : "Candidate failed assessment. Moved to Keka Rejected Pool.", { id: toastId });
-          setIsAssessmentSubmitting(false);
           setTimeout(() => {
             setCandidates(prev => {
               const match = prev.find(c => c.id === id);
@@ -204,8 +173,11 @@ export function useCandidates(isLoggedIn?: boolean) {
       }
       throw new Error("Assessment submission failed on backend");
     } catch (e) {
-      console.warn("Backend assessment submit failed, keeping local simulation:", e);
-      toast.success(score >= 70 ? "Candidate passed! Scheduled interview (local fallback)." : "Candidate failed (local fallback).", { id: toastId });
+      console.error("Backend assessment submit failed:", e);
+      setCandidates(previousCandidates);
+      setSelectedCandidate(previousSelectedCandidate);
+      toast.error("Assessment submission failed. Please try again.", { id: toastId });
+    } finally {
       setIsAssessmentSubmitting(false);
     }
   };
@@ -216,29 +188,6 @@ export function useCandidates(isLoggedIn?: boolean) {
 
     const previousCandidates = [...candidates];
     const previousSelectedCandidate = selectedCandidate;
-
-    const status = decision === "pass" ? "selected" : "rejected";
-    const kekaStatus = decision === "pass" ? "active" : "rejected_pool";
-    const logMessage = decision === "pass" 
-      ? `HR Interview passed. Feedback: "${feedback}". Moved to Final Selection.` 
-      : `Candidate rejected in HR Interview. Feedback: "${feedback}". Moved to Keka Rejected Pool.`;
-
-    // Optimistically update candidate in UI
-    setCandidates(prev => prev.map(c => {
-      if (c.id === id) {
-        const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: logMessage }];
-        return { ...c, status, kekaStatus, interviewFeedback: feedback, activityLogs: updatedLogs };
-      }
-      return c;
-    }));
-
-    setTimeout(() => {
-      setCandidates(prev => {
-        const match = prev.find(c => c.id === id);
-        if (match) setSelectedCandidate(match);
-        return prev;
-      });
-    }, 100);
 
     try {
       const resp = await fetch(`${apiBase}/candidates/${id}/submit-interview`, {
@@ -253,13 +202,11 @@ export function useCandidates(isLoggedIn?: boolean) {
         if (data && data.success) {
           setCandidates(prev => prev.map(c => {
             if (c.id === id) {
-              const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: data.logMessage }];
-              return { ...c, status: data.status, kekaStatus: data.kekaStatus, interviewFeedback: feedback, activityLogs: updatedLogs };
+              return { ...c, status: data.status, kekaStatus: data.kekaStatus, interviewFeedback: feedback, activityLogs: data.activityLogs || c.activityLogs };
             }
             return c;
           }));
           toast.success(decision === "pass" ? "Candidate approved! Moved to Selection." : "Candidate rejected. Moved to Keka Rejected Pool.", { id: toastId });
-          setIsInterviewSubmitting(false);
           setInterviewFeedbackInput("");
           setTimeout(() => {
             setCandidates(prev => {
@@ -273,10 +220,12 @@ export function useCandidates(isLoggedIn?: boolean) {
       }
       throw new Error("Interview submit failed on backend");
     } catch (e) {
-      console.warn("Backend interview submit failed, keeping local simulation:", e);
-      toast.success(decision === "pass" ? "Interview passed (local fallback)!" : "Interview failed (local fallback).", { id: toastId });
+      console.error("Backend interview submit failed:", e);
+      setCandidates(previousCandidates);
+      setSelectedCandidate(previousSelectedCandidate);
+      toast.error("Interview evaluation failed to save. Please try again.", { id: toastId });
+    } finally {
       setIsInterviewSubmitting(false);
-      setInterviewFeedbackInput("");
     }
   };
 
@@ -286,23 +235,6 @@ export function useCandidates(isLoggedIn?: boolean) {
 
     const previousCandidates = [...candidates];
     const previousSelectedCandidate = selectedCandidate;
-
-    // Optimistically update candidate in UI
-    setCandidates(prev => prev.map(c => {
-      if (c.id === id) {
-        const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: "Initiating onboarding in Keka HRMS..." }];
-        return { ...c, status: "onboarded", kekaStatus: "active", activityLogs: updatedLogs };
-      }
-      return c;
-    }));
-
-    setTimeout(() => {
-      setCandidates(prev => {
-        const match = prev.find(c => c.id === id);
-        if (match) setSelectedCandidate(match);
-        return prev;
-      });
-    }, 100);
 
     try {
       const resp = await fetch(`${apiBase}/candidates/${id}/onboard`, {
@@ -314,13 +246,11 @@ export function useCandidates(isLoggedIn?: boolean) {
         if (data && data.success) {
           setCandidates(prev => prev.map(c => {
             if (c.id === id) {
-              const updatedLogs = [...(c.activityLogs || []), { date: new Date().toISOString(), message: data.logMessage }];
-              return { ...c, status: data.status, kekaStatus: data.kekaStatus, activityLogs: updatedLogs };
+              return { ...c, status: data.status, kekaStatus: data.kekaStatus, activityLogs: data.activityLogs || c.activityLogs };
             }
             return c;
           }));
           toast.success("Candidate onboarding initiated successfully in Keka HRMS!", { id: toastId });
-          setIsOnboardingSubmitting(false);
           setTimeout(() => {
             setCandidates(prev => {
               const match = prev.find(c => c.id === id);
@@ -333,8 +263,11 @@ export function useCandidates(isLoggedIn?: boolean) {
       }
       throw new Error("Onboard failed on backend");
     } catch (e) {
-      console.warn("Backend onboarding submit failed, keeping local simulation:", e);
-      toast.success("Onboarding initiated (local fallback)!", { id: toastId });
+      console.error("Backend onboarding submit failed:", e);
+      setCandidates(previousCandidates);
+      setSelectedCandidate(previousSelectedCandidate);
+      toast.error("Onboarding initiation failed. Please try again.", { id: toastId });
+    } finally {
       setIsOnboardingSubmitting(false);
     }
   };
@@ -411,8 +344,13 @@ export function useCandidates(isLoggedIn?: boolean) {
       // Non-ok response fallback
       toast.warning(`Candidate status updated locally. Backend sync may have failed.`);
     } catch (e) {
-      console.warn("Backend decision call failed, keeping optimistic update:", e);
-      toast.warning(`Candidate status updated locally. Backend sync failed.`);
+      console.error("Backend decision call failed, rolling back:", e);
+      // Rollback optimistic update
+      setCandidates(prev => prev.map(c => {
+        const original = candidates.find(oc => oc.id === c.id);
+        return original || c;
+      }));
+      toast.error("Failed to update candidate status. Please try again.");
     }
   };
 
@@ -474,6 +412,8 @@ export function useCandidates(isLoggedIn?: boolean) {
     candidates,
     setCandidates,
     stats,
+    isLoading,
+    fetchError,
     selectedCandidate,
     setSelectedCandidate,
     searchQuery,

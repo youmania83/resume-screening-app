@@ -1,5 +1,6 @@
 // src/api/routes/interviewRouter.ts
 import { Router } from "express";
+import crypto from "crypto";
 import { queryTenant } from "../../lib/tenantDb.js";
 import { sendInterviewScheduleEmail } from "../../lib/email.js";
 import { logTimelineEvent } from "../../lib/timeline.js";
@@ -63,7 +64,7 @@ router.post("/schedule", async (req: any, res: any, next: any) => {
 
     const interviewId = checkInterview.rowCount && checkInterview.rowCount > 0
       ? checkInterview.rows[0].id
-      : `interview-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      : crypto.randomUUID();
 
     if (checkInterview.rowCount && checkInterview.rowCount > 0) {
       await queryTenant(

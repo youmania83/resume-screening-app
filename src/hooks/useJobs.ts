@@ -2,11 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { JobListItem, StructuredJD } from "../types/index";
-import { INITIAL_JOBS, INITIAL_SCM_JD } from "../lib/mockData";
 
 export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) => void) {
-  const [jobs, setJobs] = useState<JobListItem[]>(INITIAL_JOBS);
-  const [activeJD, setActiveJD] = useState<StructuredJD | null>(INITIAL_SCM_JD);
+  const [jobs, setJobs] = useState<JobListItem[]>([]);
+  const [activeJD, setActiveJD] = useState<StructuredJD | null>(null);
   const [importTab, setImportTab] = useState<"url" | "file" | "text">("url");
   const [importUrl, setImportUrl] = useState("");
   const [jdTextPaste, setJdTextPaste] = useState("");
@@ -58,7 +57,7 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         }
       }
     } catch (e) {
-      console.warn("Failed to load jobs from backend, using mocks:", e);
+      console.error("Failed to load jobs from backend:", e);
     }
   }, [apiBase]);
 
@@ -198,26 +197,11 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
         }
       }
     } catch (e) {
-      console.warn("Failed to call extract JD API, simulating locally:", e);
+      console.error("Failed to call extract JD API:", e);
     }
 
-    // Local Fallback Simulation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    const mockJD: StructuredJD = {
-      title: importTab === "url" ? "System Architect" : "React Developer",
-      experience: "5-10 Years",
-      department: "Engineering",
-      location: "Remote",
-      requiredSkills: ["Architecture Patterns", "System Design", "Cloud Computing"],
-      preferredSkills: ["Kubernetes", "Redis", "BullMQ"],
-      education: "Bachelor's Degree in Computer Science",
-      responsibilities: ["Design scalable systems", "Review code reviews", "Enforce performance limits"],
-      keywords: ["Architect", "Backend", "Scale"],
-      screeningCriteria: ["Experience in microservices", "Ability to define APIs"]
-    };
-    setActiveJD(mockJD);
-    saveOrUpdateJob(mockJD);
-    toast.success("Job parsed successfully (Local simulation)!", { id: toastId });
+    // Show error — do NOT create fake fallback data
+    toast.error("Failed to extract job description. Please check the URL/text and try again.", { id: toastId });
     setIsExtracting(false);
   };
 

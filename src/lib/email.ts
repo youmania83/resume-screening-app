@@ -1,5 +1,6 @@
 // src/lib/email.ts
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 import dns from "dns";
 import fs from "fs";
 import path from "path";
@@ -294,7 +295,7 @@ export async function canSendEmailToCandidate(candidateEmail: string, templateNa
     return { canSend: true };
   } catch (err: any) {
     console.error("⚠️ Error checking email rate limits:", err.message);
-    return { canSend: true }; // Permissive fallback on DB error
+    return { canSend: false, reason: "Email rate check failed due to database error. Blocking to prevent spam." };
   }
 }
 
@@ -311,7 +312,7 @@ export async function recordEmailLog(candidateId: string | null, recipient: stri
       }
     }
 
-    const id = `email-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const id = crypto.randomUUID();
     await query(
       `INSERT INTO email_logs (id, candidate_id, recipient, subject, template, delivery_status, error_message, tenant_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,

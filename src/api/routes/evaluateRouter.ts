@@ -206,12 +206,12 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       console.error("Failed to update credit usage metrics:", metricErr);
     }
 
-    const candidateId = `cand-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const candidateId = crypto.randomUUID();
     const appliedDate = new Date().toISOString().split("T")[0];
     const score = parsedResult.score || 0;
     const applicationSource = req.body.applicationSource || "Careers Page";
     
-    let jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    let jobId = crypto.randomUUID();
     const targetJobTitle = jobTitle || parsedResult.role || "SCM Executive";
     const targetJobDesc = parsedJD ? (parsedJD.description || jobDescription) : jobDescription;
     const targetDept = parsedJD?.department || "Operations";

@@ -51,10 +51,21 @@ export class AutonomousRecruitmentService {
 
         for (const item of queuedResumes.rows) {
           try {
+            // Mark as Processing to prevent double-picks by concurrent cycles
+            const lockRes = await queryGlobal(
+              `UPDATE resume_inbox SET status = 'Processing' WHERE id = $1 AND status IN ('Queued', 'Uploaded', 'Pending') RETURNING id;`,
+              [item.id]
+            );
+            if (!lockRes.rowCount || lockRes.rowCount === 0) {
+              console.log(`⏭️ [Autonomous Cycle] Inbox item ${item.id} already being processed. Skipping.`);
+              continue;
+            }
             await parseAndEvalResume(item.tenant_id, item.id, item.file_url, "application/pdf");
             screened++;
           } catch (evalErr: any) {
             console.error(`[Autonomous Cycle] Resume processing error for inbox item ${item.id}:`, evalErr.message);
+            // Reset status so it can be retried
+            await queryGlobal(`UPDATE resume_inbox SET status = 'Queued' WHERE id = $1;`, [item.id]).catch(() => {});
           }
         }
       } catch (screenErr: any) {
@@ -71,6 +82,7 @@ export class AutonomousRecruitmentService {
              AND (c.assessment_token IS NULL OR c.assessment_status IS NULL OR c.assessment_status = 'pending')
              AND c.assessment_status IS DISTINCT FROM 'passed'
              AND c.assessment_status IS DISTINCT FROM 'completed'
+             AND (c.assessment_token_expiry IS NULL OR c.assessment_token_expiry > CURRENT_TIMESTAMP)
              AND c.email IS NOT NULL AND c.email LIKE '%@%'
            ORDER BY c.created_at ASC
            LIMIT 20;`
@@ -138,6 +150,7 @@ export class AutonomousRecruitmentService {
            LEFT JOIN jobs j ON c.job_id = j.id
            WHERE c.assessment_status = 'passed'
              AND LOWER(c.status) NOT IN ('interviewing', 'interview_scheduled', 'selected', 'hired')
+             AND NOT EXISTS (SELECT 1 FROM interviews WHERE candidate_id = c.id AND status = 'scheduled')
            LIMIT 20;`
         );
 
@@ -147,7 +160,7 @@ export class AutonomousRecruitmentService {
             interviewDate.setDate(interviewDate.getDate() + 2);
             interviewDate.setHours(10, 0, 0, 0);
 
-            const interviewId = `interview-auto-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+            const interviewId = crypto.randomUUID();
             
             await queryGlobal(
               `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status, tenant_id)

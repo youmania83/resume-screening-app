@@ -1,5 +1,6 @@
 import { callDeepSeek } from "./deepseek.js";
 import { query } from "./db.js";
+import crypto from "crypto";
 
 export interface Question {
   questionText: string;
@@ -812,7 +813,7 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
     [normalizedTitle, `%${normalizedTitle}%`]
   );
 
-  const assessmentId = `assess-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  const assessmentId = crypto.randomUUID();
 
   if (roleQuestionBank.rowCount && roleQuestionBank.rowCount >= 15) {
     console.log(`🎯 [Question Cache HIT] Reusing 15 saved questions from database for role "${cleanJobTitle}" (jobId: ${jobId}). Zero AI calls!`);
