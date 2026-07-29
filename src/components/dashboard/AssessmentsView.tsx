@@ -50,6 +50,7 @@ export function AssessmentsView({
       const resp = await fetch(`${apiBase}/assessment/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ candidateId: id })
       });
 
