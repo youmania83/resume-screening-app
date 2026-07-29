@@ -619,6 +619,14 @@ async function init() {
       );
     `);
 
+    // Ensure single-tenant deployment consistency across all data tables
+    await client.query(`
+      UPDATE candidates SET tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' WHERE tenant_id IS NULL OR tenant_id != '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5';
+      UPDATE resume_inbox SET tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' WHERE tenant_id IS NULL OR tenant_id != '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5';
+      UPDATE jobs SET tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' WHERE tenant_id IS NULL OR tenant_id != '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5';
+    `);
+
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS tenant_usage_summary (
         tenant_id VARCHAR REFERENCES tenants(id) ON DELETE CASCADE,
