@@ -303,11 +303,19 @@ export async function canSendEmailToCandidate(candidateEmail: string, templateNa
  */
 export async function recordEmailLog(candidateId: string | null, recipient: string, subject: string, template: string, tenantId?: string, status: string = 'sent', errorMessage?: string) {
   try {
+    let validCandId: string | null = null;
+    if (candidateId) {
+      const checkCand = await query(`SELECT id FROM candidates WHERE id = $1 LIMIT 1;`, [candidateId]);
+      if (checkCand.rowCount && checkCand.rowCount > 0) {
+        validCandId = candidateId;
+      }
+    }
+
     const id = `email-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     await query(
       `INSERT INTO email_logs (id, candidate_id, recipient, subject, template, delivery_status, error_message, tenant_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
-      [id, candidateId, recipient, subject, template, status, errorMessage || null, tenantId || null]
+      [id, validCandId, recipient, subject, template, status, errorMessage || null, tenantId || null]
     );
   } catch (err: any) {
     console.error("⚠️ Failed to record email log:", err.message);

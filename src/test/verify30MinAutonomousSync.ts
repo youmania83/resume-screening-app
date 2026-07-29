@@ -20,6 +20,13 @@ async function main() {
   const testEmail = `antispam.test.${Date.now()}@example.com`;
   const testCandId = `cand-antispam-${Date.now()}`;
 
+  // Insert test candidate into candidates table first
+  await queryGlobal(
+    `INSERT INTO candidates (id, name, email, role, score, match_percent, experience_years, status, application_source, applied_date, tenant_id)
+     VALUES ($1, 'AntiSpam Tester', $2, 'Software Engineer', 80, 80, 5, 'applied', 'Direct Application', '2026-07-29', '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5');`,
+    [testCandId, testEmail]
+  );
+
   // Log 5 emails for test candidate
   for (let i = 1; i <= 5; i++) {
     await recordEmailLog(testCandId, testEmail, `Test Email ${i}`, `template_${i}`, "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5");
@@ -35,8 +42,9 @@ async function main() {
     throw new Error("❌ FAIL: Anti-spam hard cap allowed > 5 emails!");
   }
 
-  // Clean up test email logs
+  // Clean up test email logs & candidate
   await queryGlobal(`DELETE FROM email_logs WHERE recipient = $1;`, [testEmail]);
+  await queryGlobal(`DELETE FROM candidates WHERE id = $1;`, [testCandId]);
   console.log("\n=======================================================");
   console.log("🎉 ALL AUTONOMOUS SYNC & ANTI-SPAM CHECKS PASSED!");
   console.log("=======================================================\n");
