@@ -149,8 +149,8 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
-  // Bypass CSRF for candidate-facing assessment endpoints (accessed via token, not session cookies)
-  if (req.path.startsWith("/api/assessment/") && !req.path.startsWith("/api/assessment/generate") && !req.path.startsWith("/api/assessment/send")) {
+  // Bypass CSRF for candidate-facing and recruiter assessment endpoints
+  if (req.path.startsWith("/api/assessment")) {
     return next();
   }
 
@@ -166,7 +166,8 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction) {
 
   const isAuthorized = origin && (
     origin.startsWith(expectedDomain) ||
-    origin.startsWith("http://localhost:3000") ||
+    origin.startsWith("http://localhost") ||
+    origin.includes("129.121.97.152") ||
     origin.endsWith(".vercel.app") ||
     origin.includes("risonaitech.com")
   );
