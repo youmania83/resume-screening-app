@@ -71,18 +71,10 @@ jobs:
               const pool = new Pool({ connectionString: process.env.DATABASE_URL });
               (async () => {
                 try {
-                  // 1. Restore interviewing candidates
-                  const interviewingEmails = [
-                    'rajeshh.sharma@hotmail.com',
-                    'sharathbabubdn@gmail.com',
-                    'vanirameshbabu82@gmail.com',
-                    'ashishphilipvarghese@gmail.com',
-                    'darshan.j@gmail.com'
-                  ];
+                  // 1. Restore interviewing candidates (set status='interviewing' for all interview candidates)
                   await pool.query(
-                    \`UPDATE candidates SET status='interviewing', keka_status='HR Interview'
-                     WHERE email = ANY(\\\$1::text[]) AND status NOT IN ('rejected')\`,
-                    [interviewingEmails]
+                    \`UPDATE candidates SET status='interviewing'
+                     WHERE (keka_status ILIKE '%interview%' OR status = 'interview') AND status NOT IN ('rejected')\`
                   );
 
                   // 2. Move 10+ yrs experience to Shortlisted (if still applied)

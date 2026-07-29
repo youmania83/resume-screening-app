@@ -27,9 +27,11 @@ export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterview
   const interviewCandidates = useMemo(() => {
     return candidates.filter(c => {
       const status = (c.status || "").toLowerCase();
-      if (viewFilter === "pending") return status === "interviewing";
+      const kekaStatus = (c.kekaStatus || "").toLowerCase();
+      const isInterviewing = status === "interviewing" || status === "interview" || status === "interview_scheduled" || kekaStatus.includes("interview");
+      if (viewFilter === "pending") return isInterviewing && status !== "interview_scheduled";
       if (viewFilter === "scheduled") return status === "interview_scheduled";
-      return status === "interviewing" || status === "interview_scheduled";
+      return isInterviewing;
     }).filter(c => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
@@ -41,7 +43,11 @@ export function HRInterviewDashboard({ candidates, loadCandidates }: HRInterview
     });
   }, [candidates, viewFilter, searchQuery]);
 
-  const pendingCount = candidates.filter(c => (c.status || "").toLowerCase() === "interviewing").length;
+  const pendingCount = candidates.filter(c => {
+    const status = (c.status || "").toLowerCase();
+    const kekaStatus = (c.kekaStatus || "").toLowerCase();
+    return (status === "interviewing" || status === "interview" || kekaStatus.includes("interview")) && status !== "interview_scheduled";
+  }).length;
   const scheduledCount = candidates.filter(c => (c.status || "").toLowerCase() === "interview_scheduled").length;
 
   const handleScheduleInterview = async () => {
