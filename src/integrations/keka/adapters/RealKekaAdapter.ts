@@ -124,9 +124,10 @@ export class RealKekaAdapter implements ATSAdapter {
     // Candidates are nested under jobs in the Keka Hire API.
     // Fetch all active jobs, then gather/flatten candidates.
     const jobs = await this.getJobs();
+    const activeJobs = jobs.filter(j => j.status === "active");
     const allCandidates: KekaCandidate[] = [];
 
-    for (const job of jobs) {
+    for (const job of activeJobs) {
       try {
         const candidates = await this.getCandidatesForJob(job.id);
         allCandidates.push(...candidates);

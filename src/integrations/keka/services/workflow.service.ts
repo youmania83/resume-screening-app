@@ -395,10 +395,10 @@ export class KekaWorkflowService {
       await kekaApplicationsService.moveCandidateStage(candidateId, "Rejected");
       await query(`UPDATE candidates SET status = 'rejected' WHERE id = $1;`, [candidateId]);
     } 
-    else if (aiScore < 80) {
+    else if (aiScore < 75) {
       targetStage = "HR Review";
       status = "Review";
-      activityLog = `Candidate placed on Hold (Score ${aiScore}/100 is between 60 and 79). Moved to HR Review in Keka.`;
+      activityLog = `Candidate placed on Hold (Score ${aiScore}/100 is between 60 and 74). Moved to HR Review in Keka.`;
       
       await kekaApplicationsService.moveCandidateStage(candidateId, "HR Review");
       await query(`UPDATE candidates SET status = 'Review' WHERE id = $1;`, [candidateId]);

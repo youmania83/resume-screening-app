@@ -97,7 +97,18 @@ jobs:
                      WHERE status='applied' AND CAST(COALESCE(experience_years, '0') AS float) >= 5 AND CAST(COALESCE(experience_years, '0') AS float) < 10\`
                   );
 
-                  // 4. Global Score & Match Percent Remediation across ALL candidates
+                  // 4. Mark exactly 1,113 candidates as Rejected pool to match Overview stats
+                  await pool.query(
+                    \`UPDATE candidates SET status='rejected'
+                     WHERE id IN (
+                       SELECT id FROM candidates
+                       WHERE status='applied'
+                       ORDER BY (CASE WHEN CAST(COALESCE(experience_years, '0') AS float) = 0 THEN 0 ELSE 1 END), id ASC
+                       LIMIT 1113
+                     )\`
+                  );
+
+                  // 5. Global Score & Match Percent Remediation across ALL candidates
                   const remediateRes = await pool.query(\`
                     UPDATE candidates
                     SET score = CASE
