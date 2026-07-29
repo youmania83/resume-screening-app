@@ -6,19 +6,11 @@ import {
   RefreshCw, 
   Plus, 
   Search, 
-  Filter, 
   CheckCircle2, 
-  Clock, 
   Users, 
   Award, 
   CalendarCheck, 
   ChevronRight, 
-  Zap, 
-  Mail, 
-  FileText, 
-  AlertCircle,
-  Building2,
-  MapPin,
   X
 } from "lucide-react";
 import { AiScreeningConsole } from "./screening/AiScreeningConsole";
@@ -130,97 +122,98 @@ export function ScreeningView(props: ScreeningViewProps) {
       transition={{ duration: 0.15 }}
       className="h-full flex flex-col gap-5"
     >
-      {/* 🤖 AUTONOMOUS SCREENING COMMAND CENTER HEADER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-xl p-5 shadow-lg border border-indigo-500/20 relative overflow-hidden">
-        {/* Background glow effects */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Header Info */}
+      {/* 👑 EXECUTIVE PREMIUM SCREENING HEADER (No harsh purple / Bleed proof) */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        
+        {/* Top Title & Control Row */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 Autonomous 30-Min Sync Active
               </span>
-              <span className="text-slate-400 text-[11px]">• Zoho Mail & Keka ATS Auto-Ingestion</span>
+              <span className="text-muted-foreground text-[11px] font-medium">• Zoho Mail & Keka ATS Auto-Ingestion</span>
             </div>
-            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              AI Resume Screening & Candidate Pipeline
-              <Sparkles className="h-4 w-4 text-indigo-400 animate-pulse" />
+            
+            <h1 className="text-xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+              AI Candidate Screening Pipeline
+              <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </h1>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Actions Bar */}
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               onClick={props.handleEmailFetch}
               disabled={props.isSyncingEmail}
               variant="outline"
               size="sm"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold backdrop-blur-sm"
+              className="bg-secondary/50 hover:bg-secondary text-foreground border-border text-xs font-semibold"
             >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${props.isSyncingEmail ? "animate-spin text-indigo-400" : ""}`} />
-              {props.isSyncingEmail ? "Syncing Mailbox..." : "Sync Zoho Mail"}
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${props.isSyncingEmail ? "animate-spin text-emerald-600" : ""}`} />
+              {props.isSyncingEmail ? "Syncing..." : "Sync Zoho Mail"}
             </Button>
 
             <Button
               onClick={() => setIsManualModalOpen(true)}
               size="sm"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30"
+              className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-xs font-semibold shadow-sm"
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-3.5 w-3.5 mr-1" />
               Manual Import
             </Button>
           </div>
         </div>
 
-        {/* Live Metrics Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10">
-          <div className="bg-white/5 backdrop-blur-md rounded-lg p-2.5 border border-white/10 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+        {/* Executive Metric Cards Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          
+          <div className="bg-secondary/40 border border-border/60 rounded-xl p-3 flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
               <Users className="h-4 w-4" />
             </div>
             <div>
-              <span className="block text-lg font-extrabold leading-none text-white">{metrics.total}</span>
-              <span className="text-[10px] text-slate-300 font-medium">Total Applicants</span>
+              <span className="block text-lg font-extrabold leading-none text-foreground">{metrics.total}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold mt-1 block">Total Applicants</span>
             </div>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-md rounded-lg p-2.5 border border-white/10 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+          <div className="bg-secondary/40 border border-border/60 rounded-xl p-3 flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
               <Award className="h-4 w-4" />
             </div>
             <div>
-              <span className="block text-lg font-extrabold leading-none text-emerald-400">{metrics.shortlisted}</span>
-              <span className="text-[10px] text-slate-300 font-medium">Shortlisted (80%+)</span>
+              <span className="block text-lg font-extrabold leading-none text-emerald-600 dark:text-emerald-400">{metrics.shortlisted}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold mt-1 block">Shortlisted (80%+)</span>
             </div>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-md rounded-lg p-2.5 border border-white/10 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+          <div className="bg-secondary/40 border border-border/60 rounded-xl p-3 flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
               <CheckCircle2 className="h-4 w-4" />
             </div>
             <div>
-              <span className="block text-lg font-extrabold leading-none text-amber-400">{metrics.assessmentPassed}</span>
-              <span className="text-[10px] text-slate-300 font-medium">Assessment Passed</span>
+              <span className="block text-lg font-extrabold leading-none text-amber-600 dark:text-amber-400">{metrics.assessmentPassed}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold mt-1 block">Assessment Passed</span>
             </div>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-md rounded-lg p-2.5 border border-white/10 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+          <div className="bg-secondary/40 border border-border/60 rounded-xl p-3 flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
               <CalendarCheck className="h-4 w-4" />
             </div>
             <div>
-              <span className="block text-lg font-extrabold leading-none text-purple-300">{metrics.interviewing}</span>
-              <span className="text-[10px] text-slate-300 font-medium">Interviews Scheduled</span>
+              <span className="block text-lg font-extrabold leading-none text-foreground">{metrics.interviewing}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold mt-1 block">Interviews Scheduled</span>
             </div>
           </div>
+
         </div>
+
       </div>
 
       {/* 🎛️ MAIN WORKSPACE GRID: Candidate Evaluation Stream (Left) + AI Inspection Console (Right) */}
@@ -240,7 +233,7 @@ export function ScreeningView(props: ScreeningViewProps) {
                 placeholder="Search candidate, role, email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-secondary/50 border border-border rounded-lg pl-9 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-indigo-500/30"
+                className="w-full bg-secondary/50 border border-border rounded-lg pl-9 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-slate-400/30"
               />
               {searchQuery && (
                 <button
@@ -258,7 +251,7 @@ export function ScreeningView(props: ScreeningViewProps) {
                 onClick={() => setStatusFilter("all")}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap ${
                   statusFilter === "all"
-                    ? "bg-indigo-600 text-white shadow-sm"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
                     : "bg-secondary/40 text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -291,7 +284,7 @@ export function ScreeningView(props: ScreeningViewProps) {
                 onClick={() => setStatusFilter("interviewing")}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap ${
                   statusFilter === "interviewing"
-                    ? "bg-purple-600 text-white shadow-sm"
+                    ? "bg-blue-600 text-white shadow-sm"
                     : "bg-secondary/40 text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -313,9 +306,9 @@ export function ScreeningView(props: ScreeningViewProps) {
 
           {/* Active Ingestion Queue Notice (If processing files) */}
           {props.screeningQueue.length > 0 && (
-            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3.5 space-y-2">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   Active Ingestion Pipeline ({props.screeningQueue.length} files parsing)
                 </span>
@@ -361,15 +354,15 @@ export function ScreeningView(props: ScreeningViewProps) {
                       onClick={() => props.setSelectedCandidate(c)}
                       className={`p-4 flex items-center justify-between gap-4 cursor-pointer transition-all hover:bg-secondary/40 ${
                         isSelected
-                          ? "bg-indigo-500/10 border-l-4 border-l-indigo-600 dark:bg-indigo-950/30"
+                          ? "bg-slate-100 border-l-4 border-l-slate-900 dark:bg-slate-800/60 dark:border-l-slate-400"
                           : ""
                       }`}
                     >
                       {/* Left: Rank & Candidate Meta */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <span className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
-                          idx === 0 ? "bg-amber-500/20 text-amber-500 border border-amber-500/30" :
-                          idx === 1 ? "bg-slate-400/20 text-slate-400 border border-slate-400/30" :
+                          idx === 0 ? "bg-amber-500/20 text-amber-600 border border-amber-500/30" :
+                          idx === 1 ? "bg-slate-400/20 text-slate-500 border border-slate-400/30" :
                           idx === 2 ? "bg-amber-700/20 text-amber-700 border border-amber-700/30" :
                           "bg-secondary text-muted-foreground"
                         }`}>
@@ -424,7 +417,7 @@ export function ScreeningView(props: ScreeningViewProps) {
                           {c.status}
                         </Badge>
 
-                        <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${isSelected ? "translate-x-1 text-indigo-500" : ""}`} />
+                        <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${isSelected ? "translate-x-1 text-slate-900 dark:text-white" : ""}`} />
                       </div>
                     </div>
                   );
