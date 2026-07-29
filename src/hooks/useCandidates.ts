@@ -98,7 +98,7 @@ export function useCandidates(isLoggedIn?: boolean) {
             violationCount: c.violation_count,
             activityLogs: c.activityLogs || [],
             jobCode: c.job_code || undefined,
-            jobTitle: c.job_title || undefined,
+            jobTitle: (c.job_title && !/not specified/i.test(c.job_title)) ? c.job_title : (c.role && !/not specified/i.test(c.role) ? c.role : "Operations Specialist"),
             jobLocation: c.job_location || undefined
           }));
           setCandidates(mapped);
