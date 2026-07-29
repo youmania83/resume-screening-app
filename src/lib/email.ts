@@ -1028,30 +1028,41 @@ export async function sendApplicationAcknowledgementEmail(params: {
     </html>
   `;
 
-  if (zohoConfig.enabled) {
-    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+  const checkRate = await canSendEmailToCandidate(params.candidateEmail, "application_acknowledgement");
+  if (!checkRate.canSend) {
+    console.log(`⏭️ Anti-spam active for ${params.candidateEmail}: ${checkRate.reason}. Skipping application acknowledgement email.`);
     return;
   }
 
-  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
-  if (!transporter) {
-    logEmailFallback(params.candidateEmail, subject, html);
-    return;
-  }
+  let sentStatus = "sent";
+  let errMessage: string | undefined = undefined;
 
   try {
-    await transporter.sendMail({
-      from: fromEmail,
-      to: params.candidateEmail,
-      subject,
-      html
-    });
-    console.log(`✉️ Application acknowledgement email successfully sent to: ${params.candidateEmail}`);
-  } catch (err) {
-    console.error("Failed to dispatch application acknowledgement email:", err);
-    logEmailFallback(params.candidateEmail, subject, html);
+    if (zohoConfig.enabled) {
+      await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    } else {
+      const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+      if (!transporter) {
+        logEmailFallback(params.candidateEmail, subject, html);
+      } else {
+        await transporter.sendMail({
+          from: fromEmail,
+          to: params.candidateEmail,
+          subject,
+          html,
+        });
+      }
+    }
+  } catch (err: any) {
+    sentStatus = "failed";
+    errMessage = err.message || "Email send failed";
+    console.error(`🚨 Failed to send application acknowledgement to ${params.candidateEmail}:`, err.message);
+  } finally {
+    await recordEmailLog(null, params.candidateEmail, subject, "application_acknowledgement", params.tenantId, sentStatus, errMessage);
   }
+  console.log(`✉️ Application acknowledgement email processed for: ${params.candidateEmail}`);
 }
+
 
 /**
  * Send AI assessment reminder email to shortlisted candidates who haven't completed the test
