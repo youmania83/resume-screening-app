@@ -301,13 +301,13 @@ export function OverviewView({ candidates, stats }: OverviewViewProps) {
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               {candidates.slice(0, 5).map((c, i) => (
-                <div key={i} className="flex gap-3 text-xs leading-normal">
-                  <span className="text-[10px] text-muted-foreground font-mono w-28 flex-shrink-0 pt-0.5 whitespace-nowrap">
+                <div key={i} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 text-xs leading-normal pb-3 border-b border-border/40 last:border-0 last:pb-0">
+                  <span className="text-[10px] text-muted-foreground font-mono font-medium whitespace-nowrap shrink-0 sm:w-36 pt-0.5">
                     {formatDisplayDate(c.appliedDate)}
                   </span>
-                  <div>
-                    <strong className="text-foreground block font-bold">{c.name}</strong>
-                    <span className="text-muted-foreground text-[10px] block mt-0.5 font-semibold">
+                  <div className="flex-1 min-w-0">
+                    <strong className="text-foreground block font-bold truncate">{c.name}</strong>
+                    <span className="text-muted-foreground text-[10px] block mt-0.5 font-semibold leading-relaxed">
                       Applied for {c.jobTitle || c.role} {c.jobLocation ? `(${c.jobLocation})` : ""} (Score: {c.score || 0}/100)
                     </span>
                   </div>

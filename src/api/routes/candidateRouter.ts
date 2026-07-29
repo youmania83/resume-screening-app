@@ -39,17 +39,19 @@ router.get("/recruiters/list", async (req, res, next) => {
 // GET /api/candidates/stats - Get complete, accurate database-wide candidate and record totals for all time
 router.get("/stats", async (req, res, next) => {
   try {
-    const { queryGlobal } = await import("../../lib/tenantDb.js");
+    const { queryTenant, queryGlobal } = await import("../../lib/tenantDb.js");
     const [candCounts, inboxCounts] = await Promise.all([
-      queryGlobal(`
+      queryTenant(`
         SELECT 
           COUNT(*)::int as total_applicants,
-          COUNT(CASE WHEN score > 0 THEN 1 END)::int as screened_count,
-          COUNT(CASE WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 1 END)::int as shortlisted_count,
-          COUNT(CASE WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
-          COUNT(CASE WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'interview') OR keka_status ILIKE '%interview%' THEN 1 END)::int as interviewing_count,
-          COUNT(CASE WHEN LOWER(status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
-        FROM candidates;
+          COUNT(CASE WHEN candidates.score > 0 THEN 1 END)::int as screened_count,
+          COUNT(CASE WHEN LOWER(candidates.status) IN ('shortlisted', 'qualified', 'assessment') THEN 1 END)::int as shortlisted_count,
+          COUNT(CASE WHEN LOWER(candidates.status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
+          COUNT(CASE WHEN LOWER(candidates.status) IN ('interviewing', 'interview_scheduled', 'interview') OR candidates.keka_status ILIKE '%interview%' THEN 1 END)::int as interviewing_count,
+          COUNT(CASE WHEN LOWER(candidates.status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
+        FROM candidates
+        LEFT JOIN jobs j ON candidates.job_id = j.id
+        WHERE (candidates.tenant_id = :tenant_id OR candidates.tenant_id IS NULL OR j.tenant_id = :tenant_id);
       `),
       queryGlobal(`
         SELECT COUNT(*)::int as total_inbox_records
