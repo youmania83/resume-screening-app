@@ -206,7 +206,7 @@ setTimeout(async () => {
     const { queryGlobal } = await import("../lib/tenantDb.js");
     const zeroScoreRes = await queryGlobal(`
       SELECT COUNT(*)::int as count FROM candidates 
-      WHERE (score = 0 OR score IS NULL) AND resume_text IS NOT NULL;
+      WHERE (score = 0 OR score IS NULL);
     `);
     const count = zeroScoreRes.rows[0]?.count || 0;
     if (count > 0) {
