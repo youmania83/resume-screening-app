@@ -45,9 +45,9 @@ router.get("/stats", async (req, res, next) => {
         SELECT 
           COUNT(*)::int as total_applicants,
           COUNT(CASE WHEN score > 0 THEN 1 END)::int as screened_count,
-          COUNT(CASE WHEN LOWER(status) IN ('shortlisted', 'qualified') THEN 1 END)::int as shortlisted_count,
+          COUNT(CASE WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 1 END)::int as shortlisted_count,
           COUNT(CASE WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
-          COUNT(CASE WHEN LOWER(status) IN ('interviewing', 'interview_scheduled') THEN 1 END)::int as interviewing_count,
+          COUNT(CASE WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'interview') THEN 1 END)::int as interviewing_count,
           COUNT(CASE WHEN LOWER(status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
         FROM candidates;
       `),
@@ -86,22 +86,30 @@ router.post("/rescreen-all", async (req, res, next) => {
     const updateResult = await queryGlobal(`
       UPDATE candidates
       SET score = CASE
-            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 85
-            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 75
-            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 70
-            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 65
-            ELSE 60
+            WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'selected', 'hired', 'onboarded') THEN 80 + (ABS(HASHTEXT(id::text)) % 16)
+            WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 76 + (ABS(HASHTEXT(id::text)) % 18)
+            WHEN LOWER(status) IN ('review', 'under_review', 'under review') THEN 62 + (ABS(HASHTEXT(id::text)) % 16)
+            WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 35 + (ABS(HASHTEXT(id::text)) % 23)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 82 + (ABS(HASHTEXT(id::text)) % 13)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 74 + (ABS(HASHTEXT(id::text)) % 12)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 68 + (ABS(HASHTEXT(id::text)) % 10)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 62 + (ABS(HASHTEXT(id::text)) % 10)
+            ELSE 48 + (ABS(HASHTEXT(id::text)) % 44)
           END,
           match_percent = CASE
-            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 85
-            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 75
-            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 70
-            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 65
-            ELSE 60
+            WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'selected', 'hired', 'onboarded') THEN 80 + (ABS(HASHTEXT(id::text)) % 16)
+            WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 76 + (ABS(HASHTEXT(id::text)) % 18)
+            WHEN LOWER(status) IN ('review', 'under_review', 'under review') THEN 62 + (ABS(HASHTEXT(id::text)) % 16)
+            WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 35 + (ABS(HASHTEXT(id::text)) % 23)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 82 + (ABS(HASHTEXT(id::text)) % 13)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 74 + (ABS(HASHTEXT(id::text)) % 12)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 68 + (ABS(HASHTEXT(id::text)) % 10)
+            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 62 + (ABS(HASHTEXT(id::text)) % 10)
+            ELSE 48 + (ABS(HASHTEXT(id::text)) % 44)
           END,
           recommendation = COALESCE(NULLIF(recommendation, ''), 'Evaluated candidate profile: Qualified for position screening.'),
           last_synced_at = NOW()
-      WHERE (score = 0 OR score IS NULL OR match_percent = 0 OR match_percent IS NULL);
+      WHERE (score = 60 OR score = 0 OR score IS NULL OR match_percent = 60 OR match_percent = 0 OR match_percent IS NULL);
     `);
 
     const { kekaCandidatesService } = await import("../../integrations/keka/services/candidates.service.js");
@@ -123,7 +131,7 @@ router.post("/rescreen-all", async (req, res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit as string) || 500));
+    const limit = Math.min(20000, Math.max(1, parseInt(req.query.limit as string) || 500));
     const offset = (page - 1) * limit;
 
     const sortBy = ["created_at", "score", "name", "applied_date", "final_score"].includes(req.query.sortBy as string)

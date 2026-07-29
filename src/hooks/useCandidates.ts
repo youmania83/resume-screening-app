@@ -45,7 +45,7 @@ export function useCandidates(isLoggedIn?: boolean) {
   const loadCandidates = useCallback(async () => {
     try {
       const [resp, statsResp] = await Promise.all([
-        fetch(`${apiBase}/candidates?limit=1000`, { credentials: "include" }),
+        fetch(`${apiBase}/candidates?limit=15000`, { credentials: "include" }),
         fetch(`${apiBase}/candidates/stats`, { credentials: "include" }).catch(() => null)
       ]);
 
