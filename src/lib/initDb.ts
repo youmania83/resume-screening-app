@@ -942,10 +942,24 @@ async function init() {
       console.log(`Purged ${junkCandidateIds.length} unknown/junk candidate records.`);
     }
 
-    if (junkInboxIds.length > 0) {
-      await client.query("DELETE FROM resume_inbox WHERE id = ANY($1);", [junkInboxIds]);
-      console.log(`Purged ${junkInboxIds.length} failed/junk inbox items.`);
-    }
+    // Synchronize and reset all auto-increment sequences to prevent ID conflicts
+    await client.query(`
+      DO $$
+      DECLARE
+        r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT table_name, column_name, pg_get_serial_sequence(quote_ident(table_name), column_name) AS seq
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND column_default LIKE 'nextval%'
+        LOOP
+          IF r.seq IS NOT NULL THEN
+            EXECUTE format('SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I), 1))', r.seq, r.column_name, r.table_name);
+          END IF;
+        END LOOP;
+      END $$;
+    `);
 
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
