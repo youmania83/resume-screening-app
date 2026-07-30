@@ -768,18 +768,23 @@ export async function sendInterviewScheduleEmail(params: {
     "END:VCALENDAR"
   ].join("\r\n");
 
-  const hrRecipient = params.hrEmail || process.env.RECRUITER_NOTIFICATION_EMAIL || "hr@techsolengineers.com";
+  const isHrNotificationEnabled = process.env.ENABLE_HR_EMAIL_NOTIFICATIONS === "true";
+  const hrRecipient = isHrNotificationEnabled ? (params.hrEmail || process.env.RECRUITER_NOTIFICATION_EMAIL || undefined) : undefined;
 
   if (zohoConfig.enabled) {
     await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
-    await zohoMailService.sendEmail(hrRecipient, hrSubject, hrHtml);
+    if (isHrNotificationEnabled && hrRecipient) {
+      await zohoMailService.sendEmail(hrRecipient, hrSubject, hrHtml);
+    }
     return { success: true, mock: false };
   }
 
   const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   if (!transporter) {
     logEmailFallback(params.candidateEmail, candidateSubject, candidateHtml);
-    logEmailFallback(hrRecipient, hrSubject, hrHtml);
+    if (isHrNotificationEnabled && hrRecipient) {
+      logEmailFallback(hrRecipient, hrSubject, hrHtml);
+    }
     return { success: true, mock: true };
   }
 
@@ -803,15 +808,19 @@ export async function sendInterviewScheduleEmail(params: {
     ]
   });
 
-  // Send to HR
-  await transporter.sendMail({
-    from: fromEmail,
-    to: params.hrEmail,
-    subject: hrSubject,
-    html: hrHtml,
-  });
+  // Send to HR if explicitly enabled
+  if (isHrNotificationEnabled && hrRecipient) {
+    await transporter.sendMail({
+      from: fromEmail,
+      to: hrRecipient,
+      subject: hrSubject,
+      html: hrHtml,
+    });
+    console.log(`📧 Interview scheduled emails sent with .ics calendar invite to candidate (${params.candidateEmail}) and HR (${hrRecipient})`);
+  } else {
+    console.log(`📧 Interview scheduled email sent to candidate (${params.candidateEmail}) [HR Email Notification Deactivated]`);
+  }
 
-  console.log(`📧 Interview scheduled emails sent with .ics calendar invite to candidate (${params.candidateEmail}) and HR (${params.hrEmail})`);
   return { success: true, mock: false };
 }
 
@@ -1313,8 +1322,9 @@ export async function sendAssessmentResultDetailsEmail(params: {
     </html>
   `;
 
-  // Dispatch to both Candidate and HR
-  const recipients = [params.candidateEmail, params.hrEmail].filter(email => email && email.trim() !== "");
+  // Dispatch to Candidate (HR notification copy deactivated per system settings)
+  const isHrNotificationEnabled = process.env.ENABLE_HR_EMAIL_NOTIFICATIONS === "true";
+  const recipients = [params.candidateEmail, (isHrNotificationEnabled ? params.hrEmail : null)].filter(email => email && email.trim() !== "");
   
   for (const to of recipients) {
     if (zohoConfig.enabled) {
