@@ -180,8 +180,7 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all || true
-rm -rf node_modules
-NODE_ENV=development npm install --include=dev --production=false
+npm ci || npm install
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
@@ -192,8 +191,7 @@ npm run init-db
 
 echo '==> 5/6 Building production frontend...'
 rm -rf .next node_modules/.cache
-unset NODE_ENV
-npm run build
+npx next build
 
 echo '==> 6/6 Restarting PM2 services...'
 pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production
