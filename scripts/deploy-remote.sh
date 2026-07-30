@@ -179,8 +179,9 @@ git checkout '${GIT_BRANCH}'
 git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
+rm -rf node_modules
 unset NODE_ENV
-npm ci --include=dev
+npm install
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
