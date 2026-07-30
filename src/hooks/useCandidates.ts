@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Candidate } from "../types/index";
-import { inferCandidateRole, isGenericRoleTitle } from "../lib/roleInference.js";
+import { inferCandidateRole, isGenericRoleTitle } from "../lib/roleInference";
 
 export interface CandidateStats {
   totalApplicants: number;
