@@ -8,30 +8,32 @@ let bullQueue: Queue | null = null;
 let isRedisConnected = false;
 
 // Attempt to initialize BullMQ
-try {
-  bullQueue = new Queue("resume-eval-queue", {
-    connection,
-    defaultJobOptions: {
-      attempts: 3, // Auto-retry 3 times before moving to DLQ (failed state)
-      backoff: {
-        type: "exponential",
-        delay: 5000, // 5 seconds initial delay
+(async () => {
+  try {
+    bullQueue = new Queue("resume-eval-queue", {
+      connection,
+      defaultJobOptions: {
+        attempts: 3, // Auto-retry 3 times before moving to DLQ (failed state)
+        backoff: {
+          type: "exponential",
+          delay: 5000, // 5 seconds initial delay
+        },
       },
-    },
-  });
+    });
 
-  bullQueue.on("error", (err) => {
-    console.error("🚨 [Ingest Queue] BullMQ Error:", err.message || err);
-  });
+    bullQueue.on("error", (err) => {
+      console.error("🚨 [Ingest Queue] BullMQ Error:", err.message || err);
+    });
 
-  // Basic connection ping test
-  const client = await (bullQueue.client);
-  await (client as any).ping();
-  isRedisConnected = true;
-  console.log("🚀 [Queue Service] BullMQ connected to Redis successfully.");
-} catch (err: any) {
-  console.warn("⚠️ [Queue Service] Redis/BullMQ offline or unconfigured. Falling back to DB-driven queue runner.", err.message || err);
-}
+    // Basic connection ping test
+    const client = await bullQueue.client;
+    await (client as any).ping();
+    isRedisConnected = true;
+    console.log("🚀 [Queue Service] BullMQ connected to Redis successfully.");
+  } catch (err: any) {
+    console.warn("⚠️ [Queue Service] Redis/BullMQ offline or unconfigured. Falling back to DB-driven queue runner.", err.message || err);
+  }
+})();
 
 export class IngestQueue {
   /**
