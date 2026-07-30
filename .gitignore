@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# deployment credentials — SSH host/key/password for scripts/deploy-remote.sh
+# (not matched by the .env* pattern above, so listed explicitly)
+.deploy.env
+
 # vercel
 .vercel
 

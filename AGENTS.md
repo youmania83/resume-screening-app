@@ -4,6 +4,16 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Deployment
+Use `scripts/deploy-remote.sh` (drives the VPS from your machine) or
+`scripts/deploy-vps.sh` (run on the server). Always `--dry-run` first.
+Full rules: `.agent/rules/deploy.md`. Runbook: `docs/GO_LIVE_RUNBOOK.md`.
+
+Note: `.env` is gitignored and does **not** deploy with the code. New settings
+must be added to the VPS `.env` by hand before deploying, and the front end must
+be rebuilt there — `NEXT_PUBLIC_*` values are compiled into the browser bundle at
+build time, not read at runtime.
+
 # Memory Context
 # [yogeshkumarwadhwa] recent context, 2026-06-19 12:15am GMT+5:30
 
@@ -18,7 +28,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 * **Project Directory Optimization:** Conducted a file cleanup audit deleting duplicate `next.config.ts` (keeping ESM-compliant `next.config.js`), outdated CommonJS `initDb.js`, and root-level `test_resume.txt` scratch files.
 
 ## Live Production Environments
-* **Primary Host (VPS):** ALL frontend and backend services run on VPS `129.121.97.152` (SSH user: `root`, password: `Yogesh@8865`).
+* **Primary Host (VPS):** ALL frontend and backend services run on VPS `129.121.97.152` (SSH user: `root`).
+  - Credentials are **not** stored in this repository. Configure them in
+    `.deploy.env` (gitignored — see `.deploy.env.example`), or use SSH key auth.
   - **VPS Frontend URL:** https://app.risonaitech.com (or https://app.techsolengineers.com)
   - **VPS Backend API:** https://api.risonaitech.com (or https://api.techsolengineers.com)
 * **Legacy Server Backup URLs:**
