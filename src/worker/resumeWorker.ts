@@ -744,25 +744,22 @@ export async function parseAndEvalResume(
         }
       }
 
-      // Strict mapping: an applicant belongs to the opening they applied for.
-      //
-      // When we could not determine that opening from the application itself, we
-      // leave the candidate UNMAPPED for HR review rather than attaching them to
-      // the highest-scoring role. Auto-attaching by best match is what produced
-      // applicants filed under roles they never applied for.
-      if (!targetJobIsOpen) {
-        if (isStrictJobMapping()) {
-          if (matchedJobId) {
-            console.log(`[Worker] Strict job mapping is on: not auto-attaching candidate ${candidateId} to best-match job "${matchedJobTitle}" (${highestMatchScore}%). Routing to HR review for manual mapping.`);
-          }
-          matchedJobId = null;
-          matchedJobTitle = "";
-          matchedJobDesc = "";
-        } else if (highestMatchScore < PIPELINE_THRESHOLDS.JOB_MATCH_FLOOR) {
-          matchedJobId = null;
-          matchedJobTitle = "";
-          matchedJobDesc = "";
+      // Strict mapping: an applicant belongs strictly to an active open job position.
+      // Resumes that do not match a valid active open job opening are skipped and left unprocessed.
+      if (!targetJobIsOpen && isStrictJobMapping()) {
+        console.log(`[Worker] Strict job mapping: candidate ${candidateId} has no matching active open job role. Cleaning up profile and marking inbox item as Unmatched Role.`);
+        await queryGlobal("DELETE FROM candidate_timeline WHERE candidate_id = $1;", [candidateId]);
+        await queryGlobal("DELETE FROM candidate_documents WHERE candidate_id = $1;", [candidateId]);
+        await queryGlobal("DELETE FROM candidates WHERE id = $1;", [candidateId]);
+        await queryGlobal(
+          `UPDATE resume_inbox SET status = 'Unmatched Role', error_message = 'Skipped: Resume does not match any active open job position.', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+          [inboxId]
+        );
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) {}
         }
+        await logProcessingStep(tenantId, inboxId, null, "Matching", "Failed", providerName, Date.now() - startTime, "Skipped: No active open job matched.");
+        return;
       }
 
       // Automated AI screening pipeline trigger

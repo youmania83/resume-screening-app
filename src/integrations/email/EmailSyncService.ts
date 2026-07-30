@@ -289,6 +289,14 @@ export class EmailSyncService {
         console.log(`[Email Sync] Processing candidate application email: "${subject}"`);
         const targetJobId = await EmailSyncService.findBestMatchingJob(tenantId, jobTitleExtracted, subject, body);
 
+        // Strict Requirement: Only resumes with a correct, active job role from the email should be processed.
+        // If no active open job position matches the email subject or content, leave it unprocessed.
+        if (!targetJobId) {
+          console.log(`[Email Sync] Skipping application email "${subject}": No active open job position matched the email.`);
+          await provider.markAsRead(email.id, email.folder);
+          continue;
+        }
+
         let processedAtLeastOneResume = false;
 
         // B1. Process attachments
