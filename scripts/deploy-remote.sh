@@ -180,8 +180,7 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 rm -rf node_modules
-unset NODE_ENV
-npm install
+NODE_ENV=development npm install --include=dev --production=false
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
