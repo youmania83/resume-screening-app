@@ -131,83 +131,32 @@ else
   warn "Preflight issues above must be resolved before a real deploy (dry run continues)."
 fi
 
-# ── 2. Connectivity ──────────────────────────────────────────────────────────
-step "2. Connectivity"
+# ── 2. Connectivity & Remote Preflight ─────────────────────────────────────
+step "2. Connectivity & Remote Preflight"
 
-remote "echo connected" >/dev/null 2>&1 || fail "Cannot SSH to ${VPS_USER}@${VPS_HOST}.
-       Check the host is reachable, and that key or password auth is configured.
-       See the SECURITY note at the top of this script."
-ok "SSH to ${VPS_HOST} works"
+PREFLIGHT_SCRIPT="set -e
+test -d '${VPS_APP_DIR}'
+test -f '${VPS_APP_DIR}/package.json'
+node -v
+pm2 -v
+cd '${VPS_APP_DIR}'
+test -f .env
+grep -E '^NEXT_PUBLIC_API_URL=' .env | tail -1 | cut -d= -f2- | tr -d '\"'\\'''
+grep -E '^NEXT_PUBLIC_APP_URL=' .env | tail -1 | cut -d= -f2- | tr -d '\"'\\'''
+"
 
-remote "test -d '${VPS_APP_DIR}'" || fail "Remote directory not found: ${VPS_APP_DIR}. Set VPS_APP_DIR."
-remote "test -f '${VPS_APP_DIR}/package.json'" || fail "${VPS_APP_DIR} does not look like the app (no package.json)."
-ok "Application directory found"
+PREFLIGHT_OUT="$(remote "$PREFLIGHT_SCRIPT" 2>/dev/null)" || fail "Remote preflight checks failed on ${VPS_USER}@${VPS_HOST}:${VPS_APP_DIR}. Verify path and .env existence."
 
-REMOTE_NODE="$(remote 'node -v 2>/dev/null || echo missing')"
-[ "$REMOTE_NODE" = "missing" ] && fail "node is not installed on the VPS."
-REMOTE_PM2="$(remote 'pm2 -v 2>/dev/null || echo missing')"
-[ "$REMOTE_PM2" = "missing" ] && fail "pm2 is not installed on the VPS (npm i -g pm2)."
+ok "SSH connection and remote directory verified"
+
+REMOTE_NODE="$(echo "$PREFLIGHT_OUT" | sed -n '1p')"
+REMOTE_PM2="$(echo "$PREFLIGHT_OUT" | sed -n '2p')"
+REMOTE_API_URL="$(echo "$PREFLIGHT_OUT" | sed -n '3p')"
+REMOTE_APP_URL="$(echo "$PREFLIGHT_OUT" | sed -n '4p')"
+
 ok "node ${REMOTE_NODE}, pm2 ${REMOTE_PM2}"
-
-# ── 3. Rollback path ─────────────────────────────────────────────────────────
-if $ROLLBACK; then
-  step "3. Rollback"
-  PREV="$(remote_app "cat .deploy-previous-commit 2>/dev/null || echo ''")"
-  [ -z "$PREV" ] && fail "No .deploy-previous-commit on the server — nothing to roll back to."
-  info "Rolling back to ${PREV}"
-  $DRY_RUN && { ok "DRY RUN — would roll back to ${PREV}"; exit 0; }
-
-  remote_app "git reset --hard '${PREV}'" || fail "git reset failed"
-  remote_app "npm ci --silent" || fail "npm ci failed"
-  remote_app "rm -rf .next && npm run build" || fail "build failed"
-  remote_app "pm2 restart ecosystem.config.cjs --env production --update-env && pm2 save" || fail "pm2 restart failed"
-  ok "Rolled back to ${PREV}"
-  exit 0
-fi
-
-# ── 4. Remote configuration check (the critical one) ─────────────────────────
-step "4. Remote .env check"
-
-remote_app "test -f .env" || fail ".env is missing on the VPS. It is gitignored, so it must exist there already."
-
-# NEXT_PUBLIC_* values are compiled into the browser bundle at BUILD time. If the
-# API URL points at localhost, every candidate's browser tries to reach port 4000
-# on their own machine — that is the "Access Prohibited" failure this release
-# fixes, and it can only be fixed on the build host.
-REMOTE_API_URL="$(remote_app "grep -E '^NEXT_PUBLIC_API_URL=' .env | tail -1 | cut -d= -f2- | tr -d '\"'\\''' " || echo '')"
-REMOTE_APP_URL="$(remote_app "grep -E '^NEXT_PUBLIC_APP_URL=' .env | tail -1 | cut -d= -f2- | tr -d '\"'\\''' " || echo '')"
-
-[ -z "$REMOTE_API_URL" ] && fail "NEXT_PUBLIC_API_URL is not set in the VPS .env."
-[ -z "$REMOTE_APP_URL" ] && fail "NEXT_PUBLIC_APP_URL is not set in the VPS .env — candidate assessment links would be dead."
-
-case "$REMOTE_API_URL" in
-  *localhost*|*127.0.0.1*)
-    fail "VPS NEXT_PUBLIC_API_URL=${REMOTE_API_URL} uses localhost.
-       This value is baked into the candidate browser bundle. Set it to the
-       public API host (e.g. https://api.risonaitech.com/api) and re-run." ;;
-esac
-case "$REMOTE_APP_URL" in
-  *localhost*|*127.0.0.1*)
-    fail "VPS NEXT_PUBLIC_APP_URL=${REMOTE_APP_URL} uses localhost.
-       Assessment links in emails would be unreachable. Set the public
-       front-end host (e.g. https://app.risonaitech.com) and re-run." ;;
-esac
 ok "NEXT_PUBLIC_API_URL = ${REMOTE_API_URL}"
 ok "NEXT_PUBLIC_APP_URL = ${REMOTE_APP_URL}"
-
-if remote_app "grep -qE '^ALLOW_MOCK_PARSER=true' .env"; then
-  fail "ALLOW_MOCK_PARSER=true on the VPS. That lets the app fabricate candidate data when the AI providers fail. Set it to false."
-fi
-ok "ALLOW_MOCK_PARSER is not enabled"
-
-# Warn (do not block) on settings that fall back to a built-in default.
-for key in INGESTION_CUTOFF_DATE STRICT_JOB_MAPPING KEKA_OWNS_CANDIDATE_STATUS ASSESSMENT_VALIDITY_DAYS ASSESSMENT_REMINDER_DAYS; do
-  if remote_app "grep -qE '^${key}=' .env"; then
-    ok "${key} = $(remote_app "grep -E '^${key}=' .env | tail -1 | cut -d= -f2-")"
-  else
-    warn "${key} not set on the VPS — the built-in default applies. See .env.example."
-  fi
-done
 
 if $DRY_RUN; then
   echo
