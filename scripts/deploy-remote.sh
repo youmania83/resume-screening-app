@@ -179,6 +179,7 @@ git checkout '${GIT_BRANCH}'
 git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
+pm2 stop all || true
 rm -rf node_modules
 NODE_ENV=development npm install --include=dev --production=false
 
