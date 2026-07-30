@@ -1,5 +1,8 @@
 // src/integrations/keka/services/candidates.service.ts
 
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaCandidate } from "../interfaces/Candidate.js";
+import { query } from "../../../lib/db.js";
 import { ACTIVE_JOB_SQL } from "../../../lib/appConfig.js";
 
 export class KekaCandidatesService {
