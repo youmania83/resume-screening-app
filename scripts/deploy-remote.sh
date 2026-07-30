@@ -65,7 +65,7 @@ for arg in "$@"; do
 done
 
 # ── SSH plumbing ─────────────────────────────────────────────────────────────
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=30)
+SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=30 -o PreferredAuthentications=password,publickey)
 [ -n "$VPS_SSH_KEY" ] && SSH_OPTS+=(-i "$VPS_SSH_KEY")
 
 ssh_prefix=()
@@ -225,46 +225,42 @@ ok "Previous commit ${CURRENT_SHA:0:8} recorded; .env backed up"
 info "Roll back any time with: bash scripts/deploy-remote.sh --rollback"
 
 step "6. Pull ${GIT_BRANCH}"
-remote_app "git fetch --all --prune && git checkout '${GIT_BRANCH}' && git pull --ff-only origin '${GIT_BRANCH}'" \
-  || fail "git pull failed on the VPS. Resolve conflicts there, then re-run."
+remote_app "git fetch --all --prune && git checkout '${GIT_BRANCH}' && git reset --hard 'origin/${GIT_BRANCH}'" || fail "git pull failed on the VPS"
 ok "Now at $(remote_app 'git log --oneline -1')"
 
 step "7. Install dependencies"
-remote_app "npm ci" || fail "npm ci failed on the VPS."
+remote_app "npm ci" || fail "npm ci failed on the VPS"
 ok "Dependencies installed"
 
 step "8. Type check"
-remote_app "npx tsc --noEmit" || fail "Type check failed on the VPS — not shipping a broken build."
+remote_app "npx tsc --noEmit" || fail "Type check failed on the VPS"
 ok "Type check clean"
 
 if $SKIP_TESTS; then
   warn "Skipping regression checks (--skip-tests)"
 else
   step "9. Regression checks"
-  remote_app "npx tsx src/test/verifyPipelineFixes.ts" || fail "Regression checks failed — investigate before deploying."
+  remote_app "npx tsx src/test/verifyPipelineFixes.ts" || fail "Regression checks failed on VPS"
   ok "Regression checks passed"
 fi
 
 step "10. Database migration"
-remote_app "npm run init-db" || fail "init-db failed. The app expects the new columns — fix before continuing."
+remote_app "npm run init-db" || fail "init-db failed on VPS"
 ok "Schema up to date"
 
 step "11. Build the front end"
 info "This is what bakes NEXT_PUBLIC_API_URL into the candidate bundle."
-remote_app "rm -rf .next && npm run build" || fail "next build failed on the VPS."
+remote_app "rm -rf .next && npm run build" || fail "next build failed on the VPS"
 ok "Build complete"
 
 step "12. Verify the bundle has no localhost API URL"
-# The check that actually proves the assessment fix shipped.
 if remote_app "grep -rq 'localhost:4000' .next/static/ 2>/dev/null"; then
-  fail "The built bundle still references localhost:4000 — the build read the wrong .env.
-       Candidates would still see 'Access Prohibited'. Fix .env on the VPS and re-run."
+  fail "The built bundle still references localhost:4000. Fix .env on VPS and re-run."
 fi
 ok "Bundle points at the public API host"
 
 step "13. Restart services"
-remote_app "pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production" \
-  || fail "pm2 restart failed."
+remote_app "pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production" || fail "pm2 restart failed"
 remote_app "pm2 save" >/dev/null 2>&1 || true
 ok "Services restarted"
 
