@@ -179,7 +179,7 @@ git checkout '${GIT_BRANCH}'
 git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
-npm ci
+npm ci --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
