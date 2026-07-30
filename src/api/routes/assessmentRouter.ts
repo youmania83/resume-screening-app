@@ -1,13 +1,49 @@
 // src/api/routes/assessmentRouter.ts
 import { Router } from "express";
-import { ensureJobAssessment, regenerateJobAssessment } from "../../lib/assessmentService";
-import { sendAssessmentInviteEmail, sendInterviewScheduleEmail, sendAssessmentResultDetailsEmail } from "../../lib/email";
-import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service";
+import { ensureJobAssessment, regenerateJobAssessment } from "../../lib/assessmentService.js";
+import { sendAssessmentInviteEmail, sendInterviewScheduleEmail, sendAssessmentResultDetailsEmail } from "../../lib/email.js";
+import { kekaWorkflowService } from "../../integrations/keka/services/workflow.service.js";
 import crypto from "crypto";
 import { tenantStorage, DEFAULT_TENANT_ID } from "../../lib/tenantContext.js";
 import { queryGlobal, queryTenant } from "../../lib/tenantDb.js";
+import { PIPELINE_THRESHOLDS, nextBusinessDaySlot, getFallbackHrEmail } from "../../lib/appConfig.js";
 
 const router = Router();
+
+/**
+ * Resolves the HR notification recipient for a tenant.
+ *
+ * Order: tenant email_config.hrManagerEmail → tenant owner → HR_NOTIFICATION_EMAIL env.
+ * Returns null when none is configured — callers must then skip the HR copy
+ * rather than fall back to a placeholder address. (The previous hard-coded
+ * `yogeshkumarwadhwa@localhost.com` default made every HR notification attempt
+ * delivery to an unroutable domain and log an SMTP failure.)
+ */
+async function resolveHrEmail(tenantId: string | null | undefined): Promise<string | null> {
+  if (tenantId) {
+    try {
+      const tenantCfgRes = await queryGlobal(
+        `SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;`,
+        [tenantId]
+      );
+      const configured = tenantCfgRes.rows[0]?.email_config?.hrManagerEmail;
+      if (configured && String(configured).includes("@")) {
+        return String(configured).trim();
+      }
+
+      const ownerRes = await queryGlobal(
+        `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' AND email LIKE '%@%' LIMIT 1;`,
+        [tenantId]
+      );
+      if (ownerRes.rowCount && ownerRes.rowCount > 0) {
+        return String(ownerRes.rows[0].email).trim();
+      }
+    } catch (dbErr) {
+      console.error("Failed to look up the HR manager email:", dbErr);
+    }
+  }
+  return getFallbackHrEmail();
+}
 
 // Middleware to resolve tenant context for single-user workspace
 async function resolveTenantContext(req: any, res: any, next: any) {
@@ -199,14 +235,27 @@ router.get("/:token", async (req: any, res: any) => {
     // Auto-resolve job_id if candidate job_id is null
     let targetJobId = candidate.job_id;
     if (!targetJobId) {
+      // Resolve against OPEN openings within the candidate's own tenant only.
       const jobMatch = await queryGlobal(
-        `SELECT id, title, description FROM jobs WHERE LOWER(title) = LOWER($1) AND sync_status IS DISTINCT FROM 'removed' LIMIT 1;`,
-        [candidate.role]
+        `SELECT id, title, description FROM jobs
+          WHERE LOWER(title) = LOWER($1)
+            AND tenant_id = $2
+            AND COALESCE(status, 'active') = 'active'
+            AND sync_status IS DISTINCT FROM 'removed'
+          LIMIT 1;`,
+        [candidate.role, candidate.tenant_id]
       );
       if (jobMatch.rowCount && jobMatch.rowCount > 0) {
         targetJobId = jobMatch.rows[0].id;
       } else {
-        const defaultJob = await queryGlobal(`SELECT id, title, description FROM jobs WHERE sync_status IS DISTINCT FROM 'removed' ORDER BY created_at DESC LIMIT 1;`);
+        const defaultJob = await queryGlobal(
+          `SELECT id, title, description FROM jobs
+            WHERE tenant_id = $1
+              AND COALESCE(status, 'active') = 'active'
+              AND sync_status IS DISTINCT FROM 'removed'
+            ORDER BY created_at DESC LIMIT 1;`,
+          [candidate.tenant_id]
+        );
         if (defaultJob.rowCount && defaultJob.rowCount > 0) {
           targetJobId = defaultJob.rows[0].id;
         }
@@ -602,17 +651,39 @@ router.post("/submit", async (req: any, res: any) => {
     const resumeScore = candidate.score || 0;
     const finalScore = Number(((resumeScore * 0.4) + (assessmentScore * 0.6)).toFixed(1));
 
-    // Rank candidate
+    // Resolve the real job title once, for every downstream email. Using
+    // `candidate.role` (a free-text inferred role) produced emails referencing a
+    // position the candidate never applied to.
+    let jobTitleForEmails = candidate.role || "Open Position";
+    try {
+      if (candidate.job_id) {
+        const jobTitleRes = await queryGlobal(`SELECT title FROM jobs WHERE id = $1 LIMIT 1;`, [candidate.job_id]);
+        if (jobTitleRes.rowCount && jobTitleRes.rows[0]?.title) {
+          jobTitleForEmails = jobTitleRes.rows[0].title;
+        }
+      }
+    } catch (titleErr) {
+      console.error("Failed to resolve job title for assessment emails:", titleErr);
+    }
+
+    // Rank candidate.
+    //
+    // `assessment_status` records the assessment outcome ("did they clear it"),
+    // while `status` drives the pipeline stage. Both the Qualified and Review
+    // bands cleared the assessment, so both are 'passed' — dashboards count on
+    // that. Auto-advancing to interview is gated separately on `final_score`
+    // (see AutonomousRecruitmentService step 4), so candidates in the Review band
+    // stay with HR instead of being promoted automatically.
     let nextStatus = "Review";
     let kekaStatus = "active";
     let assessmentStatus = "failed";
 
-    if (finalScore >= 80) {
+    if (finalScore >= PIPELINE_THRESHOLDS.INTERVIEW) {
       nextStatus = "Qualified";
       assessmentStatus = "passed";
-    } else if (finalScore >= 60) {
+    } else if (finalScore >= PIPELINE_THRESHOLDS.REVIEW) {
       nextStatus = "Review";
-      assessmentStatus = "passed"; // passed assessment, but overall score is in review range
+      assessmentStatus = "passed"; // cleared the assessment; overall score needs HR review
     } else {
       nextStatus = "Rejected";
       kekaStatus = "rejected_pool";
@@ -680,41 +751,22 @@ router.post("/submit", async (req: any, res: any) => {
 
       // Trigger Detailed Assessment Results Email to both Candidate and HR
       try {
-        let hrEmail = "yogeshkumarwadhwa@localhost.com";
-        try {
-          const tenantCfgRes = await queryGlobal(
-            `SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;`,
-            [candidate.tenant_id]
-          );
-          const emailCfg = tenantCfgRes.rows[0]?.email_config;
-          if (emailCfg?.hrManagerEmail) {
-            hrEmail = emailCfg.hrManagerEmail;
-          } else {
-            const ownerRes = await queryGlobal(
-              `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
-              [candidate.tenant_id]
-            );
-            if (ownerRes.rowCount && ownerRes.rowCount > 0) {
-              hrEmail = ownerRes.rows[0].email;
-            }
-          }
-        } catch (dbErr) {
-          console.error("Failed to lookup HR manager email, falling back to default:", dbErr);
-        }
+        const hrEmail = await resolveHrEmail(candidate.tenant_id);
 
         if (fullQuestions.length > 0) {
           await sendAssessmentResultDetailsEmail({
             candidateName: candidate.name,
             candidateEmail: candidate.email,
-            hrEmail,
-            jobTitle: candidate.role,
+            hrEmail: hrEmail || undefined,
+            jobTitle: jobTitleForEmails,
             resumeScore,
             assessmentScore,
             finalScore,
             questions: fullQuestions,
             candidateAnswers: answers,
-            tenantId: candidate.tenant_id
-          });
+            tenantId: candidate.tenant_id,
+            candidateId: candidate.id
+          } as any);
         }
       } catch (mailDetailsErr) {
         console.error("⚠️ [Side-Effect] Failed to trigger detailed results email:", mailDetailsErr);
@@ -722,6 +774,7 @@ router.post("/submit", async (req: any, res: any) => {
 
       // Sync assessment completion stage via Keka
       let interviewDate: Date | null = null;
+      let scheduledInterviewId: string | null = null;
       try {
         const kekaResult = await kekaWorkflowService.handleAssessmentCompletion(candidate.id, finalScore);
         if (kekaResult?.interviewDate) {
@@ -732,24 +785,48 @@ router.post("/submit", async (req: any, res: any) => {
       }
 
       // Fallback: If candidate passed but interview wasn't scheduled via Keka, schedule locally
-      if (finalScore >= 80 && !interviewDate) {
-        interviewDate = new Date();
-        interviewDate.setDate(interviewDate.getDate() + 2);
-        interviewDate.setHours(10, 0, 0, 0);
+      if (finalScore >= PIPELINE_THRESHOLDS.INTERVIEW && !interviewDate) {
+        const slot = nextBusinessDaySlot(2, 10);
 
         try {
           const interviewId = crypto.randomUUID();
-          await queryGlobal(
-            `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status)
-             VALUES ($1, $2, $3, $4, 'scheduled')
-             ON CONFLICT (id) DO NOTHING;`,
-            [interviewId, candidate.id, candidate.job_id, interviewDate]
+          // tenant_id was previously omitted here (but supplied by the autonomous
+          // cycle), producing tenant-less interview rows invisible to the
+          // tenant-scoped HR dashboard queries.
+          const insertRes = await queryGlobal(
+            `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status, tenant_id)
+             SELECT $1, $2, $3, $4, 'scheduled', $5
+              WHERE NOT EXISTS (
+                    SELECT 1 FROM interviews
+                     WHERE candidate_id = $2 AND status IN ('scheduled', 'completed')
+                  )
+             ON CONFLICT DO NOTHING
+             RETURNING id;`,
+            [interviewId, candidate.id, candidate.job_id, slot, candidate.tenant_id]
           );
 
-          await queryGlobal(
-            `UPDATE candidates SET status = 'interviewing' WHERE id = $1;`,
-            [candidate.id]
-          );
+          if (insertRes.rowCount) {
+            interviewDate = slot;
+            scheduledInterviewId = interviewId;
+            await queryGlobal(
+              `UPDATE candidates SET status = 'interviewing' WHERE id = $1;`,
+              [candidate.id]
+            );
+          } else {
+            // An interview already exists (e.g. scheduled by the autonomous
+            // cycle). Reuse it rather than creating a second booking and a
+            // second notification email.
+            const existing = await queryGlobal(
+              `SELECT id, scheduled_date FROM interviews
+                WHERE candidate_id = $1 AND status IN ('scheduled', 'completed')
+                ORDER BY scheduled_date ASC LIMIT 1;`,
+              [candidate.id]
+            );
+            if (existing.rowCount) {
+              interviewDate = new Date(existing.rows[0].scheduled_date);
+              scheduledInterviewId = existing.rows[0].id;
+            }
+          }
         } catch (intErr) {
           console.error("⚠️ [Side-Effect] Failed to schedule fallback interview:", intErr);
         }
@@ -780,40 +857,22 @@ router.post("/submit", async (req: any, res: any) => {
 
         // Trigger automatic emails (Candidate and HR)
         try {
-          let hrEmail = "yogeshkumarwadhwa@localhost.com";
-          try {
-            // Priority 1: Check tenant's configured HR Manager email
-            const tenantCfgRes = await queryGlobal(
-              `SELECT email_config FROM tenants WHERE id = $1 LIMIT 1;`,
-              [candidate.tenant_id]
-            );
-            const emailCfg = tenantCfgRes.rows[0]?.email_config;
-            if (emailCfg?.hrManagerEmail) {
-              hrEmail = emailCfg.hrManagerEmail;
-            } else {
-              // Priority 2: Fall back to tenant owner email
-              const ownerRes = await queryGlobal(
-                `SELECT email FROM users WHERE tenant_id = $1 AND role = 'owner' LIMIT 1;`,
-                [candidate.tenant_id]
-              );
-              if (ownerRes.rowCount && ownerRes.rowCount > 0) {
-                hrEmail = ownerRes.rows[0].email;
-              }
-            }
-          } catch (dbErr) {
-            console.error("Failed to lookup HR manager email, falling back to default:", dbErr);
-          }
+          const hrEmail = await resolveHrEmail(candidate.tenant_id);
 
+          // sendInterviewScheduleEmail self-guards against duplicates, so this is
+          // safe even if the autonomous cycle reaches the same candidate.
           await sendInterviewScheduleEmail({
             candidateName: candidate.name,
             candidateEmail: candidate.email,
-            jobTitle: candidate.role,
+            jobTitle: jobTitleForEmails,
             resumeScore,
             assessmentScore,
             finalScore,
             scheduledDate: interviewDate,
-            hrEmail,
+            hrEmail: hrEmail || undefined,
             tenantId: candidate.tenant_id,
+            candidateId: candidate.id,
+            interviewId: scheduledInterviewId || undefined,
           });
         } catch (mailErr) {
           console.error("⚠️ [Side-Effect] Failed to trigger automated interview emails:", mailErr);

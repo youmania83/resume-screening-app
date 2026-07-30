@@ -1,8 +1,8 @@
 // src/integrations/zoho/controllers/zoho.controller.ts
 
 import { Request, Response } from "express";
-import { zohoConfig, isZohoConfigured } from "../config/zoho.config";
-import { zohoMailService } from "../services/zohoMail.service";
+import { zohoConfig, isZohoConfigured } from "../config/zoho.config.js";
+import { zohoMailService } from "../services/zohoMail.service.js";
 
 export class ZohoController {
   /**

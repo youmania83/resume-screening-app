@@ -5,14 +5,14 @@ import crypto from "crypto";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
-import { query } from "../../../lib/db";
-import { kekaApplicationsService } from "./applications.service";
-import { kekaInterviewsService } from "./interviews.service";
-import { kekaOffersService } from "./offers.service";
-import { kekaAssessmentService } from "./assessment.service";
-import { kekaDocumentsService } from "./documents.service";
-import { callDeepSeek } from "../../../lib/deepseek";
-import { isKekaEnabled } from "../config/keka.config";
+import { query } from "../../../lib/db.js";
+import { kekaApplicationsService } from "./applications.service.js";
+import { kekaInterviewsService } from "./interviews.service.js";
+import { kekaOffersService } from "./offers.service.js";
+import { kekaAssessmentService } from "./assessment.service.js";
+import { kekaDocumentsService } from "./documents.service.js";
+import { callDeepSeek } from "../../../lib/deepseek.js";
+import { isKekaEnabled } from "../config/keka.config.js";
 import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic } from "../../../lib/aiEvaluationCache.js";
 
 // Define the threshold mapping configurations

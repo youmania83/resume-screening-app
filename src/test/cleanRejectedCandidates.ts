@@ -6,7 +6,29 @@ import fs from "fs";
 import path from "path";
 import { queryGlobal } from "../lib/tenantDb.js";
 
+/**
+ * DEPRECATED — superseded by src/scripts/purgeRejectedCandidates.ts, which adds
+ * a retention window, a dry-run mode and an audit manifest.
+ *
+ * Kept only for reference. It refuses to run without explicit approval because
+ * it deletes rejected candidates immediately, with no retention window.
+ */
+function assertApproved(): void {
+  const envApproved = (process.env.CONFIRM_DESTRUCTIVE_ACTION || "").trim().toUpperCase() === "YES";
+  const flagApproved = process.argv.includes("--confirm");
+
+  if (!envApproved || !flagApproved) {
+    console.error("🛑 REFUSING TO RUN — this script permanently deletes rejected candidate data with no retention window.");
+    console.error("   Use the supported, approval-gated weekly purge instead:");
+    console.error("     npx tsx src/scripts/purgeRejectedCandidates.ts            # dry run");
+    console.error("     CONFIRM_DESTRUCTIVE_ACTION=YES npx tsx src/scripts/purgeRejectedCandidates.ts --confirm");
+    process.exit(1);
+  }
+}
+
 async function main() {
+  assertApproved();
+
   console.log("=== RUNNING REJECTED CANDIDATES & RESUMES CLEANUP ===");
 
   const uploadDir = path.join(process.cwd(), "uploads");

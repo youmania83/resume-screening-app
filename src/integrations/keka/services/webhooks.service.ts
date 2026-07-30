@@ -1,6 +1,6 @@
 // src/integrations/keka/services/webhooks.service.ts
 
-import { query } from "../../../lib/db";
+import { query } from "../../../lib/db.js";
 import { v4 as uuidv4 } from "uuid";
 
 export class KekaWebhooksService {

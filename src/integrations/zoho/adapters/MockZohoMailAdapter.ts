@@ -1,6 +1,6 @@
 // src/integrations/zoho/adapters/MockZohoMailAdapter.ts
 
-import { ZohoMailAdapter, ZohoEmailMessage } from "./ZohoMailAdapter";
+import { ZohoMailAdapter, ZohoEmailMessage } from "./ZohoMailAdapter.js";
 
 export class MockZohoMailAdapter implements ZohoMailAdapter {
   private sentEmails: any[] = [];

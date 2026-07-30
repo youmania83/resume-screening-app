@@ -2,8 +2,8 @@
 
 import nodemailer from "nodemailer";
 import dns from "dns";
-import { ZohoMailAdapter, ZohoEmailMessage, ZohoEmailAttachment } from "./ZohoMailAdapter";
-import { zohoConfig, isZohoConfigured } from "../config/zoho.config";
+import { ZohoMailAdapter, ZohoEmailMessage, ZohoEmailAttachment } from "./ZohoMailAdapter.js";
+import { zohoConfig, isZohoConfigured } from "../config/zoho.config.js";
 import { CircuitBreaker, retryWithBackoff } from "../../../lib/circuitBreaker.js";
 
 // Zoho SMTP circuit breaker

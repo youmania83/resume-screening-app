@@ -1,7 +1,7 @@
 // src/integrations/keka/routes/keka.routes.ts
 
 import { Router } from "express";
-import { kekaController } from "../controllers/keka.controller";
+import { kekaController } from "../controllers/keka.controller.js";
 
 const router = Router();
 

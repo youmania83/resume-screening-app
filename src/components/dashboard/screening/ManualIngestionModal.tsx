@@ -42,10 +42,45 @@ interface ManualIngestionModalProps {
   isSyncingEmail: boolean;
 }
 
-export function ManualIngestionModal(props: ManualIngestionModalProps) {
+export function ManualIngestionModal({
+  isOpen,
+  onClose,
+  importTab,
+  setImportTab,
+  importUrl,
+  setImportUrl,
+  jdTextPaste,
+  setJdTextPaste,
+  jdFile,
+  setJdFile,
+  isExtracting,
+  activeJD,
+  setActiveJD,
+  isEditingJD,
+  setIsEditingJD,
+  handleJdImport,
+  handleSaveJD,
+  jdFileInputRef,
+  isIngesting: _isIngesting,
+  dragActive,
+  handleDrag,
+  handleDrop,
+  triggerFileSelect,
+  fileInputRef,
+  handleFileChange,
+  triggerFolderSelect,
+  folderInputRef,
+  handleFolderChange,
+  uploadProgress,
+  handleEmailFetch,
+  isSyncingEmail,
+}: ManualIngestionModalProps) {
+  // NOTE: props are destructured (rather than accessed as `x` during
+  // render) because this props object carries React refs. Reading members off a
+  // ref-carrying object during render trips the react-hooks/refs rule.
   const [activeMode, setActiveMode] = React.useState<"resumes" | "jd">("resumes");
 
-  if (!props.isOpen) return null;
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
@@ -68,7 +103,7 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
               </div>
             </div>
             <button
-              onClick={props.onClose}
+              onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-foreground hover:bg-secondary transition-colors"
             >
               <X className="h-4 w-4" />
@@ -106,29 +141,29 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
             {activeMode === "resumes" ? (
               <div className="space-y-4">
                 <div
-                  onDragEnter={props.handleDrag}
-                  onDragOver={props.handleDrag}
-                  onDragLeave={props.handleDrag}
-                  onDrop={props.handleDrop}
-                  onClick={props.triggerFileSelect}
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={triggerFileSelect}
                   className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${
-                    props.dragActive
+                    dragActive
                       ? "border-indigo-500 bg-indigo-500/10"
                       : "border-border hover:border-slate-400 bg-secondary/30"
                   }`}
                 >
                   <input
                     type="file"
-                    ref={props.fileInputRef}
-                    onChange={props.handleFileChange}
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
                     accept=".pdf,.docx,.zip"
                     className="hidden"
                     multiple
                   />
                   <input
                     type="file"
-                    ref={props.folderInputRef}
-                    onChange={props.handleFolderChange}
+                    ref={folderInputRef}
+                    onChange={handleFolderChange}
                     className="hidden"
                     multiple
                   />
@@ -137,8 +172,8 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-foreground">
-                      {Object.keys(props.uploadProgress).length > 0
-                        ? `Uploading ${Object.keys(props.uploadProgress).length} file(s)...`
+                      {Object.keys(uploadProgress).length > 0
+                        ? `Uploading ${Object.keys(uploadProgress).length} file(s)...`
                         : "Drop resumes, folder, or ZIP here"}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-1">Supports PDF, DOCX, folders, and ZIP archives</p>
@@ -147,7 +182,7 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          props.triggerFileSelect();
+                          triggerFileSelect();
                         }}
                         className="hover:underline"
                       >
@@ -158,7 +193,7 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          props.triggerFolderSelect();
+                          triggerFolderSelect();
                         }}
                         className="hover:underline"
                       >
@@ -167,23 +202,23 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
                       <span className="text-muted-foreground/30">|</span>
                       <button
                         type="button"
-                        disabled={props.isSyncingEmail}
+                        disabled={isSyncingEmail}
                         onClick={(e) => {
                           e.stopPropagation();
-                          props.handleEmailFetch();
+                          handleEmailFetch();
                         }}
                         className="hover:underline disabled:opacity-50"
                       >
-                        {props.isSyncingEmail ? "Fetching..." : "Fetch from Email"}
+                        {isSyncingEmail ? "Fetching..." : "Fetch from Email"}
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {Object.keys(props.uploadProgress).length > 0 && (
+                {Object.keys(uploadProgress).length > 0 && (
                   <div className="p-4 bg-secondary/40 rounded-lg border border-border space-y-3">
                     <span className="block text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Ingestion Stream</span>
-                    {Object.entries(props.uploadProgress).map(([fileId, progress]) => (
+                    {Object.entries(uploadProgress).map(([fileId, progress]) => (
                       <div key={fileId} className="space-y-1">
                         <div className="flex justify-between text-xs font-semibold text-foreground">
                           <span className="truncate max-w-[250px]">{fileId.split("-")[0]}</span>
@@ -198,22 +233,22 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
             ) : (
               <div className="space-y-4">
                 <JobImportCard
-                  importTab={props.importTab}
-                  setImportTab={props.setImportTab}
-                  importUrl={props.importUrl}
-                  setImportUrl={props.setImportUrl}
-                  jdTextPaste={props.jdTextPaste}
-                  setJdTextPaste={props.setJdTextPaste}
-                  jdFile={props.jdFile}
-                  setJdFile={props.setJdFile}
-                  isExtracting={props.isExtracting}
-                  activeJD={props.activeJD}
-                  setActiveJD={props.setActiveJD}
-                  isEditingJD={props.isEditingJD}
-                  setIsEditingJD={props.setIsEditingJD}
-                  handleJdImport={props.handleJdImport}
-                  handleSaveJD={props.handleSaveJD}
-                  jdFileInputRef={props.jdFileInputRef}
+                  importTab={importTab}
+                  setImportTab={setImportTab}
+                  importUrl={importUrl}
+                  setImportUrl={setImportUrl}
+                  jdTextPaste={jdTextPaste}
+                  setJdTextPaste={setJdTextPaste}
+                  jdFile={jdFile}
+                  setJdFile={setJdFile}
+                  isExtracting={isExtracting}
+                  activeJD={activeJD}
+                  setActiveJD={setActiveJD}
+                  isEditingJD={isEditingJD}
+                  setIsEditingJD={setIsEditingJD}
+                  handleJdImport={handleJdImport}
+                  handleSaveJD={handleSaveJD}
+                  jdFileInputRef={jdFileInputRef}
                 />
               </div>
             )}
@@ -222,7 +257,7 @@ export function ManualIngestionModal(props: ManualIngestionModalProps) {
           {/* Modal Footer */}
           <div className="px-6 py-3 border-t border-border bg-secondary/20 flex justify-end">
             <button
-              onClick={props.onClose}
+              onClick={onClose}
               className="px-4 py-1.5 text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground rounded-lg transition-colors"
             >
               Close Window

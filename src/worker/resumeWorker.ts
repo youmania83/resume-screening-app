@@ -18,6 +18,7 @@ import { ensureJobAssessment } from "../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../lib/email.js";
 import { isNonResumeFile } from "../lib/fileFilters.js";
 import { inferCandidateRole } from "../lib/roleInference.js";
+import { ACTIVE_JOB_SQL, PIPELINE_THRESHOLDS } from "../lib/appConfig.js";
 
 dotenv.config();
 
@@ -428,9 +429,14 @@ export async function parseAndEvalResume(
         }
       }
 
-      // Check active jobs
-      const jobsCountRes = await queryGlobal("SELECT COUNT(*) FROM jobs WHERE tenant_id = $1 LIMIT 1;", [tenantId]);
-      const activeJobsCount = parseInt(jobsCountRes.rows[0]?.count || "0", 10);
+      // Check active jobs.
+      // Only *open* openings count: a job that HR closed, or that an ATS sync
+      // marked as removed, must not attract new applicants.
+      const jobsCountRes = await queryGlobal(
+        `SELECT COUNT(*)::int as count FROM jobs WHERE tenant_id = $1 AND ${ACTIVE_JOB_SQL};`,
+        [tenantId]
+      );
+      const activeJobsCount = Number(jobsCountRes.rows[0]?.count || 0);
       const noActiveJobsExist = activeJobsCount === 0;
 
       if (noActiveJobsExist) {
@@ -606,13 +612,28 @@ export async function parseAndEvalResume(
       // Select jobs to match: either targeted job (match by id or external_id) or all active jobs in the tenant
       let jobsToMatch: any[] = [];
       if (targetJobId) {
-        const targetJob = await queryGlobal("SELECT * FROM jobs WHERE (id = $1 OR external_id = $1) AND tenant_id = $2 LIMIT 1;", [targetJobId, tenantId]);
+        const targetJob = await queryGlobal(
+          `SELECT * FROM jobs WHERE (id = $1 OR external_id = $1) AND tenant_id = $2 AND ${ACTIVE_JOB_SQL} LIMIT 1;`,
+          [targetJobId, tenantId]
+        );
         if ((targetJob.rowCount || 0) > 0) {
           jobsToMatch.push(targetJob.rows[0]);
+        } else {
+          console.log(`[Worker] Target job ${targetJobId} is closed/removed or not found — falling back to open openings only.`);
         }
-      } else {
-        // Fetch all jobs for this tenant
-        const tenantJobs = await queryGlobal("SELECT * FROM jobs WHERE tenant_id = $1 LIMIT 50;", [tenantId]);
+      }
+
+      // True when the candidate explicitly applied to a job that is still open.
+      // If the requested job is closed we fall back to "best open opening",
+      // rather than silently pinning the candidate to a dead requisition.
+      const targetJobIsOpen = jobsToMatch.length > 0;
+
+      if (!targetJobIsOpen) {
+        // Match against open openings for this tenant only.
+        const tenantJobs = await queryGlobal(
+          `SELECT * FROM jobs WHERE tenant_id = $1 AND ${ACTIVE_JOB_SQL} ORDER BY created_at DESC LIMIT 50;`,
+          [tenantId]
+        );
         jobsToMatch = tenantJobs.rows;
       }
 
@@ -648,12 +669,12 @@ export async function parseAndEvalResume(
         );
 
         // Track highest matching job, or target job specifically
-        if (targetJobId && (job.id === targetJobId || job.external_id === targetJobId)) {
+        if (targetJobIsOpen && (job.id === targetJobId || job.external_id === targetJobId)) {
           highestMatchScore = match.score;
           matchedJobId = job.id;
           matchedJobTitle = job.title;
           matchedJobDesc = job.description;
-        } else if (!targetJobId && match.score > highestMatchScore) {
+        } else if (!targetJobIsOpen && match.score > highestMatchScore) {
           highestMatchScore = match.score;
           matchedJobId = job.id;
           matchedJobTitle = job.title;
@@ -661,8 +682,10 @@ export async function parseAndEvalResume(
         }
       }
 
-      // If no target job was specified, and the highest score is < 50%, clear matchedJobId so it remains unmapped
-      if (!targetJobId && highestMatchScore < 50) {
+      // Without an explicit (open) target job, require a minimum match before we
+      // attach the candidate to a requisition; otherwise leave them unmapped for
+      // HR review instead of forcing a poor match.
+      if (!targetJobIsOpen && highestMatchScore < PIPELINE_THRESHOLDS.JOB_MATCH_FLOOR) {
         matchedJobId = null;
         matchedJobTitle = "";
         matchedJobDesc = "";
@@ -670,7 +693,7 @@ export async function parseAndEvalResume(
 
       // Automated AI screening pipeline trigger
       if (candidateStatus === "applied" && matchedJobId) {
-        if (highestMatchScore >= 80) {
+        if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
           const assessmentToken = crypto.randomBytes(24).toString("hex");
           const expiry = new Date();
           expiry.setDate(expiry.getDate() + 7);
@@ -706,27 +729,39 @@ export async function parseAndEvalResume(
           // Ensure job assessment and send invitation
           try {
             await ensureJobAssessment(matchedJobId, matchedJobTitle, matchedJobDesc);
-            
-            await sendAssessmentInviteEmail({
+
+            const inviteResult = await sendAssessmentInviteEmail({
               candidateName,
               candidateEmail: parsedData.email || "",
               jobTitle: matchedJobTitle,
               token: assessmentToken,
               expiryDate: expiry,
-              tenantId
+              tenantId,
+              candidateId: candidateId || undefined
             });
-            
-            hasSentAssessmentInvite = true;
 
-            await queryGlobal(
-              `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-               VALUES ($1, 'assessment_invited', $2, $3);`,
-              [candidateId, `Assessment invitation email sent to candidate. Token: ${assessmentToken}`, tenantId]
-            );
+            if (inviteResult?.success) {
+              hasSentAssessmentInvite = true;
+
+              // Stamp the invite time so the 30-minute autonomous cycle knows the
+              // invitation already went out and does not re-send it.
+              await queryGlobal(
+                `UPDATE candidates SET assessment_invited_at = NOW() WHERE id = $1;`,
+                [candidateId]
+              );
+
+              await queryGlobal(
+                `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+                 VALUES ($1, 'assessment_invited', $2, $3);`,
+                [candidateId, `Assessment invitation email sent to candidate for "${matchedJobTitle}".`, tenantId]
+              );
+            } else {
+              console.warn(`[Worker] Assessment invitation for candidate ${candidateId} was not delivered (${inviteResult?.reason || "unknown reason"}). It will be retried by the autonomous cycle.`);
+            }
           } catch (err: any) {
             console.error(`[Worker] Failed to generate/send assessment for candidate ${candidateId}:`, err);
           }
-        } else if (highestMatchScore >= 60) {
+        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.REVIEW) {
           // Hold / HR Review stage
           await queryGlobal(
             `UPDATE candidates 
@@ -808,8 +843,9 @@ export async function parseAndEvalResume(
           await sendApplicationAcknowledgementEmail({
             candidateName,
             candidateEmail: parsedData.email || "",
-            tenantId
-          });
+            tenantId,
+            candidateId: candidateId || undefined
+          } as any);
         } catch (ackErr) {
           console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
         }

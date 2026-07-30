@@ -1,8 +1,8 @@
 // src/integrations/keka/services/applications.service.ts
 
-import { getKekaAdapter } from "../adapters";
-import { KekaApplication } from "../interfaces/Application";
-import { query } from "../../../lib/db";
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaApplication } from "../interfaces/Application.js";
+import { query } from "../../../lib/db.js";
 
 export class KekaApplicationsService {
   private getAdapter() {

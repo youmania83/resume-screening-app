@@ -89,7 +89,14 @@ router.post("/remap-roles", async (req, res, next) => {
     const { queryTenant, queryGlobal } = await import("../../lib/tenantDb.js");
     const { inferCandidateRole, isGenericRoleTitle } = await import("../../lib/roleInference.js");
 
-    const jobsRes = await queryTenant(`SELECT id, title, description, location, experience_required FROM jobs;`);
+    // Only OPEN openings are valid matching targets.
+    const jobsRes = await queryTenant(
+      `SELECT id, title, description, location, experience_required
+         FROM jobs
+        WHERE tenant_id = :tenant_id
+          AND COALESCE(status, 'active') = 'active'
+          AND sync_status IS DISTINCT FROM 'removed';`
+    );
     const activeJobs = jobsRes.rows;
 
     const candRes = await queryTenant(

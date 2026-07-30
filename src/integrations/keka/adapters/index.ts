@@ -1,9 +1,9 @@
 // src/integrations/keka/adapters/index.ts
 
-import { ATSAdapter } from "./KekaAdapter";
-import { MockKekaAdapter } from "./MockKekaAdapter";
-import { RealKekaAdapter } from "./RealKekaAdapter";
-import { isKekaEnabled } from "../config/keka.config";
+import { ATSAdapter } from "./KekaAdapter.js";
+import { MockKekaAdapter } from "./MockKekaAdapter.js";
+import { RealKekaAdapter } from "./RealKekaAdapter.js";
+import { isKekaEnabled } from "../config/keka.config.js";
 
 let activeAdapter: ATSAdapter | null = null;
 
@@ -20,7 +20,7 @@ export function getKekaAdapter(): ATSAdapter {
   return activeAdapter;
 }
 
-export * from "./KekaAdapter";
-export * from "./MockKekaAdapter";
-export * from "./RealKekaAdapter";
-export { isKekaEnabled } from "../config/keka.config";
+export * from "./KekaAdapter.js";
+export * from "./MockKekaAdapter.js";
+export * from "./RealKekaAdapter.js";
+export { isKekaEnabled } from "../config/keka.config.js";

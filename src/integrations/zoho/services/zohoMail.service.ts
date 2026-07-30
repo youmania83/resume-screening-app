@@ -3,10 +3,43 @@
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { getZohoAdapter } from "../adapters";
-import { query, transaction } from "../../../lib/db";
-import { kekaWorkflowService } from "../../keka/services/workflow.service";
+import { getZohoAdapter } from "../adapters/index.js";
+import { query, transaction } from "../../../lib/db.js";
+import { kekaWorkflowService } from "../../keka/services/workflow.service.js";
 import { isNonResumeFile } from "../../../lib/fileFilters.js";
+import { getIngestionCutoff } from "../../../lib/appConfig.js";
+import { DEFAULT_TENANT_ID } from "../../../lib/tenantContext.js";
+
+/**
+ * Resolves the tenant that inbound Zoho Mail applications belong to.
+ *
+ * This sync runs from a single shared mailbox, outside any request context, so it
+ * has no ambient tenant. Records were previously inserted with a NULL tenant_id,
+ * which made them invisible to every tenant-scoped dashboard query — the
+ * candidates existed in the database but never appeared in the UI.
+ */
+async function resolveSyncTenantId(): Promise<string> {
+  try {
+    const res = await query("SELECT id FROM tenants ORDER BY created_at ASC LIMIT 2;");
+    if (res.rowCount === 1) {
+      return res.rows[0].id;
+    }
+    if (res.rowCount && res.rowCount > 1) {
+      const configured = process.env.ZOHO_SYNC_TENANT_ID;
+      if (configured && res.rows.some((r: any) => r.id === configured)) {
+        return configured;
+      }
+      console.warn(
+        "[Zoho Mail Sync] Multiple tenants exist but ZOHO_SYNC_TENANT_ID is not set. " +
+        `Defaulting to ${res.rows[0].id}. Set ZOHO_SYNC_TENANT_ID to route this mailbox explicitly.`
+      );
+      return res.rows[0].id;
+    }
+  } catch (err: any) {
+    console.error("[Zoho Mail Sync] Failed to resolve the sync tenant:", err.message);
+  }
+  return DEFAULT_TENANT_ID;
+}
 
 // Helper for bulk insertions
 async function bulkInsert(client: any, table: string, columns: string[], rows: any[][]) {
@@ -51,9 +84,19 @@ export class ZohoMailService {
         return { syncedCandidatesCount: 0, errors };
       }
 
-      // 2. Fetch active jobs to map candidates based on email subject
-      const jobsRes = await query("SELECT id, title FROM jobs");
+      // 2. Fetch active jobs to map candidates based on email subject.
+      // Only OPEN openings: applications must never be mapped onto a job that HR
+      // closed or that the ATS sync removed.
+      const jobsRes = await query(
+        `SELECT id, title FROM jobs
+          WHERE COALESCE(status, 'active') = 'active'
+            AND sync_status IS DISTINCT FROM 'removed';`
+      );
       const activeJobs = jobsRes.rows;
+
+      if (activeJobs.length === 0) {
+        console.warn("[Zoho Mail Sync] No open job openings — incoming applications will not be mapped to a requisition.");
+      }
 
       const uploadsDir = path.join(process.cwd(), "uploads");
       if (!fs.existsSync(uploadsDir)) {
@@ -74,10 +117,27 @@ export class ZohoMailService {
       const logsToInsert: any[][] = [];
       const candidateIdsToScreen: string[] = [];
 
+      // Only ingest applications received at/after the configured cutoff. The
+      // IMAP path (EmailSyncService) already enforced this; this OAuth path did
+      // not, so the two ingestion routes disagreed and this one kept pulling in
+      // historical backlog.
+      const cutoff = getIngestionCutoff();
+      const syncTenantId = await resolveSyncTenantId();
+
       for (const msg of emailMessages) {
         try {
           if (existingMsgIds.has(msg.id)) {
             console.log(`Candidate application from email message ${msg.id} already synced. Skipping.`);
+            continue;
+          }
+
+          const msgTime = msg.date ? new Date(msg.date).getTime() : NaN;
+          if (isNaN(msgTime)) {
+            console.log(`[Zoho Mail Sync] Skipping message ${msg.id}: missing or unparseable date.`);
+            continue;
+          }
+          if (msgTime < cutoff.getTime()) {
+            console.log(`[Zoho Mail Sync] Skipping message ${msg.id} received before the ${cutoff.toISOString()} cutoff.`);
             continue;
           }
 
@@ -93,24 +153,32 @@ export class ZohoMailService {
             }
           }
 
-          // Fallback to first available job if no match found
-          if (!jobId && activeJobs.length > 0) {
-            jobId = activeJobs[0].id;
-            matchedRole = activeJobs[0].title;
+          // NOTE: there is deliberately NO "fall back to the first available job".
+          // That fallback assigned every unmatched application to whichever
+          // requisition happened to be first in the result set, producing wrong
+          // role mappings and wrong assessments. An unmatched application is left
+          // with job_id NULL so the screening worker can match it on resume
+          // content, or route it to HR review.
+          if (!jobId) {
+            console.log(`[Zoho Mail Sync] No job title matched in subject "${msg.subject}". Leaving unmapped for content-based matching / HR review.`);
           }
 
           const candidateId = `cand-zoho-${uuidv4()}`;
           const applicationId = `app-zoho-${uuidv4()}`;
 
-          // Prepare candidate insert row
+          // Prepare candidate insert row.
+          // Score starts at 0 — NOT a fabricated 60 baseline. A hard-coded 60 sat
+          // exactly on the HR-review threshold, so unscreened candidates appeared
+          // pre-qualified before the AI had evaluated anything. The real score is
+          // written by the screening worker.
           candidatesToInsert.push([
             candidateId,
             msg.fromName,
             msg.fromEmail,
             null, // Phone placeholder, extracted by AI parser
             matchedRole,
-            60, // Initial baseline AI Score
-            60, // Initial match percent
+            0, // Score — assigned by AI screening, not guessed here
+            0, // Match percent — assigned by AI screening
             0, // Experience years
             "applied",
             "Zoho Mail",
@@ -121,7 +189,8 @@ export class ZohoMailService {
             msg.id,
             "Zoho Mail",
             "pending",
-            new Date()
+            new Date(),
+            syncTenantId
           ]);
 
           let resumeSaved = false;
@@ -155,37 +224,29 @@ export class ZohoMailService {
                   `${msg.id}-${attachment.filename}`,
                   "Zoho Mail",
                   "synced",
-                  new Date()
+                  new Date(),
+                  syncTenantId
                 ]);
               }
             }
           }
 
-          // If no resume attachment is provided, create a blank placeholder file to allow parser logic to run
+          // If no resume attachment is provided, record the application WITHOUT a
+          // resume document and leave it for HR review.
+          //
+          // Previously this wrote a fake PDF containing invented text
+          // ("Experience: 3 years. General skills.") purely so the parser would
+          // run. The AI then dutifully extracted those invented details, and the
+          // candidate was scored and progressed on fabricated data. Never
+          // synthesise resume content.
           if (!resumeSaved) {
-            const relativePath = `uploads/resume-${candidateId}.pdf`;
-            const destPath = path.join(process.cwd(), relativePath);
-            fs.writeFileSync(
-              destPath,
-              Buffer.from(
-                `%PDF Mock Resume Contents for ${msg.fromName}. Experience: 3 years. General skills. Candidate did not upload resume.`,
-                "utf-8"
-              )
-            );
-            savedFilename = "resume-placeholder.pdf";
+            console.warn(`[Zoho Mail Sync] Application from ${msg.fromEmail} has no usable resume attachment. Recorded for HR review; no resume document created.`);
 
-            const docId = `doc-zoho-${uuidv4()}`;
-            documentsToInsert.push([
-              docId,
+            logsToInsert.push([
               candidateId,
-              savedFilename,
-              `/${relativePath}`,
-              "Resume",
-              new Date(msg.date),
-              `${msg.id}-placeholder`,
-              "Zoho Mail",
-              "synced",
-              new Date()
+              "needs_review",
+              "Application received via Zoho Mail with no readable resume attachment. Requires HR follow-up to obtain a resume before screening.",
+              syncTenantId
             ]);
           }
 
@@ -201,14 +262,16 @@ export class ZohoMailService {
             msg.id,
             "Zoho Mail",
             "synced",
-            new Date()
+            new Date(),
+            syncTenantId
           ]);
 
           // 8. Prepare Candidate activity log
           logsToInsert.push([
             candidateId,
             "applied",
-            "Candidate applied via Zoho Mail email sourcing and resume inbox synchronization."
+            "Candidate applied via Zoho Mail email sourcing and resume inbox synchronization.",
+            syncTenantId
           ]);
 
           candidateIdsToScreen.push(candidateId);
@@ -226,21 +289,21 @@ export class ZohoMailService {
           await bulkInsert(client, "candidates", [
             "id", "name", "email", "phone", "role", "score", "match_percent", "experience_years",
             "status", "application_source", "assessment_score", "keka_status", "applied_date",
-            "job_id", "external_id", "source_system", "sync_status", "last_synced_at"
+            "job_id", "external_id", "source_system", "sync_status", "last_synced_at", "tenant_id"
           ], candidatesToInsert);
 
           await bulkInsert(client, "documents", [
             "id", "candidate_id", "title", "file_url", "document_type", "uploaded_at",
-            "external_id", "source_system", "sync_status", "last_synced_at"
+            "external_id", "source_system", "sync_status", "last_synced_at", "tenant_id"
           ], documentsToInsert);
 
           await bulkInsert(client, "applications", [
             "id", "candidate_id", "job_id", "application_date", "status", "stage",
-            "source", "external_id", "source_system", "sync_status", "last_synced_at"
+            "source", "external_id", "source_system", "sync_status", "last_synced_at", "tenant_id"
           ], applicationsToInsert);
 
           await bulkInsert(client, "candidate_activity_logs", [
-            "candidate_id", "event_type", "message"
+            "candidate_id", "event_type", "message", "tenant_id"
           ], logsToInsert);
         });
 

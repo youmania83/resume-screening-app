@@ -4,7 +4,37 @@ dotenv.config();
 import { queryGlobal } from "../lib/tenantDb.js";
 import { pool } from "../lib/db.js";
 
+/**
+ * DESTRUCTIVE — permanently deletes candidate records and their history.
+ *
+ * This was a one-off go-live cleanup. It is now double-gated so it can never run
+ * accidentally (e.g. from a stale npm script, a deploy hook, or shell history).
+ * Data retention policy: records from the go-live cutoff forward are kept
+ * indefinitely; only pre-cutoff legacy rows were ever in scope here.
+ */
+function assertApproved(): void {
+  const envApproved = (process.env.CONFIRM_DESTRUCTIVE_ACTION || "").trim().toUpperCase() === "YES";
+  const flagApproved = process.argv.includes("--confirm");
+
+  if (!envApproved || !flagApproved) {
+    console.error("🛑 REFUSING TO RUN — this script permanently deletes candidate data.");
+    console.error("");
+    console.error("   It requires explicit human approval via BOTH:");
+    console.error("     • env  CONFIRM_DESTRUCTIVE_ACTION=YES");
+    console.error("     • flag --confirm");
+    console.error("");
+    console.error("   Example:");
+    console.error("     CONFIRM_DESTRUCTIVE_ACTION=YES npx tsx src/scripts/resetPreJuly29Data.ts --confirm");
+    console.error("");
+    console.error("   To delete only rejected candidates on the weekly retention schedule, use");
+    console.error("   src/scripts/purgeRejectedCandidates.ts instead.");
+    process.exit(1);
+  }
+}
+
 async function resetPreJuly29Data() {
+  assertApproved();
+
   const client = await pool.connect();
   try {
     console.log("🚀 Starting database cleanup for records prior to 2026-07-29...");

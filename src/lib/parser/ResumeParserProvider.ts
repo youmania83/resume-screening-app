@@ -239,11 +239,103 @@ export class MockParser implements IResumeParserProvider {
   }
 }
 
+/**
+ * Sanity-checks an LLM parse result before it is allowed into the pipeline.
+ *
+ * A malformed or hallucinated response that still parses as JSON would otherwise
+ * be written straight to the candidates table (and trigger a real assessment
+ * invitation email), so reject anything structurally implausible here.
+ */
+function validateParsedData(data: any, providerName: string): ParsedResumeData {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(`${providerName} returned a non-object parse result.`);
+  }
+
+  // Normalise array fields — models occasionally return a comma-joined string.
+  const toArray = (val: any): string[] => {
+    if (Array.isArray(val)) return val.filter(v => typeof v === "string" && v.trim()).map(v => v.trim());
+    if (typeof val === "string" && val.trim()) return val.split(",").map(v => v.trim()).filter(Boolean);
+    return [];
+  };
+
+  data.skills = toArray(data.skills);
+  data.certifications = toArray(data.certifications);
+  data.strengths = toArray(data.strengths);
+  data.concerns = toArray(data.concerns);
+  data.matchedSkills = toArray(data.matchedSkills);
+  data.missingSkills = toArray(data.missingSkills);
+
+  // Numeric coercion with plausibility bounds.
+  const clamp = (val: any, min: number, max: number, fallback: number): number => {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(max, Math.max(min, num));
+  };
+
+  data.experienceYears = clamp(data.experienceYears, 0, 60, 0);
+  data.overallConfidence = clamp(data.overallConfidence, 0, 1, 0.5);
+  data.emailConfidence = clamp(data.emailConfidence, 0, 1, 0.5);
+  data.phoneConfidence = clamp(data.phoneConfidence, 0, 1, 0.5);
+  data.skillsConfidence = clamp(data.skillsConfidence, 0, 1, 0.5);
+
+  for (const key of ["skillsScore", "experienceScore", "industryScore", "educationScore", "locationScore"] as const) {
+    if (data[key] !== undefined && data[key] !== null) {
+      data[key] = clamp(data[key], 0, 100, 0);
+    }
+  }
+
+  // `isResume` must be an explicit boolean — treat a missing value as "unknown",
+  // never as "yes", so non-resume documents cannot slip through.
+  if (typeof data.isResume !== "boolean") {
+    const looksLikeResume = data.skills.length > 0 || !!data.email || Number(data.experienceYears) > 0;
+    data.isResume = looksLikeResume;
+  }
+
+  if (typeof data.firstName !== "string") data.firstName = "";
+  if (typeof data.lastName !== "string") data.lastName = "";
+  if (typeof data.email !== "string") data.email = "";
+  if (typeof data.phone !== "string") data.phone = "";
+
+  return data as ParsedResumeData;
+}
+
+/** Small helper: retry a transient provider failure once, with backoff. */
+async function withRetry<T>(fn: () => Promise<T>, attempts: number, label: string): Promise<T> {
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      if (attempt < attempts) {
+        const delayMs = 1000 * attempt;
+        console.warn(`[Parser Manager] ${label} attempt ${attempt}/${attempts} failed (${err?.message || err}). Retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 // Failover parser runner
 export class ResumeParserManager {
+  /**
+   * True only when the regex-based MockParser is explicitly opted into.
+   *
+   * The MockParser fabricates a complete candidate profile (john.doe@example.com,
+   * five years of experience, a fixed skill list and hard-coded scores of 80-95).
+   * It used to be appended unconditionally as the last fallback, which meant that
+   * any AI outage silently produced fake high-scoring candidates that were then
+   * auto-shortlisted and emailed real assessment invitations. It is now opt-in
+   * and never enabled by default.
+   */
+  static isMockParserEnabled(): boolean {
+    return process.env.ALLOW_MOCK_PARSER === "true" || process.env.NODE_ENV === "test";
+  }
+
   static getProviders(): IResumeParserProvider[] {
     const list: IResumeParserProvider[] = [];
-    
+
     if (process.env.DEEPSEEK_API_KEY) {
       list.push(new DeepSeekParser());
     }
@@ -253,19 +345,38 @@ export class ResumeParserManager {
     if (process.env.GEMINI_API_KEY) {
       list.push(new GeminiParser());
     }
-    
-    list.push(new MockParser());
+
+    if (this.isMockParserEnabled()) {
+      console.warn("⚠️ [Parser Manager] MockParser is ENABLED (ALLOW_MOCK_PARSER=true). Fabricated candidate data may be produced — do not use in production.");
+      list.push(new MockParser());
+    }
+
     return list;
   }
 
   static async parse(rawText: string, jobDescription?: string): Promise<{ data: ParsedResumeData; provider: string }> {
     const providers = this.getProviders();
+
+    if (providers.length === 0) {
+      throw new Error(
+        "[Parser Manager] No AI parsing provider is configured. Set at least one of " +
+          "DEEPSEEK_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY. Resumes will be retried " +
+          "once a provider is available (no fabricated data is generated)."
+      );
+    }
+
     let lastError: any = null;
+    const attemptsPerProvider = Number(process.env.AI_PARSE_ATTEMPTS) > 0 ? Number(process.env.AI_PARSE_ATTEMPTS) : 2;
 
     for (const provider of providers) {
       try {
         console.log(`[Parser Manager] Attempting parsing with provider: ${provider.name}...`);
-        const data = await provider.parseResume(rawText, jobDescription);
+        const raw = await withRetry(
+          () => provider.parseResume(rawText, jobDescription),
+          attemptsPerProvider,
+          provider.name
+        );
+        const data = validateParsedData(raw, provider.name);
         console.log(`[Parser Manager] Successfully parsed using provider: ${provider.name}`);
         return { data, provider: provider.name };
       } catch (err: any) {
@@ -274,6 +385,8 @@ export class ResumeParserManager {
       }
     }
 
-    throw new Error(`[Parser Manager] All parsing providers failed. Last error: ${lastError?.message || lastError}`);
+    // Deliberately throw rather than degrade to fabricated data. The caller marks
+    // the inbox item as retryable so the resume is re-processed on the next cycle.
+    throw new Error(`[Parser Manager] All AI parsing providers failed. Last error: ${lastError?.message || lastError}`);
   }
 }

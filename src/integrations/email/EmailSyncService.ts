@@ -9,6 +9,7 @@ import { queryGlobal } from "../../lib/tenantDb.js";
 import { JobExtractionService } from "../../services/JobExtractionService.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { isNonResumeFile } from "../../lib/fileFilters.js";
+import { ACTIVE_JOB_SQL, getIngestionCutoff } from "../../lib/appConfig.js";
 
 // Global connection health ledger
 export interface ProviderHealth {
@@ -63,8 +64,12 @@ export class EmailSyncService {
     body: string
   ): Promise<string | undefined> {
     try {
+      // Only OPEN openings are valid application targets — a closed or
+      // ATS-removed requisition must not absorb new applicants.
       const jobsRes = await queryGlobal(
-        "SELECT id, title, location, job_code, external_id FROM jobs WHERE tenant_id = $1;",
+        `SELECT id, title, location, job_code, external_id
+           FROM jobs
+          WHERE tenant_id = $1 AND ${ACTIVE_JOB_SQL};`,
         [tenantId]
       );
       const jobs = jobsRes.rows;
@@ -178,17 +183,30 @@ export class EmailSyncService {
         }
       ];
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      // Only ingest applications received at/after the configured cutoff.
+      // Prefer a pinned INGESTION_CUTOFF_DATE over a rolling "midnight today":
+      // with a rolling boundary an application that arrives at 23:55 and fails a
+      // transient sync is skipped forever once the clock passes midnight.
+      const cutoff = getIngestionCutoff();
 
       for (const email of emails) {
-        if (email.date) {
-          const emailTime = new Date(email.date).getTime();
-          if (emailTime < todayStart.getTime()) {
-            console.log(`[Email Sync] Skipping older email received before today: "${email.subject}" (${email.date})`);
-            continue;
-          }
+        if (!email.date) {
+          // No date header — we cannot prove it arrived after the cutoff, and
+          // silently ingesting it would reintroduce historical backlog.
+          console.log(`[Email Sync] Skipping email with no date header: "${email.subject}"`);
+          continue;
         }
+
+        const emailTime = new Date(email.date).getTime();
+        if (isNaN(emailTime)) {
+          console.log(`[Email Sync] Skipping email with an unparseable date "${email.date}": "${email.subject}"`);
+          continue;
+        }
+        if (emailTime < cutoff.getTime()) {
+          console.log(`[Email Sync] Skipping email received before the ${cutoff.toISOString()} cutoff: "${email.subject}" (${email.date})`);
+          continue;
+        }
+
         const subject = email.subject || "";
         const body = email.bodyText || email.bodyHtml || "";
         

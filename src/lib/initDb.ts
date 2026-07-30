@@ -794,6 +794,65 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_jobs_tenant_sync ON jobs(tenant_id, sync_status, created_at DESC);
     `);
 
+    // ─── Pipeline stability schema (workflow correctness guarantees) ───────────
+    console.log("Applying recruitment pipeline stability schema updates...");
+
+    await client.query(`
+      -- Explicit open/closed state for a requisition. Previously the only signal
+      -- was sync_status='removed' (set by the ATS sync), so there was no way for
+      -- HR to close a job and stop it attracting new applicants.
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'active';
+
+      -- Exactly-once marker for the assessment invitation. Without this the
+      -- 30-minute autonomous cycle re-selected every 'pending' candidate and
+      -- re-sent the invitation email on every run.
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assessment_invited_at TIMESTAMPTZ;
+    `);
+
+    await client.query(`UPDATE jobs SET status = 'active' WHERE status IS NULL;`);
+
+    // Backfill the invite marker for candidates who already received an
+    // invitation, so the fix does not re-mail the existing pipeline.
+    await client.query(`
+      UPDATE candidates c
+         SET assessment_invited_at = COALESCE(
+               (SELECT MIN(l.sent_time) FROM email_logs l
+                 WHERE l.candidate_id = c.id AND l.template = 'assessment_invitation' AND l.delivery_status = 'sent'),
+               (SELECT MIN(a.logged_at) FROM candidate_activity_logs a
+                 WHERE a.candidate_id = c.id AND a.event_type = 'assessment_invited'),
+               c.created_at
+             )
+       WHERE c.assessment_invited_at IS NULL
+         AND c.assessment_token IS NOT NULL;
+    `).catch((err: any) => {
+      console.warn("[initDb] Could not backfill assessment_invited_at (non-fatal):", err.message);
+    });
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_jobs_tenant_active ON jobs(tenant_id, status, sync_status);
+      CREATE INDEX IF NOT EXISTS idx_candidates_invite_pending
+        ON candidates(tenant_id, status, assessment_status, assessment_invited_at);
+      CREATE INDEX IF NOT EXISTS idx_candidates_created_at ON candidates(tenant_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_resume_inbox_status_created ON resume_inbox(tenant_id, status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_email_logs_dedup
+        ON email_logs(candidate_id, template, delivery_status, sent_time DESC);
+      CREATE INDEX IF NOT EXISTS idx_email_logs_recipient_template
+        ON email_logs(LOWER(recipient), template, delivery_status);
+    `);
+
+    // A candidate may hold at most one live interview booking. This makes
+    // double-booking impossible even if two cron cycles race.
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_interviews_active_candidate
+        ON interviews(candidate_id)
+        WHERE status IN ('scheduled', 'completed');
+    `).catch(async (err: any) => {
+      console.warn(
+        "[initDb] Could not create uniq_interviews_active_candidate — duplicate live interviews already exist. " +
+        "Resolve duplicates and re-run init-db. Details:", err.message
+      );
+    });
+
     // Alter experience_years to NUMERIC(4,1) to support fractional experience years (e.g. 0.5, 1.5)
     await client.query("ALTER TABLE candidates ALTER COLUMN experience_years TYPE NUMERIC(4,1);");
 

@@ -1,7 +1,7 @@
 // src/integrations/zoho/routes/zoho.routes.ts
 
 import { Router } from "express";
-import { zohoController } from "../controllers/zoho.controller";
+import { zohoController } from "../controllers/zoho.controller.js";
 
 const router = Router();
 

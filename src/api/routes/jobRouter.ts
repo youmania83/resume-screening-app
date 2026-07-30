@@ -41,10 +41,11 @@ router.get("/", async (req, res, next) => {
          SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
          LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
-         WHERE j.tenant_id = :tenant_id 
+         WHERE j.tenant_id = :tenant_id
            AND (j.sync_status IS NULL OR j.sync_status != 'removed')
-           AND j.title IS NOT NULL 
-           AND j.title != 'Not Specified' 
+           AND COALESCE(j.status, 'active') = 'active'
+           AND j.title IS NOT NULL
+           AND j.title != 'Not Specified'
            AND j.title != 'Not specified'
          ORDER BY j.created_at DESC;`;
     const jobsRes = await queryTenant(sql);
@@ -132,12 +133,25 @@ router.delete("/:id", async (req, res, next) => {
        return;
     }
 
-    await queryTenant("DELETE FROM jobs WHERE id = $1 AND tenant_id = :tenant_id;", [id]);
+    // Soft close instead of a hard DELETE.
+    //
+    // A hard delete cascaded through candidate_job_matches and nulled
+    // candidates.job_id, destroying the application history of everyone who had
+    // applied. Closing the requisition stops it attracting new applicants (every
+    // matching query filters on this) while retaining all candidate records
+    // permanently, per the data-retention policy.
+    await queryTenant(
+      "UPDATE jobs SET status = 'closed', last_synced_at = NOW() WHERE id = $1 AND tenant_id = :tenant_id;",
+      [id]
+    );
 
     const tenantId = getTenantContext()?.tenantId || req.user?.tenantId || (req.headers["x-tenant-id"] as string) || "default-tenant";
     await TenantUsageService.decrementMetric(tenantId, "active_jobs", 1);
 
-    res.json({ success: true, message: `Job ${id} deleted successfully.` });
+    res.json({
+      success: true,
+      message: `Job ${id} closed successfully. It no longer accepts new applicants; existing candidate records are retained.`
+    });
   } catch (err) {
     next(err);
   }

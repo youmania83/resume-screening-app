@@ -1,13 +1,13 @@
 // src/integrations/keka/adapters/RealKekaAdapter.ts
 
-import { ATSAdapter } from "./KekaAdapter";
-import { KekaJob } from "../interfaces/Job";
-import { KekaCandidate } from "../interfaces/Candidate";
-import { KekaApplication } from "../interfaces/Application";
-import { KekaInterview } from "../interfaces/Interview";
-import { KekaOffer } from "../interfaces/Offer";
-import { KekaDocument } from "../interfaces/Document";
-import { kekaConfig } from "../config/keka.config";
+import { ATSAdapter } from "./KekaAdapter.js";
+import { KekaJob } from "../interfaces/Job.js";
+import { KekaCandidate } from "../interfaces/Candidate.js";
+import { KekaApplication } from "../interfaces/Application.js";
+import { KekaInterview } from "../interfaces/Interview.js";
+import { KekaOffer } from "../interfaces/Offer.js";
+import { KekaDocument } from "../interfaces/Document.js";
+import { kekaConfig } from "../config/keka.config.js";
 
 export class RealKekaAdapter implements ATSAdapter {
   private cachedToken: string | null = null;

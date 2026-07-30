@@ -1,8 +1,8 @@
 // src/integrations/keka/services/offers.service.ts
 
-import { getKekaAdapter } from "../adapters";
-import { KekaOffer } from "../interfaces/Offer";
-import { query } from "../../../lib/db";
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaOffer } from "../interfaces/Offer.js";
+import { query } from "../../../lib/db.js";
 
 export class KekaOffersService {
   private getAdapter() {

@@ -1,8 +1,8 @@
 // src/integrations/keka/services/interviews.service.ts
 
-import { getKekaAdapter } from "../adapters";
-import { KekaInterview } from "../interfaces/Interview";
-import { query } from "../../../lib/db";
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaInterview } from "../interfaces/Interview.js";
+import { query } from "../../../lib/db.js";
 
 export class KekaInterviewsService {
   private getAdapter() {

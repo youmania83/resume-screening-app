@@ -1,8 +1,8 @@
 // src/integrations/keka/services/candidates.service.ts
 
-import { getKekaAdapter } from "../adapters";
-import { KekaCandidate } from "../interfaces/Candidate";
-import { query } from "../../../lib/db";
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaCandidate } from "../interfaces/Candidate.js";
+import { query } from "../../../lib/db.js";
 
 import { inferCandidateRole } from "../../../lib/roleInference.js";
 

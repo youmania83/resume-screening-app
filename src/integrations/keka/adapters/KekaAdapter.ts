@@ -1,11 +1,11 @@
 // src/integrations/keka/adapters/KekaAdapter.ts
 
-import { KekaJob } from "../interfaces/Job";
-import { KekaCandidate } from "../interfaces/Candidate";
-import { KekaApplication } from "../interfaces/Application";
-import { KekaInterview } from "../interfaces/Interview";
-import { KekaOffer } from "../interfaces/Offer";
-import { KekaDocument } from "../interfaces/Document";
+import { KekaJob } from "../interfaces/Job.js";
+import { KekaCandidate } from "../interfaces/Candidate.js";
+import { KekaApplication } from "../interfaces/Application.js";
+import { KekaInterview } from "../interfaces/Interview.js";
+import { KekaOffer } from "../interfaces/Offer.js";
+import { KekaDocument } from "../interfaces/Document.js";
 
 export interface ATSAdapter {
   getJobs(): Promise<KekaJob[]>;

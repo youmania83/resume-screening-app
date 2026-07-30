@@ -2,9 +2,9 @@
 
 import fs from "fs";
 import path from "path";
-import { getKekaAdapter } from "../adapters";
-import { KekaDocument } from "../interfaces/Document";
-import { query } from "../../../lib/db";
+import { getKekaAdapter } from "../adapters/index.js";
+import { KekaDocument } from "../interfaces/Document.js";
+import { query } from "../../../lib/db.js";
 
 export class KekaDocumentsService {
   private getAdapter() {

@@ -1,11 +1,11 @@
 // src/integrations/keka/webhooks/webhook.handlers.ts
 
 import crypto from "crypto";
-import { kekaConfig } from "../config/keka.config";
-import { kekaWebhooksService } from "../services/webhooks.service";
-import { kekaApplicationsService } from "../services/applications.service";
-import { kekaWorkflowService } from "../services/workflow.service";
-import { query } from "../../../lib/db";
+import { kekaConfig } from "../config/keka.config.js";
+import { kekaWebhooksService } from "../services/webhooks.service.js";
+import { kekaApplicationsService } from "../services/applications.service.js";
+import { kekaWorkflowService } from "../services/workflow.service.js";
+import { query } from "../../../lib/db.js";
 
 /**
  * Validates the HMAC signature sent in Keka webhook headers.

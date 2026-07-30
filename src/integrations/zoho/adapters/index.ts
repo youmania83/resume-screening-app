@@ -1,9 +1,9 @@
 // src/integrations/zoho/adapters/index.ts
 
-import { ZohoMailAdapter } from "./ZohoMailAdapter";
-import { MockZohoMailAdapter } from "./MockZohoMailAdapter";
-import { RealZohoMailAdapter } from "./RealZohoMailAdapter";
-import { isZohoConfigured } from "../config/zoho.config";
+import { ZohoMailAdapter } from "./ZohoMailAdapter.js";
+import { MockZohoMailAdapter } from "./MockZohoMailAdapter.js";
+import { RealZohoMailAdapter } from "./RealZohoMailAdapter.js";
+import { isZohoConfigured } from "../config/zoho.config.js";
 
 let activeAdapter: ZohoMailAdapter | null = null;
 
@@ -20,7 +20,7 @@ export function getZohoAdapter(): ZohoMailAdapter {
   return activeAdapter;
 }
 
-export * from "./ZohoMailAdapter";
-export * from "./MockZohoMailAdapter";
-export * from "./RealZohoMailAdapter";
-export { isZohoConfigured } from "../config/zoho.config";
+export * from "./ZohoMailAdapter.js";
+export * from "./MockZohoMailAdapter.js";
+export * from "./RealZohoMailAdapter.js";
+export { isZohoConfigured } from "../config/zoho.config.js";

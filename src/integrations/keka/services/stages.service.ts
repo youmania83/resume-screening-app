@@ -1,7 +1,7 @@
 // src/integrations/keka/services/stages.service.ts
 
-import { query } from "../../../lib/db";
-import { KekaStage } from "../interfaces/Stage";
+import { query } from "../../../lib/db.js";
+import { KekaStage } from "../interfaces/Stage.js";
 
 export class KekaStagesService {
   async getStages(): Promise<KekaStage[]> {

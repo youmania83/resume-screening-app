@@ -43,7 +43,15 @@ import { Worker, Job } from "bullmq";
 import { redisClient, isRedisConnected } from "./middleware/security.js";
 import { connection } from "./queue.js";
 import { parseAndEvalResume } from "../worker/resumeWorker.js";
+import { assertAppUrlConfigured, getAppUrl, getIngestionCutoffIso, ResumeParserBootCheck } from "../lib/serverBootChecks.js";
 dotenv.config();
+
+// Fail loudly at boot on misconfiguration whose failure mode is otherwise silent
+// (dead candidate links, fabricated AI data).
+assertAppUrlConfigured();
+ResumeParserBootCheck();
+console.log(`🔗 [Config] Candidate-facing links will be built from: ${getAppUrl()}`);
+console.log(`🗓️  [Config] Ingestion cutoff: ${getIngestionCutoffIso()} (older applications are ignored)`);
 
 async function runWithLock(lockKey: string, lockTtlSeconds: number, task: () => Promise<void>) {
   if (redisClient && isRedisConnected) {
@@ -204,15 +212,19 @@ cron.schedule("0 2 * * *", () => { // Run at 2 AM daily
 setTimeout(async () => {
   try {
     const { queryGlobal } = await import("../lib/tenantDb.js");
-    const zeroScoreRes = await queryGlobal(`
-      SELECT COUNT(*)::int as count FROM candidates 
-      WHERE (score = 0 OR score IS NULL);
-    `);
+    // Scoped to the ingestion cutoff: pre-cutoff legacy rows are retained but are
+    // not re-processed, so they no longer skew this diagnostic or consume AI credits.
+    const zeroScoreRes = await queryGlobal(
+      `SELECT COUNT(*)::int as count FROM candidates
+        WHERE (score = 0 OR score IS NULL)
+          AND created_at >= $1::timestamptz;`,
+      [getIngestionCutoffIso()]
+    );
     const count = zeroScoreRes.rows[0]?.count || 0;
     if (count > 0) {
-      console.log(`📊 [Startup] Found ${count} unscored candidates with resume text. They will be evaluated in the next 30-min autonomous cycle.`);
+      console.log(`📊 [Startup] Found ${count} unscored candidates received since the cutoff. They will be evaluated in the next 30-min autonomous cycle.`);
     } else {
-      console.log(`✅ [Startup] All candidates with resumes have been AI-scored.`);
+      console.log(`✅ [Startup] All candidates received since the cutoff have been AI-scored.`);
     }
 
     const { kekaCandidatesService } = await import("../integrations/keka/services/candidates.service.js");
@@ -241,16 +253,24 @@ async function processAssessmentReminders(tag: string = "Cron") {
     const { queryGlobal } = await import("../lib/tenantDb.js");
     const { sendAssessmentReminderEmail } = await import("../lib/email.js");
 
-    const candidatesRes = await queryGlobal(`
-      SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry, c.tenant_id,
-             COALESCE(j.title, c.role) as job_title
-      FROM candidates c
-      LEFT JOIN jobs j ON c.job_id = j.id
-      WHERE c.status = 'shortlisted'
-        AND c.assessment_status = 'pending'
-        AND c.assessment_token IS NOT NULL
-        AND c.assessment_token_expiry > CURRENT_TIMESTAMP;
-    `);
+    // Remind only candidates who were actually invited, whose token is still
+    // valid, and whose job opening is still open.
+    const candidatesRes = await queryGlobal(
+      `SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry, c.tenant_id,
+              COALESCE(j.title, c.role) as job_title
+       FROM candidates c
+       JOIN jobs j ON c.job_id = j.id
+         AND COALESCE(j.status, 'active') = 'active'
+         AND j.sync_status IS DISTINCT FROM 'removed'
+       WHERE LOWER(c.status) = 'shortlisted'
+         AND c.assessment_status = 'pending'
+         AND c.assessment_token IS NOT NULL
+         AND c.assessment_invited_at IS NOT NULL
+         AND c.assessment_token_expiry > CURRENT_TIMESTAMP
+         AND c.created_at >= $1::timestamptz
+         AND c.email IS NOT NULL AND c.email LIKE '%@%';`,
+      [getIngestionCutoffIso()]
+    );
 
     let remindersSent = 0;
 
@@ -280,8 +300,9 @@ async function processAssessmentReminders(tag: string = "Cron") {
             jobTitle: candidate.job_title,
             token: candidate.assessment_token,
             remainingDays,
-            tenantId: candidate.tenant_id
-          });
+            tenantId: candidate.tenant_id,
+            candidateId: candidate.id
+          } as any);
 
           await queryGlobal(`
             INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)

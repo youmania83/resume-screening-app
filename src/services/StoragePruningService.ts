@@ -14,6 +14,14 @@ export class StoragePruningService {
     const provider = StorageManager.getProvider();
     const providerName = process.env.STORAGE_PROVIDER || "local";
 
+    // Grace period: never delete a file that is younger than this. A resume is
+    // written to storage *before* its resume_inbox row is committed, so a file
+    // uploaded seconds ago can legitimately look unreferenced.
+    const minAgeHours = Number(process.env.STORAGE_PRUNE_MIN_AGE_HOURS) > 0
+      ? Number(process.env.STORAGE_PRUNE_MIN_AGE_HOURS)
+      : 48;
+    const minAgeCutoff = Date.now() - minAgeHours * 60 * 60 * 1000;
+
     // 1. Get all files currently stored in the storage provider
     const allFiles = await provider.listAllFiles();
     if (allFiles.length === 0) {
@@ -28,7 +36,7 @@ export class StoragePruningService {
       UNION
       SELECT file_url FROM candidate_documents
     `);
-    
+
     const dbUrls = new Set<string>();
     for (const row of dbUrlsRes.rows) {
       if (row.file_url) {
@@ -36,8 +44,27 @@ export class StoragePruningService {
       }
     }
 
+    // ── SAFETY GUARD ─────────────────────────────────────────────────────────
+    // If the reference set comes back empty (or implausibly small) while storage
+    // holds many files, something went wrong with the query — not every file
+    // suddenly became an orphan. Bail out rather than wipe the bucket. Candidate
+    // records and their resumes must be retained indefinitely.
+    if (dbUrls.size === 0) {
+      console.error(
+        `🛑 [StoragePruningService] Aborting: the database returned 0 referenced file URLs while storage holds ${allFiles.length} file(s). ` +
+        "Refusing to prune to avoid deleting live candidate resumes."
+      );
+      return { deletedCount: 0, bytesFreed: 0 };
+    }
+
+    const maxDeleteRatio = Number(process.env.STORAGE_PRUNE_MAX_RATIO) > 0
+      ? Number(process.env.STORAGE_PRUNE_MAX_RATIO)
+      : 0.5;
+
     // Identify orphaned files
     const orphanedFiles: Array<{ fileKey: string; sizeBytes: number; tenantId: string }> = [];
+    let skippedTooNew = 0;
+
     for (const file of allFiles) {
       const { fileKey, sizeBytes } = file;
 
@@ -47,6 +74,13 @@ export class StoragePruningService {
           isReferenced = true;
           break;
         }
+      }
+
+      // Respect the grace period for recently-written files.
+      const lastModified = (file as any).lastModified ? new Date((file as any).lastModified).getTime() : null;
+      if (!isReferenced && lastModified !== null && lastModified > minAgeCutoff) {
+        skippedTooNew++;
+        continue;
       }
 
       if (!isReferenced) {
@@ -61,7 +95,22 @@ export class StoragePruningService {
       }
     }
 
+    if (skippedTooNew > 0) {
+      console.log(`[StoragePruningService] Skipped ${skippedTooNew} unreferenced file(s) younger than the ${minAgeHours}h grace period.`);
+    }
+
     if (orphanedFiles.length === 0) {
+      return { deletedCount: 0, bytesFreed: 0 };
+    }
+
+    // Second safety guard: refuse a mass deletion.
+    const ratio = orphanedFiles.length / allFiles.length;
+    if (ratio > maxDeleteRatio) {
+      console.error(
+        `🛑 [StoragePruningService] Aborting: ${orphanedFiles.length}/${allFiles.length} files (${Math.round(ratio * 100)}%) ` +
+        `look orphaned, which exceeds the ${Math.round(maxDeleteRatio * 100)}% safety limit. ` +
+        "This usually indicates a storage-key/URL mismatch rather than real orphans. No files were deleted."
+      );
       return { deletedCount: 0, bytesFreed: 0 };
     }
 

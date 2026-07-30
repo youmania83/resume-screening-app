@@ -1,13 +1,13 @@
 // src/integrations/keka/adapters/MockKekaAdapter.ts
 
-import { ATSAdapter } from "./KekaAdapter";
-import { KekaJob } from "../interfaces/Job";
-import { KekaCandidate } from "../interfaces/Candidate";
-import { KekaApplication } from "../interfaces/Application";
-import { KekaInterview } from "../interfaces/Interview";
-import { KekaOffer } from "../interfaces/Offer";
-import { KekaDocument } from "../interfaces/Document";
-import { query } from "../../../lib/db";
+import { ATSAdapter } from "./KekaAdapter.js";
+import { KekaJob } from "../interfaces/Job.js";
+import { KekaCandidate } from "../interfaces/Candidate.js";
+import { KekaApplication } from "../interfaces/Application.js";
+import { KekaInterview } from "../interfaces/Interview.js";
+import { KekaOffer } from "../interfaces/Offer.js";
+import { KekaDocument } from "../interfaces/Document.js";
+import { query } from "../../../lib/db.js";
 
 // Stateful in-memory store for rich mocking behavior
 class MockKekaDatabase {

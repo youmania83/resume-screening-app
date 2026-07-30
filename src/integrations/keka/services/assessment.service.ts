@@ -1,8 +1,8 @@
 // src/integrations/keka/services/assessment.service.ts
 
-import { query } from "../../../lib/db";
-import { ensureJobAssessment } from "../../../lib/assessmentService";
-import { sendAssessmentInviteEmail } from "../../../lib/email";
+import { query } from "../../../lib/db.js";
+import { ensureJobAssessment } from "../../../lib/assessmentService.js";
+import { sendAssessmentInviteEmail } from "../../../lib/email.js";
 import crypto from "crypto";
 
 export class KekaAssessmentService {

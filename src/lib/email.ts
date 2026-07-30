@@ -8,9 +8,10 @@ import dotenv from "dotenv";
 import { query } from "./db.js";
 import { decrypt } from "./crypto.js";
 import { getTenantContext } from "./tenantContext.js";
-import { zohoConfig } from "../integrations/zoho/config/zoho.config";
-import { zohoMailService } from "../integrations/zoho/services/zohoMail.service";
+import { zohoConfig } from "../integrations/zoho/config/zoho.config.js";
+import { zohoMailService } from "../integrations/zoho/services/zohoMail.service.js";
 import { CircuitBreaker, retryWithBackoff } from "./circuitBreaker.js";
+import { buildAssessmentLink, getFallbackHrEmail, hrNotificationsEnabled } from "./appConfig.js";
 
 dotenv.config();
 
@@ -252,9 +253,57 @@ async function resolveTransporter(tenantId?: string): Promise<{ transporter: any
   return { transporter, fromEmail: FROM_EMAIL };
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Email delivery policy
+ *
+ * Each recruitment stage sends exactly one email. Templates are therefore
+ * classified as either ONCE_PER_CANDIDATE (a stage notification that must never
+ * repeat) or repeatable-with-cooldown (reminders).
+ *
+ * The previous policy was the root cause of two production defects:
+ *   1. A flat 24-hour dedup window meant every stage email could be re-sent once
+ *      a day for as long as the candidate stayed in that stage. Combined with the
+ *      30-minute autonomous cycle, shortlisted candidates received a fresh
+ *      assessment invitation every single day.
+ *   2. A hard lifetime cap of 5 emails per recipient silently swallowed
+ *      late-stage notifications (interview schedule, offer) for any candidate who
+ *      had already received earlier ones.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Templates that must be delivered at most once per candidate, ever. */
+const ONCE_PER_CANDIDATE_TEMPLATES = new Set([
+  "application_acknowledgement",
+  "assessment_invitation",
+  "assessment_results",
+  "interview_schedule",
+  "offer_letter",
+  "candidate_decision",
+]);
+
+/** Repeatable templates and their minimum gap between sends, in hours. */
+const REPEATABLE_TEMPLATE_COOLDOWN_HOURS: Record<string, number> = {
+  assessment_reminder: 20,
+  support_ticket: 1,
+  restricted_link: 24,
+};
+
+/** Absolute safety net against a runaway loop hammering a single recipient. */
+const MAX_EMAILS_PER_RECIPIENT_PER_DAY = Number(process.env.MAX_EMAILS_PER_RECIPIENT_PER_DAY) > 0
+  ? Number(process.env.MAX_EMAILS_PER_RECIPIENT_PER_DAY)
+  : 6;
+
+/** Absolute lifetime ceiling — generous enough to cover the full funnel. */
+const MAX_EMAILS_PER_RECIPIENT_LIFETIME = Number(process.env.MAX_EMAILS_PER_RECIPIENT_LIFETIME) > 0
+  ? Number(process.env.MAX_EMAILS_PER_RECIPIENT_LIFETIME)
+  : 25;
+
 /**
- * Anti-Spam & Rate Limiting Guard: Enforces a hard cap of MAX 5 emails per candidate across their entire lifecycle,
- * and prevents sending duplicate email templates to the same candidate within 24 hours.
+ * Anti-duplicate / anti-spam guard.
+ *
+ * Returns `canSend: false` (with a reason) when delivering `templateName` to this
+ * candidate would produce a duplicate or breach a rate ceiling. Only successful
+ * sends (`delivery_status = 'sent'`) count towards duplicate detection, so a
+ * failed delivery is correctly retried on the next cycle.
  */
 export async function canSendEmailToCandidate(candidateEmail: string, templateName: string, candidateId?: string): Promise<{ canSend: boolean; reason?: string }> {
   if (!candidateEmail || !candidateEmail.trim()) {
@@ -262,39 +311,73 @@ export async function canSendEmailToCandidate(candidateEmail: string, templateNa
   }
 
   const emailClean = candidateEmail.trim().toLowerCase();
+  if (!emailClean.includes("@") || emailClean.endsWith("@localhost.com") || emailClean.includes("@example.com")) {
+    return { canSend: false, reason: `Recipient address "${emailClean}" is not a deliverable address.` };
+  }
+
+  // Match on candidate id when we have one, otherwise on the address. Matching on
+  // "id OR address" would leak dedup state between distinct candidates that share
+  // a shared/team mailbox.
+  const identityClause = candidateId
+    ? `(candidate_id = $2 OR (candidate_id IS NULL AND LOWER(recipient) = $1))`
+    : `LOWER(recipient) = $1`;
+  const identityParams = candidateId ? [emailClean, candidateId] : [emailClean];
 
   try {
-    // 1. Hard cap: Max 5 emails total per candidate across their entire lifecycle
-    const totalEmailsRes = await query(
-      `SELECT COUNT(*)::int as count 
-       FROM email_logs 
-       WHERE LOWER(recipient) = $1 OR (candidate_id IS NOT NULL AND candidate_id = $2);`,
-      [emailClean, candidateId || "non-existent"]
-    );
-
-    const totalSent = totalEmailsRes.rows[0]?.count || 0;
-    if (totalSent >= 5) {
-      return { canSend: false, reason: `Max email limit reached for candidate (${totalSent}/5 total emails sent). Anti-spam protection active.` };
+    // 1. Per-template idempotency.
+    if (ONCE_PER_CANDIDATE_TEMPLATES.has(templateName)) {
+      const everSentRes = await query(
+        `SELECT COUNT(*)::int as count
+           FROM email_logs
+          WHERE ${identityClause}
+            AND template = $${identityParams.length + 1}
+            AND delivery_status = 'sent';`,
+        [...identityParams, templateName]
+      );
+      if ((everSentRes.rows[0]?.count || 0) > 0) {
+        return { canSend: false, reason: `Stage email '${templateName}' has already been delivered to this candidate (one-time template).` };
+      }
+    } else {
+      const cooldownHours = REPEATABLE_TEMPLATE_COOLDOWN_HOURS[templateName] ?? 24;
+      const recentRes = await query(
+        `SELECT COUNT(*)::int as count
+           FROM email_logs
+          WHERE ${identityClause}
+            AND template = $${identityParams.length + 1}
+            AND delivery_status = 'sent'
+            AND sent_time > (CURRENT_TIMESTAMP - ($${identityParams.length + 2} || ' hours')::interval);`,
+        [...identityParams, templateName, String(cooldownHours)]
+      );
+      if ((recentRes.rows[0]?.count || 0) > 0) {
+        return { canSend: false, reason: `Template '${templateName}' was already sent within the last ${cooldownHours}h cooldown.` };
+      }
     }
 
-    // 2. Idempotency: Do not send the same template to the candidate within 24 hours
-    const recentTemplateRes = await query(
-      `SELECT COUNT(*)::int as count 
-       FROM email_logs 
-       WHERE (LOWER(recipient) = $1 OR (candidate_id IS NOT NULL AND candidate_id = $2))
-         AND template = $3
-         AND sent_time > (CURRENT_TIMESTAMP - INTERVAL '24 hours');`,
-      [emailClean, candidateId || "non-existent", templateName]
+    // 2. Rate ceilings (safety net against runaway loops).
+    const volumeRes = await query(
+      `SELECT
+         COUNT(*)::int AS lifetime,
+         COUNT(*) FILTER (WHERE sent_time > CURRENT_TIMESTAMP - INTERVAL '24 hours')::int AS last_day
+       FROM email_logs
+       WHERE ${identityClause}
+         AND delivery_status = 'sent';`,
+      identityParams
     );
 
-    const recentCount = recentTemplateRes.rows[0]?.count || 0;
-    if (recentCount > 0) {
-      return { canSend: false, reason: `Duplicate template '${templateName}' sent to candidate within last 24 hours.` };
+    const lastDay = volumeRes.rows[0]?.last_day || 0;
+    if (lastDay >= MAX_EMAILS_PER_RECIPIENT_PER_DAY) {
+      return { canSend: false, reason: `Daily email cap reached for this candidate (${lastDay}/${MAX_EMAILS_PER_RECIPIENT_PER_DAY} in 24h). Anti-spam protection active.` };
+    }
+
+    const lifetime = volumeRes.rows[0]?.lifetime || 0;
+    if (lifetime >= MAX_EMAILS_PER_RECIPIENT_LIFETIME) {
+      return { canSend: false, reason: `Lifetime email cap reached for this candidate (${lifetime}/${MAX_EMAILS_PER_RECIPIENT_LIFETIME}).` };
     }
 
     return { canSend: true };
   } catch (err: any) {
     console.error("⚠️ Error checking email rate limits:", err.message);
+    // Fail closed: a DB hiccup must not turn into a mail storm.
     return { canSend: false, reason: "Email rate check failed due to database error. Blocking to prevent spam." };
   }
 }
@@ -470,12 +553,29 @@ export async function sendAssessmentInviteEmail(params: {
   token: string;
   expiryDate: Date;
   tenantId?: string;
+  candidateId?: string;
+  /** Set true only when the caller has already run canSendEmailToCandidate. */
+  skipGuard?: boolean;
 }) {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
 
-  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "https://api.risonaitech.com";
-  const assessmentLink = `${portalUrl}/assessment/${params.token}`;
+  if (!params.token) {
+    throw new Error("Cannot send an assessment invitation without an assessment token.");
+  }
+
+  // Self-guard: this sender is invoked from the resume worker, the 30-minute
+  // autonomous cycle and manual HR actions. Guarding here (rather than only at
+  // each call site) is what makes the invitation exactly-once.
+  if (!params.skipGuard) {
+    const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_invitation", params.candidateId);
+    if (!guard.canSend) {
+      console.log(`⏭️ [Email] Skipping assessment invitation to ${params.candidateEmail}: ${guard.reason}`);
+      return { success: false, mock: false, skipped: true, reason: guard.reason };
+    }
+  }
+
+  const assessmentLink = buildAssessmentLink(params.token);
   const formattedExpiry = params.expiryDate.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -556,26 +656,53 @@ export async function sendAssessmentInviteEmail(params: {
     </html>
   `;
 
-  if (zohoConfig.enabled) {
-    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+  try {
+    if (zohoConfig.enabled) {
+      await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+      await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_invitation", params.tenantId, "sent");
+      console.log(`📧 Invitation email sent successfully to ${params.candidateEmail} (Zoho Mail)`);
+      return { success: true, mock: false };
+    }
+
+    const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+    if (!transporter) {
+      logEmailFallback(params.candidateEmail, subject, html);
+      // A file-log fallback is NOT a delivery: record it as failed so the real
+      // invitation is retried once SMTP is configured.
+      await recordEmailLog(
+        params.candidateId || null,
+        params.candidateEmail,
+        subject,
+        "assessment_invitation",
+        params.tenantId,
+        "failed",
+        "No SMTP transport configured; email written to local fallback log only."
+      );
+      return { success: false, mock: true };
+    }
+
+    await transporter.sendMail({
+      from: fromEmail,
+      to: params.candidateEmail,
+      subject,
+      html,
+    });
+
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_invitation", params.tenantId, "sent");
+    console.log(`📧 Invitation email sent successfully to ${params.candidateEmail}`);
     return { success: true, mock: false };
+  } catch (err: any) {
+    await recordEmailLog(
+      params.candidateId || null,
+      params.candidateEmail,
+      subject,
+      "assessment_invitation",
+      params.tenantId,
+      "failed",
+      err?.message || String(err)
+    );
+    throw err;
   }
-
-  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
-  if (!transporter) {
-    logEmailFallback(params.candidateEmail, subject, html);
-    return { success: true, mock: true };
-  }
-
-  await transporter.sendMail({
-    from: fromEmail,
-    to: params.candidateEmail,
-    subject,
-    html,
-  });
-
-  console.log(`📧 Invitation email sent successfully to ${params.candidateEmail}`);
-  return { success: true, mock: false };
 }
 
 /**
@@ -591,9 +718,23 @@ export async function sendInterviewScheduleEmail(params: {
   scheduledDate: Date;
   hrEmail?: string;
   tenantId?: string;
+  candidateId?: string;
+  /** Stable interview id — used as the iCalendar UID so reschedules update the
+   *  existing calendar entry instead of creating a duplicate. */
+  interviewId?: string;
+  /** Set true only when the caller has already run canSendEmailToCandidate. */
+  skipGuard?: boolean;
 }) {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
+
+  if (!params.skipGuard) {
+    const guard = await canSendEmailToCandidate(params.candidateEmail, "interview_schedule", params.candidateId);
+    if (!guard.canSend) {
+      console.log(`⏭️ [Email] Skipping interview schedule email to ${params.candidateEmail}: ${guard.reason}`);
+      return { success: false, mock: false, skipped: true, reason: guard.reason };
+    }
+  }
 
   const formattedDate = params.scheduledDate.toLocaleDateString("en-US", {
     weekday: "long",
@@ -753,7 +894,7 @@ export async function sendInterviewScheduleEmail(params: {
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
-    `UID:interview-${Date.now()}@techsolengineers.com`,
+    `UID:interview-${params.interviewId || params.candidateId || Date.now()}@techsolengineers.com`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
     `DTSTART:${params.scheduledDate.toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
     `DTEND:${new Date(params.scheduledDate.getTime() + 30 * 60000).toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
@@ -768,60 +909,95 @@ export async function sendInterviewScheduleEmail(params: {
     "END:VCALENDAR"
   ].join("\r\n");
 
-  const isHrNotificationEnabled = process.env.ENABLE_HR_EMAIL_NOTIFICATIONS === "true";
-  const hrRecipient = isHrNotificationEnabled ? (params.hrEmail || process.env.RECRUITER_NOTIFICATION_EMAIL || undefined) : undefined;
+  const isHrNotificationEnabled = hrNotificationsEnabled();
+  const hrRecipient = isHrNotificationEnabled
+    ? (params.hrEmail || process.env.RECRUITER_NOTIFICATION_EMAIL || getFallbackHrEmail() || undefined)
+    : undefined;
+  const hrRecipientValid = hrRecipient && hrRecipient.includes("@") && !hrRecipient.endsWith("@localhost.com")
+    ? hrRecipient
+    : undefined;
 
-  if (zohoConfig.enabled) {
-    await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
-    if (isHrNotificationEnabled && hrRecipient) {
-      await zohoMailService.sendEmail(hrRecipient, hrSubject, hrHtml);
-    }
-    return { success: true, mock: false };
-  }
-
-  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
-  if (!transporter) {
-    logEmailFallback(params.candidateEmail, candidateSubject, candidateHtml);
-    if (isHrNotificationEnabled && hrRecipient) {
-      logEmailFallback(hrRecipient, hrSubject, hrHtml);
-    }
-    return { success: true, mock: true };
-  }
-
-  // Send to candidate with calendar invite attachment
-  await transporter.sendMail({
-    from: fromEmail,
-    to: params.candidateEmail,
-    subject: candidateSubject,
-    html: candidateHtml,
-    icalEvent: {
-      filename: "invite.ics",
-      method: "REQUEST",
-      content: csContent
-    },
-    attachments: [
-      {
-        filename: "invite.ics",
-        content: csContent,
-        contentType: "text/calendar; method=REQUEST"
+  try {
+    if (zohoConfig.enabled) {
+      await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
+      await recordEmailLog(params.candidateId || null, params.candidateEmail, candidateSubject, "interview_schedule", params.tenantId, "sent");
+      if (hrRecipientValid) {
+        await zohoMailService.sendEmail(hrRecipientValid, hrSubject, hrHtml);
       }
-    ]
-  });
+      return { success: true, mock: false };
+    }
 
-  // Send to HR if explicitly enabled
-  if (isHrNotificationEnabled && hrRecipient) {
+    const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+    if (!transporter) {
+      logEmailFallback(params.candidateEmail, candidateSubject, candidateHtml);
+      if (hrRecipientValid) {
+        logEmailFallback(hrRecipientValid, hrSubject, hrHtml);
+      }
+      await recordEmailLog(
+        params.candidateId || null,
+        params.candidateEmail,
+        candidateSubject,
+        "interview_schedule",
+        params.tenantId,
+        "failed",
+        "No SMTP transport configured; email written to local fallback log only."
+      );
+      return { success: false, mock: true };
+    }
+
+    // Send to candidate with calendar invite attachment
     await transporter.sendMail({
       from: fromEmail,
-      to: hrRecipient,
-      subject: hrSubject,
-      html: hrHtml,
+      to: params.candidateEmail,
+      subject: candidateSubject,
+      html: candidateHtml,
+      icalEvent: {
+        filename: "invite.ics",
+        method: "REQUEST",
+        content: csContent
+      },
+      attachments: [
+        {
+          filename: "invite.ics",
+          content: csContent,
+          contentType: "text/calendar; method=REQUEST"
+        }
+      ]
     });
-    console.log(`📧 Interview scheduled emails sent with .ics calendar invite to candidate (${params.candidateEmail}) and HR (${hrRecipient})`);
-  } else {
-    console.log(`📧 Interview scheduled email sent to candidate (${params.candidateEmail}) [HR Email Notification Deactivated]`);
-  }
 
-  return { success: true, mock: false };
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, candidateSubject, "interview_schedule", params.tenantId, "sent");
+
+    // Send to HR if explicitly enabled. A failure here must not mark the
+    // candidate-facing delivery as failed (which would trigger a re-send).
+    if (hrRecipientValid) {
+      try {
+        await transporter.sendMail({
+          from: fromEmail,
+          to: hrRecipientValid,
+          subject: hrSubject,
+          html: hrHtml,
+        });
+        console.log(`📧 Interview scheduled emails sent with .ics calendar invite to candidate (${params.candidateEmail}) and HR (${hrRecipientValid})`);
+      } catch (hrErr: any) {
+        console.error(`⚠️ Candidate interview email delivered, but the HR copy to ${hrRecipientValid} failed:`, hrErr?.message || hrErr);
+      }
+    } else {
+      console.log(`📧 Interview scheduled email sent to candidate (${params.candidateEmail}) [HR Email Notification Deactivated]`);
+    }
+
+    return { success: true, mock: false };
+  } catch (err: any) {
+    await recordEmailLog(
+      params.candidateId || null,
+      params.candidateEmail,
+      candidateSubject,
+      "interview_schedule",
+      params.tenantId,
+      "failed",
+      err?.message || String(err)
+    );
+    throw err;
+  }
 }
 
 /**
@@ -984,6 +1160,7 @@ export async function sendApplicationAcknowledgementEmail(params: {
   candidateName: string;
   candidateEmail: string;
   tenantId?: string;
+  candidateId?: string;
 }): Promise<void> {
   const safeCandidateName = escapeHtml(params.candidateName);
   const subject = "Application Received – Next Steps";
@@ -1039,7 +1216,7 @@ export async function sendApplicationAcknowledgementEmail(params: {
     </html>
   `;
 
-  const checkRate = await canSendEmailToCandidate(params.candidateEmail, "application_acknowledgement");
+  const checkRate = await canSendEmailToCandidate(params.candidateEmail, "application_acknowledgement", params.candidateId);
   if (!checkRate.canSend) {
     console.log(`⏭️ Anti-spam active for ${params.candidateEmail}: ${checkRate.reason}. Skipping application acknowledgement email.`);
     return;
@@ -1069,7 +1246,7 @@ export async function sendApplicationAcknowledgementEmail(params: {
     errMessage = err.message || "Email send failed";
     console.error(`🚨 Failed to send application acknowledgement to ${params.candidateEmail}:`, err.message);
   } finally {
-    await recordEmailLog(null, params.candidateEmail, subject, "application_acknowledgement", params.tenantId, sentStatus, errMessage);
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "application_acknowledgement", params.tenantId, sentStatus, errMessage);
   }
   console.log(`✉️ Application acknowledgement email processed for: ${params.candidateEmail}`);
 }
@@ -1090,8 +1267,7 @@ export async function sendAssessmentReminderEmail(params: {
   const safeJobTitle = escapeHtml(params.jobTitle);
   const { remainingDays, token } = params;
 
-  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || "https://api.risonaitech.com";
-  const assessmentLink = `${portalUrl}/assessment/${token}`;
+  const assessmentLink = buildAssessmentLink(token);
   const subject = "Reminder – AI Assessment Pending";
 
   const daysLabel = remainingDays === 1 ? "day" : "days";
@@ -1166,14 +1342,30 @@ export async function sendAssessmentReminderEmail(params: {
     </html>
   `;
 
+  const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_reminder", (params as any).candidateId);
+  if (!guard.canSend) {
+    console.log(`⏭️ [Email] Skipping assessment reminder to ${params.candidateEmail}: ${guard.reason}`);
+    return;
+  }
+
   if (zohoConfig.enabled) {
     await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+    await recordEmailLog((params as any).candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
     return;
   }
 
   const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   if (!transporter) {
     logEmailFallback(params.candidateEmail, subject, html);
+    await recordEmailLog(
+      (params as any).candidateId || null,
+      params.candidateEmail,
+      subject,
+      "assessment_reminder",
+      params.tenantId,
+      "failed",
+      "No SMTP transport configured; email written to local fallback log only."
+    );
     return;
   }
 
@@ -1184,10 +1376,20 @@ export async function sendAssessmentReminderEmail(params: {
       subject,
       html
     });
+    await recordEmailLog((params as any).candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
     console.log(`✉️ Assessment reminder email successfully sent to: ${params.candidateEmail}`);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to dispatch assessment reminder email:", err);
     logEmailFallback(params.candidateEmail, subject, html);
+    await recordEmailLog(
+      (params as any).candidateId || null,
+      params.candidateEmail,
+      subject,
+      "assessment_reminder",
+      params.tenantId,
+      "failed",
+      err?.message || String(err)
+    );
   }
 }
 
@@ -1322,17 +1524,40 @@ export async function sendAssessmentResultDetailsEmail(params: {
     </html>
   `;
 
-  // Dispatch to Candidate (HR notification copy deactivated per system settings)
-  const isHrNotificationEnabled = process.env.ENABLE_HR_EMAIL_NOTIFICATIONS === "true";
-  const recipients = [params.candidateEmail, (isHrNotificationEnabled ? params.hrEmail : null)].filter(email => email && email.trim() !== "");
-  
+  // One-time guard so a re-submitted / re-processed assessment cannot mail the
+  // candidate their results report twice.
+  const candidateId = (params as any).candidateId as string | undefined;
+  const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_results", candidateId);
+  if (!guard.canSend) {
+    console.log(`⏭️ [Email] Skipping detailed results email to ${params.candidateEmail}: ${guard.reason}`);
+    return;
+  }
+
+  // Build the recipient list. Explicitly typed as string[] so the optional HR
+  // copy cannot leak a null into the delivery loop.
+  const recipients: string[] = [params.candidateEmail];
+  if (hrNotificationsEnabled()) {
+    const hr = params.hrEmail || getFallbackHrEmail();
+    if (hr && hr.trim() && hr.includes("@") && !hr.endsWith("@localhost.com")) {
+      recipients.push(hr.trim());
+    }
+  }
+
   for (const to of recipients) {
+    const isCandidate = to === params.candidateEmail;
+
     if (zohoConfig.enabled) {
       try {
         await zohoMailService.sendEmail(to, subject, html);
+        if (isCandidate) {
+          await recordEmailLog(candidateId || null, to, subject, "assessment_results", params.tenantId, "sent");
+        }
         console.log(`✉️ Detailed results email successfully sent to ${to} (Zoho Mail)`);
-      } catch (err) {
+      } catch (err: any) {
         console.error(`Failed to dispatch detailed results email to ${to} via Zoho:`, err);
+        if (isCandidate) {
+          await recordEmailLog(candidateId || null, to, subject, "assessment_results", params.tenantId, "failed", err?.message || String(err));
+        }
       }
       continue;
     }
@@ -1340,6 +1565,17 @@ export async function sendAssessmentResultDetailsEmail(params: {
     const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
     if (!transporter) {
       logEmailFallback(to, subject, html);
+      if (isCandidate) {
+        await recordEmailLog(
+          candidateId || null,
+          to,
+          subject,
+          "assessment_results",
+          params.tenantId,
+          "failed",
+          "No SMTP transport configured; email written to local fallback log only."
+        );
+      }
       continue;
     }
 
@@ -1350,10 +1586,16 @@ export async function sendAssessmentResultDetailsEmail(params: {
         subject,
         html
       });
+      if (isCandidate) {
+        await recordEmailLog(candidateId || null, to, subject, "assessment_results", params.tenantId, "sent");
+      }
       console.log(`✉️ Detailed results email successfully sent to: ${to}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Failed to dispatch detailed results email to ${to}:`, err);
       logEmailFallback(to, subject, html);
+      if (isCandidate) {
+        await recordEmailLog(candidateId || null, to, subject, "assessment_results", params.tenantId, "failed", err?.message || String(err));
+      }
     }
   }
 }

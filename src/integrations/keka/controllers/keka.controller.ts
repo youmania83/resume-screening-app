@@ -1,11 +1,11 @@
 // src/integrations/keka/controllers/keka.controller.ts
 
 import { Request, Response } from "express";
-import { kekaConfig, isKekaEnabled } from "../config/keka.config";
-import { kekaWebhooksService } from "../services/webhooks.service";
-import { kekaJobsService } from "../services/jobs.service";
-import { kekaCandidatesService } from "../services/candidates.service";
-import { validateWebhookSignature, processWebhookEvent } from "../webhooks/webhook.handlers";
+import { kekaConfig, isKekaEnabled } from "../config/keka.config.js";
+import { kekaWebhooksService } from "../services/webhooks.service.js";
+import { kekaJobsService } from "../services/jobs.service.js";
+import { kekaCandidatesService } from "../services/candidates.service.js";
+import { validateWebhookSignature, processWebhookEvent } from "../webhooks/webhook.handlers.js";
 import { KekaCareersSyncService } from "../../../services/KekaCareersSyncService.js";
 
 export class KekaController {
