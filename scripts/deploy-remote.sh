@@ -189,6 +189,7 @@ echo '==> 4/6 Running database migration...'
 npm run init-db
 
 echo '==> 5/6 Building production frontend...'
+rm -rf .next
 npm run build
 
 echo '==> 6/6 Restarting PM2 services...'
