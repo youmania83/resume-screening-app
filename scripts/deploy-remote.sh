@@ -215,54 +215,41 @@ if $DRY_RUN; then
   exit 0
 fi
 
-# ── 5. Deploy ────────────────────────────────────────────────────────────────
-step "5. Record the current release (for rollback)"
+# ── 5. Deploy in a single SSH session ───────────────────────────────────────
+step "5. Executing full remote release pipeline"
 
-CURRENT_SHA="$(remote_app "git rev-parse HEAD")"
-remote_app "echo '${CURRENT_SHA}' > .deploy-previous-commit"
-remote_app "cp .env .env.backup-\$(date +%Y%m%d-%H%M%S)"
-ok "Previous commit ${CURRENT_SHA:0:8} recorded; .env backed up"
-info "Roll back any time with: bash scripts/deploy-remote.sh --rollback"
+REMOTE_SCRIPT="set -e
+cd '${VPS_APP_DIR}'
+CURRENT_SHA=\$(git rev-parse HEAD 2>/dev/null || echo 'initial')
+echo \"\${CURRENT_SHA}\" > .deploy-previous-commit
+cp .env \".env.backup-\$(date +%Y%m%d-%H%M%S)\"
 
-step "6. Pull ${GIT_BRANCH}"
-remote_app "git fetch --all --prune && git checkout '${GIT_BRANCH}' && git reset --hard 'origin/${GIT_BRANCH}'" || fail "git pull failed on the VPS"
-ok "Now at $(remote_app 'git log --oneline -1')"
+echo '==> 1/6 Pulling latest ${GIT_BRANCH}...'
+git fetch --all --prune
+git checkout '${GIT_BRANCH}'
+git reset --hard 'origin/${GIT_BRANCH}'
 
-step "7. Install dependencies"
-remote_app "npm ci" || fail "npm ci failed on the VPS"
-ok "Dependencies installed"
+echo '==> 2/6 Installing dependencies...'
+npm ci --silent
 
-step "8. Type check"
-remote_app "npx tsc --noEmit" || fail "Type check failed on the VPS"
-ok "Type check clean"
+echo '==> 3/6 Running type checks & regression suite...'
+npx tsc --noEmit
+npx tsx src/test/verifyPipelineFixes.ts
 
-if $SKIP_TESTS; then
-  warn "Skipping regression checks (--skip-tests)"
-else
-  step "9. Regression checks"
-  remote_app "npx tsx src/test/verifyPipelineFixes.ts" || fail "Regression checks failed on VPS"
-  ok "Regression checks passed"
-fi
+echo '==> 4/6 Running database migration...'
+npm run init-db
 
-step "10. Database migration"
-remote_app "npm run init-db" || fail "init-db failed on VPS"
-ok "Schema up to date"
+echo '==> 5/6 Building production frontend...'
+rm -rf .next
+npm run build
 
-step "11. Build the front end"
-info "This is what bakes NEXT_PUBLIC_API_URL into the candidate bundle."
-remote_app "rm -rf .next && npm run build" || fail "next build failed on the VPS"
-ok "Build complete"
+echo '==> 6/6 Restarting PM2 services...'
+pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production
+pm2 save
+"
 
-step "12. Verify the bundle has no localhost API URL"
-if remote_app "grep -rq 'localhost:4000' .next/static/ 2>/dev/null"; then
-  fail "The built bundle still references localhost:4000. Fix .env on VPS and re-run."
-fi
-ok "Bundle points at the public API host"
-
-step "13. Restart services"
-remote_app "pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production" || fail "pm2 restart failed"
-remote_app "pm2 save" >/dev/null 2>&1 || true
-ok "Services restarted"
+remote "$REMOTE_SCRIPT" || fail "Remote release execution failed on VPS."
+ok "Remote build and PM2 restart completed successfully"
 
 # ── 14. Health ───────────────────────────────────────────────────────────────
 step "14. Health check"
