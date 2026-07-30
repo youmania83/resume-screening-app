@@ -15,6 +15,7 @@ export interface NormalizedEmail {
   bodyText?: string;
   bodyHtml?: string;
   receivedAt: Date;
+  date?: Date;
   attachments: EmailAttachment[];
   folder?: string;
 }

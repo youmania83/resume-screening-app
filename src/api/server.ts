@@ -217,6 +217,11 @@ setTimeout(async () => {
 
     const { kekaCandidatesService } = await import("../integrations/keka/services/candidates.service.js");
     await kekaCandidatesService.screenUnscreenedCandidates();
+
+    // Autonomous candidate job role remapping on startup
+    const { AutonomousRecruitmentService } = await import("../services/AutonomousRecruitmentService.js");
+    console.log("🤖 [Startup] Triggering initial autonomous candidate job matching and role remapping...");
+    await AutonomousRecruitmentService.run30MinCycle();
   } catch (err) {
     console.error("🚨 [Startup] Candidate diagnostic check error:", err);
   }

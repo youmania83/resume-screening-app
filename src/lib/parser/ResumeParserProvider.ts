@@ -19,6 +19,9 @@ export interface ParsedResumeData {
   linkedinUrl?: string;
   githubUrl?: string;
   summary: string;
+  currentTitle?: string;
+  role?: string;
+  jobTitle?: string;
   
   // US Visa status
   usCitizen: boolean;
@@ -79,6 +82,7 @@ Return ONLY a valid JSON object matching the following schema. Do NOT wrap in ma
   "linkedinUrl": "string (LinkedIn URL or empty)",
   "githubUrl": "string (GitHub URL or empty)",
   "summary": "string (brief professional summary)",
+  "currentTitle": "string (candidate's primary current or target professional job title/designation extracted or inferred from resume, e.g. 'Project Engineer', 'React Developer', 'HR Executive', 'Sales Manager', 'DevOps Engineer', 'Civil Engineer', etc.)",
   "usCitizen": boolean (infer if candidate is a US citizen),
   "greenCard": boolean (infer if candidate holds green card),
   "h1b": boolean (infer if candidate requires H1B/visa transfer),

@@ -101,6 +101,8 @@ export default function Dashboard() {
     handleDecision,
     filteredCandidates,
     loadCandidates,
+    remapRoles,
+    isRemapping,
     stats
   } = useCandidates(!!user)
 

@@ -4,6 +4,8 @@ import { getKekaAdapter } from "../adapters";
 import { KekaCandidate } from "../interfaces/Candidate";
 import { query } from "../../../lib/db";
 
+import { inferCandidateRole } from "../../../lib/roleInference.js";
+
 export class KekaCandidatesService {
   private getAdapter() {
     return getKekaAdapter();
@@ -48,7 +50,7 @@ export class KekaCandidatesService {
     const candidates = await this.getCandidates();
     for (const c of candidates) {
       let mappedJobId: string | null = null;
-      let roleTitle = (c as any).jobTitle || (c.jobId ? "Candidate" : "Unassigned");
+      let roleTitle = (c as any).jobTitle || inferCandidateRole({ skills: c.skills, experienceYears: c.experience, name: c.name });
       if (c.jobId) {
         const jobCheck = await query(
           "SELECT id, title FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;",

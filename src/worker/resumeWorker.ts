@@ -17,6 +17,7 @@ import { TenantUsageService } from "../services/TenantUsageService.js";
 import { ensureJobAssessment } from "../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../lib/email.js";
 import { isNonResumeFile } from "../lib/fileFilters.js";
+import { inferCandidateRole } from "../lib/roleInference.js";
 
 dotenv.config();
 
@@ -456,7 +457,7 @@ export async function parseAndEvalResume(
             );`,
             [
               candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-              "General Applicant",
+              inferCandidateRole(parsedData),
               candidateScore, candidateScore, parsedData.experienceYears,
               parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
               parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
@@ -556,7 +557,7 @@ export async function parseAndEvalResume(
         );`,
         [
           candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-          parsedData.firstName ? `${parsedData.firstName} Role` : "Software Engineer",
+          inferCandidateRole(parsedData),
           parsedData.skillsScore || 70, parsedData.skillsScore || 70, parsedData.experienceYears,
           parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
           parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
@@ -683,9 +684,10 @@ export async function parseAndEvalResume(
                  match_percent = $2,
                  assessment_token = $3, 
                  assessment_token_expiry = $4, 
-                 assessment_status = 'pending'
+                 assessment_status = 'pending',
+                 role = COALESCE(NULLIF($6, ''), role)
              WHERE id = $5;`,
-            [matchedJobId, highestMatchScore, assessmentToken, expiry, candidateId]
+            [matchedJobId, highestMatchScore, assessmentToken, expiry, candidateId, matchedJobTitle]
           );
 
           // Log activity and timeline
@@ -731,9 +733,10 @@ export async function parseAndEvalResume(
              SET status = 'Review', 
                  job_id = $1, 
                  score = $2, 
-                 match_percent = $2
+                 match_percent = $2,
+                 role = COALESCE(NULLIF($4, ''), role)
              WHERE id = $3;`,
-            [matchedJobId, highestMatchScore, candidateId]
+            [matchedJobId, highestMatchScore, candidateId, matchedJobTitle]
           );
 
           await queryGlobal(
@@ -754,9 +757,10 @@ export async function parseAndEvalResume(
              SET status = 'rejected', 
                  job_id = $1, 
                  score = $2, 
-                 match_percent = $2
+                 match_percent = $2,
+                 role = COALESCE(NULLIF($4, ''), role)
              WHERE id = $3;`,
-            [matchedJobId, highestMatchScore, candidateId]
+            [matchedJobId, highestMatchScore, candidateId, matchedJobTitle]
           );
 
           await queryGlobal(

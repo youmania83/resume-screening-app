@@ -87,6 +87,104 @@ export class AutonomousRecruitmentService {
         console.error("🚨 [Autonomous Cycle] Candidate promotion error:", promoteErr.message);
       }
 
+      // 2.6 Autonomous Candidate-Job Role Remapping & Matching
+      try {
+        const { inferCandidateRole, isGenericRoleTitle } = await import("../lib/roleInference.js");
+        const jobsRes = await queryGlobal(`SELECT id, title, description, location, experience_required FROM jobs;`);
+        const activeJobs = jobsRes.rows;
+
+        const candRes = await queryGlobal(
+          `SELECT id, name, role, skills, experience_years, job_id, score, match_percent, recommendation, education FROM candidates;`
+        );
+
+        let autoRemappedCount = 0;
+
+        for (const c of candRes.rows) {
+          let bestJob: any = null;
+          let highestScore = 0;
+          let matchedSkills: string[] = [];
+          let missingSkills: string[] = [];
+
+          const candSkills: string[] = Array.isArray(c.skills) ? c.skills : [];
+          const expYears = Number(c.experience_years) || 0;
+
+          if (activeJobs.length > 0) {
+            for (const job of activeJobs) {
+              const descLower = (job.description || "").toLowerCase();
+              const titleLower = (job.title || "").toLowerCase();
+              const jMatched: string[] = [];
+              const jMissing: string[] = [];
+
+              for (const s of candSkills) {
+                if (descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase())) {
+                  jMatched.push(s);
+                } else {
+                  jMissing.push(s);
+                }
+              }
+
+              let score = candSkills.length > 0 ? Math.round((jMatched.length / candSkills.length) * 80) : 50;
+
+              if (c.role && !isGenericRoleTitle(c.role)) {
+                const rLower = c.role.toLowerCase();
+                if (titleLower.includes(rLower) || rLower.includes(titleLower)) {
+                  score += 20;
+                }
+              }
+
+              if (job.experience_required) {
+                const reqExp = parseInt(job.experience_required.replace(/[^0-9]/g, ""), 10);
+                if (!isNaN(reqExp) && expYears >= reqExp) {
+                  score += 15;
+                }
+              }
+
+              score = Math.min(100, score);
+
+              if (score > highestScore) {
+                highestScore = score;
+                bestJob = job;
+                matchedSkills = jMatched;
+                missingSkills = jMissing;
+              }
+            }
+          }
+
+          if (bestJob && highestScore >= 45 && (c.job_id !== bestJob.id || isGenericRoleTitle(c.role))) {
+            await queryGlobal(
+              `UPDATE candidates 
+               SET job_id = $1, 
+                   role = $2, 
+                   score = GREATEST(score, $3), 
+                   match_percent = GREATEST(match_percent, $3),
+                   matched_skills = $4,
+                   missing_skills = $5,
+                   last_synced_at = NOW()
+               WHERE id = $6;`,
+              [bestJob.id, bestJob.title, highestScore, matchedSkills, missingSkills, c.id]
+            );
+            autoRemappedCount++;
+          } else if (isGenericRoleTitle(c.role) || !c.role) {
+            const suitableRole = inferCandidateRole(c);
+            await queryGlobal(
+              `UPDATE candidates 
+               SET role = $1, 
+                   job_id = NULL,
+                   last_synced_at = NOW()
+               WHERE id = $2;`,
+              [suitableRole, c.id]
+            );
+            autoRemappedCount++;
+          }
+        }
+
+        if (autoRemappedCount > 0) {
+          console.log(`✨ [Autonomous Cycle] Autonomously remapped/matched ${autoRemappedCount} candidates to active jobs and inferred professional roles.`);
+        }
+      } catch (remapErr: any) {
+        console.error("🚨 [Autonomous Cycle] Candidate role remapping error:", remapErr.message);
+      }
+
       // 3. Automated Assessment Dispatches for Shortlisted & High-Scoring Candidates
       try {
         const shortlistedRes = await queryGlobal(

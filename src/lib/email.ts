@@ -589,7 +589,7 @@ export async function sendInterviewScheduleEmail(params: {
   assessmentScore: number;
   finalScore: number;
   scheduledDate: Date;
-  hrEmail: string;
+  hrEmail?: string;
   tenantId?: string;
 }) {
   const safeCandidateName = escapeHtml(params.candidateName);
@@ -768,16 +768,18 @@ export async function sendInterviewScheduleEmail(params: {
     "END:VCALENDAR"
   ].join("\r\n");
 
+  const hrRecipient = params.hrEmail || process.env.RECRUITER_NOTIFICATION_EMAIL || "hr@techsolengineers.com";
+
   if (zohoConfig.enabled) {
     await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
-    await zohoMailService.sendEmail(params.hrEmail, hrSubject, hrHtml);
+    await zohoMailService.sendEmail(hrRecipient, hrSubject, hrHtml);
     return { success: true, mock: false };
   }
 
   const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   if (!transporter) {
     logEmailFallback(params.candidateEmail, candidateSubject, candidateHtml);
-    logEmailFallback(params.hrEmail, hrSubject, hrHtml);
+    logEmailFallback(hrRecipient, hrSubject, hrHtml);
     return { success: true, mock: true };
   }
 

@@ -1,7 +1,7 @@
 // src/components/dashboard/CandidatesView.tsx
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, FileDown, Trash2 } from "lucide-react";
+import { Search, FileDown, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Badge } from "../ui/badge";

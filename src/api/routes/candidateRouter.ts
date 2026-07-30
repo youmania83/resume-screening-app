@@ -83,6 +83,119 @@ router.get("/stats", async (req, res, next) => {
   }
 });
 
+// POST /api/candidates/remap-roles - Remap candidates to active jobs or infer suitable job roles from resume
+router.post("/remap-roles", async (req, res, next) => {
+  try {
+    const { queryTenant, queryGlobal } = await import("../../lib/tenantDb.js");
+    const { inferCandidateRole, isGenericRoleTitle } = await import("../../lib/roleInference.js");
+
+    const jobsRes = await queryTenant(`SELECT id, title, description, location, experience_required FROM jobs;`);
+    const activeJobs = jobsRes.rows;
+
+    const candRes = await queryTenant(
+      `SELECT id, name, role, skills, experience_years, job_id, score, match_percent, recommendation, education FROM candidates;`
+    );
+    const candidates = candRes.rows;
+
+    let remappedCount = 0;
+    let matchedToJobCount = 0;
+    let roleInferredCount = 0;
+
+    for (const c of candidates) {
+      let bestJob: any = null;
+      let highestScore = 0;
+      let matchedSkills: string[] = [];
+      let missingSkills: string[] = [];
+
+      const candSkills: string[] = Array.isArray(c.skills) ? c.skills : [];
+      const expYears = Number(c.experience_years) || 0;
+
+      if (activeJobs.length > 0) {
+        for (const job of activeJobs) {
+          const descLower = (job.description || "").toLowerCase();
+          const titleLower = (job.title || "").toLowerCase();
+          const jMatched: string[] = [];
+          const jMissing: string[] = [];
+
+          for (const s of candSkills) {
+            if (descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase())) {
+              jMatched.push(s);
+            } else {
+              jMissing.push(s);
+            }
+          }
+
+          let score = candSkills.length > 0 ? Math.round((jMatched.length / candSkills.length) * 80) : 50;
+
+          if (c.role && !isGenericRoleTitle(c.role)) {
+            const rLower = c.role.toLowerCase();
+            if (titleLower.includes(rLower) || rLower.includes(titleLower)) {
+              score += 20;
+            }
+          }
+
+          if (job.experience_required) {
+            const reqExp = parseInt(job.experience_required.replace(/[^0-9]/g, ""), 10);
+            if (!isNaN(reqExp) && expYears >= reqExp) {
+              score += 15;
+            }
+          }
+
+          score = Math.min(100, score);
+
+          if (score > highestScore) {
+            highestScore = score;
+            bestJob = job;
+            matchedSkills = jMatched;
+            missingSkills = jMissing;
+          }
+        }
+      }
+
+      if (bestJob && highestScore >= 45) {
+        await queryGlobal(
+          `UPDATE candidates 
+           SET job_id = $1, 
+               role = $2, 
+               score = GREATEST(score, $3), 
+               match_percent = GREATEST(match_percent, $3),
+               matched_skills = $4,
+               missing_skills = $5,
+               last_synced_at = NOW()
+           WHERE id = $6;`,
+          [bestJob.id, bestJob.title, highestScore, matchedSkills, missingSkills, c.id]
+        );
+        remappedCount++;
+        matchedToJobCount++;
+      } else {
+        if (isGenericRoleTitle(c.role) || !c.role) {
+          const suitableRole = inferCandidateRole(c);
+          await queryGlobal(
+            `UPDATE candidates 
+             SET role = $1, 
+                 job_id = NULL,
+                 last_synced_at = NOW()
+             WHERE id = $2;`,
+            [suitableRole, c.id]
+          );
+          remappedCount++;
+          roleInferredCount++;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Remapped ${remappedCount} candidates (${matchedToJobCount} matched to active jobs, ${roleInferredCount} roles inferred from resume).`,
+      remappedCount,
+      matchedToJobCount,
+      roleInferredCount
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/candidates/rescreen-all - Trigger batch rescreening of zero-score candidates
 router.post("/rescreen-all", async (req, res, next) => {
   try {

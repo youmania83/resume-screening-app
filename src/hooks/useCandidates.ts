@@ -7,6 +7,7 @@ export interface CandidateStats {
   totalApplicants: number;
   totalRecords: number;
   screened: number;
+  assessmentPassed?: number;
   shortlisted: number;
   rejected: number;
   interviewsScheduled: number;
@@ -408,6 +409,29 @@ export function useCandidates(isLoggedIn?: boolean) {
     });
   }, [candidates, searchQuery, scoreFilter, statusFilter, assessmentStatusFilter, expFilter, roleFilter]);
 
+  const [isRemapping, setIsRemapping] = useState(false);
+
+  const remapRoles = useCallback(async () => {
+    setIsRemapping(true);
+    try {
+      const resp = await fetch(`${apiBase}/candidates/remap-roles`, {
+        method: "POST",
+        credentials: "include"
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        toast.success(data.message || "Candidate job roles remapped successfully.");
+        await loadCandidates();
+      } else {
+        toast.error("Failed to remap candidate job roles.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error remapping job roles.");
+    } finally {
+      setIsRemapping(false);
+    }
+  }, [apiBase, loadCandidates]);
+
   return {
     candidates,
     setCandidates,
@@ -431,6 +455,8 @@ export function useCandidates(isLoggedIn?: boolean) {
     isAssessmentSubmitting,
     isInterviewSubmitting,
     isOnboardingSubmitting,
+    isRemapping,
+    remapRoles,
     assessmentScoreInput,
     setAssessmentScoreInput,
     interviewFeedbackInput,
