@@ -191,6 +191,7 @@ npm run init-db
 
 echo '==> 5/6 Building production frontend...'
 rm -rf .next
+export NODE_ENV=production
 npm run build
 
 echo '==> 6/6 Restarting PM2 services...'
