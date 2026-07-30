@@ -237,7 +237,9 @@ export function AssessmentsView({
                         <TableCell className="py-3.5 text-muted-foreground font-medium">
                           <div>
                             <span className="text-foreground font-semibold block">{c.jobTitle || c.role}</span>
-                            {c.jobLocation && <span className="text-[10px] text-muted-foreground block mt-0.5">{c.jobLocation}</span>}
+                            {c.jobLocation && !/not specified/i.test(c.jobLocation) && c.jobLocation !== "null" && (
+                              <span className="text-[10px] text-muted-foreground block mt-0.5">{c.jobLocation}</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="py-3.5 text-center">

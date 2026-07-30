@@ -234,7 +234,9 @@ export function CandidatesView({
                         <span className="block font-semibold">
                           {c.jobTitle || c.role} {c.jobCode && <span className="text-[10px] font-normal text-slate-400">({c.jobCode})</span>}
                         </span>
-                        {c.jobLocation && <span className="text-[10px] font-normal text-muted-foreground block mt-0.5">{c.jobLocation}</span>}
+                        {c.jobLocation && !/not specified/i.test(c.jobLocation) && c.jobLocation !== "null" && (
+                          <span className="text-[10px] font-normal text-muted-foreground block mt-0.5">{c.jobLocation}</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>

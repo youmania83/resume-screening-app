@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Candidate } from "../types/index";
+import { inferCandidateRole, isGenericRoleTitle } from "../lib/roleInference.js";
 
 export interface CandidateStats {
   totalApplicants: number;
@@ -62,46 +63,54 @@ export function useCandidates(isLoggedIn?: boolean) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.candidates)) {
           // Normalize backend mapping
-          const mapped: Candidate[] = data.candidates.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            role: c.role,
-            score: c.score,
-            matchPercent: c.match_percent,
-            experienceYears: c.experience_years,
-            experienceMatch: c.experience_match,
-            recommendation: c.recommendation,
-            confidence: c.confidence || "90% (High)",
-            riskLevel: c.risk_level || "Low",
-            strengths: c.strengths || [],
-            weaknesses: c.weaknesses || [],
-            missingSkills: c.missing_skills || [],
-            matchedSkills: c.matched_skills || [],
-            skills: c.skills || [],
-            certifications: c.certifications || [],
-            projects: c.projects || [],
-            keywords: c.keywords || [],
-            riskFactors: c.risk_factors || [],
-            status: c.status,
-            education: c.education,
-            email: c.email,
-            phone: c.phone,
-            appliedDate: c.applied_date,
-            applicationSource: c.application_source,
-            assessmentScore: c.assessment_score,
-            assessmentStatus: c.assessment_status,
-            interviewScheduledDate: c.interview_scheduled_date,
-            interviewFeedback: c.interview_feedback,
-            kekaStatus: c.keka_status,
-            assessmentToken: c.assessment_token,
-            assessmentCompletedAt: c.assessment_completed_at,
-            finalScore: c.final_score,
-            violationCount: c.violation_count,
-            activityLogs: c.activityLogs || [],
-            jobCode: c.job_code || undefined,
-            jobTitle: (c.job_title && !/not specified/i.test(c.job_title)) ? c.job_title : (c.role && !/not specified/i.test(c.role) ? c.role : "Operations Specialist"),
-            jobLocation: c.job_location || undefined
-          }));
+          const mapped: Candidate[] = data.candidates.map((c: any) => {
+            const cleanRole = !isGenericRoleTitle(c.role)
+              ? c.role
+              : inferCandidateRole({ skills: c.skills, experienceYears: c.experience_years, name: c.name, role: c.role });
+            const cleanJobTitle = (c.job_title && !isGenericRoleTitle(c.job_title)) ? c.job_title : cleanRole;
+            const cleanJobLocation = (c.job_location && !/not specified/i.test(c.job_location) && c.job_location !== "null") ? c.job_location : undefined;
+
+            return {
+              id: c.id,
+              name: c.name,
+              role: cleanRole,
+              score: c.score,
+              matchPercent: c.match_percent,
+              experienceYears: c.experience_years,
+              experienceMatch: c.experience_match,
+              recommendation: c.recommendation,
+              confidence: c.confidence || "90% (High)",
+              riskLevel: c.risk_level || "Low",
+              strengths: c.strengths || [],
+              weaknesses: c.weaknesses || [],
+              missingSkills: c.missing_skills || [],
+              matchedSkills: c.matched_skills || [],
+              skills: c.skills || [],
+              certifications: c.certifications || [],
+              projects: c.projects || [],
+              keywords: c.keywords || [],
+              riskFactors: c.risk_factors || [],
+              status: c.status,
+              education: c.education,
+              email: c.email,
+              phone: c.phone,
+              appliedDate: c.applied_date,
+              applicationSource: c.application_source,
+              assessmentScore: c.assessment_score,
+              assessmentStatus: c.assessment_status,
+              interviewScheduledDate: c.interview_scheduled_date,
+              interviewFeedback: c.interview_feedback,
+              kekaStatus: c.keka_status,
+              assessmentToken: c.assessment_token,
+              assessmentCompletedAt: c.assessment_completed_at,
+              finalScore: c.final_score,
+              violationCount: c.violation_count,
+              activityLogs: c.activityLogs || [],
+              jobCode: c.job_code || undefined,
+              jobTitle: cleanJobTitle,
+              jobLocation: cleanJobLocation
+            };
+          });
           setCandidates(mapped);
           setFetchError(null);
           setSelectedCandidate(prev => {
