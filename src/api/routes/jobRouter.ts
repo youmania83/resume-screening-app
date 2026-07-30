@@ -28,6 +28,9 @@ router.get("/", async (req, res, next) => {
          FROM jobs j 
          LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
          WHERE j.tenant_id = :tenant_id 
+           AND j.title IS NOT NULL 
+           AND j.title != 'Not Specified' 
+           AND j.title != 'Not specified'
          ORDER BY j.created_at DESC;`
       : `WITH candidate_counts AS (
            SELECT job_id, COUNT(*) as count
@@ -38,7 +41,11 @@ router.get("/", async (req, res, next) => {
          SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
          LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
-         WHERE j.tenant_id = :tenant_id AND (j.sync_status IS NULL OR j.sync_status != 'removed') 
+         WHERE j.tenant_id = :tenant_id 
+           AND (j.sync_status IS NULL OR j.sync_status != 'removed')
+           AND j.title IS NOT NULL 
+           AND j.title != 'Not Specified' 
+           AND j.title != 'Not specified'
          ORDER BY j.created_at DESC;`;
     const jobsRes = await queryTenant(sql);
     res.json({ success: true, jobs: jobsRes.rows });

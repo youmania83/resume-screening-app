@@ -23,31 +23,35 @@ export function useJobs(isLoggedIn?: boolean, onJobSaved?: (jd: StructuredJD) =>
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.success && Array.isArray(data.jobs)) {
-          const mapped: JobListItem[] = data.jobs.map((j: any) => {
+          const mapped: JobListItem[] = data.jobs.filter((j: any) => j.title && j.title !== "Not Specified" && j.title !== "Not specified").map((c: any) => {
             let parsedJd = null;
-            if (j.jd) {
-              parsedJd = typeof j.jd === "string" ? JSON.parse(j.jd) : j.jd;
+            if (c.jd) {
+              parsedJd = typeof c.jd === "string" ? JSON.parse(c.jd) : c.jd;
             }
+            const cleanDept = (c.department && !/not specified/i.test(c.department)) ? c.department : "Engineering";
+            const cleanLoc = (c.location && !/not specified/i.test(c.location) && c.location !== "null") ? c.location : "Bengaluru / Remote";
+            const cleanExp = (c.experience_required && !/not specified/i.test(c.experience_required) && c.experience_required !== "null") ? c.experience_required : (c.experience && !/not specified/i.test(c.experience) ? c.experience : "1-3 Years");
+
             return {
-              id: j.id,
-              title: j.title,
-              dept: j.department || "Engineering",
-              loc: j.location || "Remote",
-              exp: j.experience_required || j.experience || "Not Specified",
-              candidates: j.candidates_count || 0,
-              status: j.status || "Active",
-              jobCode: j.job_code || undefined,
-              lastSyncedAt: j.last_synced_at || undefined,
-              syncStatus: j.sync_status || undefined,
+              id: c.id,
+              title: c.title,
+              dept: cleanDept,
+              loc: cleanLoc,
+              exp: cleanExp,
+              candidates: c.candidates_count || 0,
+              status: c.status || "Active",
+              jobCode: c.job_code || undefined,
+              lastSyncedAt: c.last_synced_at || undefined,
+              syncStatus: c.sync_status || undefined,
               jd: parsedJd || {
-                title: j.title,
-                experience: j.experience_required || j.experience || "Not Specified",
-                department: j.department || "Engineering",
-                location: j.location || "Remote",
-                requiredSkills: j.skills || [],
+                title: c.title,
+                experience: cleanExp,
+                department: cleanDept,
+                location: cleanLoc,
+                requiredSkills: c.skills || [],
                 preferredSkills: [],
                 education: "",
-                responsibilities: j.description ? [j.description] : [],
+                responsibilities: c.description ? [c.description] : [],
                 keywords: [],
                 screeningCriteria: []
               }
