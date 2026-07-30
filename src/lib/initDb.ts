@@ -807,6 +807,9 @@ async function init() {
       -- 30-minute autonomous cycle re-selected every 'pending' candidate and
       -- re-sent the invitation email on every run.
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assessment_invited_at TIMESTAMPTZ;
+
+      -- Exactly-once marker for the assessment reminder (day 3-4 after invite).
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assessment_reminder_sent_at TIMESTAMPTZ;
     `);
 
     await client.query(`UPDATE jobs SET status = 'active' WHERE status IS NULL;`);

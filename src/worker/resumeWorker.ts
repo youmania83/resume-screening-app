@@ -18,7 +18,7 @@ import { ensureJobAssessment } from "../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../lib/email.js";
 import { isNonResumeFile } from "../lib/fileFilters.js";
 import { inferCandidateRole } from "../lib/roleInference.js";
-import { ACTIVE_JOB_SQL, PIPELINE_THRESHOLDS } from "../lib/appConfig.js";
+import { ACTIVE_JOB_SQL, PIPELINE_THRESHOLDS, isStrictJobMapping } from "../lib/appConfig.js";
 
 dotenv.config();
 
@@ -548,9 +548,73 @@ export async function parseAndEvalResume(
       }
 
       // 5. Create Candidate Record
-      candidateId = crypto.randomUUID();
       const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";
-      const candidateStatus = primaryCandidateId ? "duplicate" : "applied";
+
+      // ── Re-application by an EXISTING candidate ──────────────────────────────
+      //
+      // When the same person applies again, do NOT create a second candidate row.
+      // The old behaviour inserted a duplicate marked status='duplicate', which is
+      // why the same person appeared repeatedly in the portal — often under several
+      // different roles, because each duplicate row was independently job-matched.
+      //
+      // Instead: refresh the existing profile with the newly parsed data, attach the
+      // new resume document, and stop. The candidate keeps one identity and one
+      // pipeline position.
+      if (primaryCandidateId) {
+        console.log(`[Worker] Resume for inbox ${inboxId} belongs to existing candidate ${primaryCandidateId} (${dupReason}). Updating the existing profile instead of creating a duplicate.`);
+
+        await queryGlobal(
+          `UPDATE candidates SET
+             phone = COALESCE(NULLIF($1, ''), phone),
+             skills = CASE WHEN COALESCE(array_length($2::text[], 1), 0) > 0 THEN $2 ELSE skills END,
+             certifications = CASE WHEN COALESCE(array_length($3::text[], 1), 0) > 0 THEN $3 ELSE certifications END,
+             education = COALESCE(NULLIF($4, ''), education),
+             experience_years = GREATEST(COALESCE(experience_years, 0), $5),
+             linkedin_url = COALESCE(NULLIF($6, ''), linkedin_url),
+             github_url = COALESCE(NULLIF($7, ''), github_url),
+             last_synced_at = NOW()
+           WHERE id = $8;`,
+          [
+            parsedData.phone || "",
+            parsedData.skills || [],
+            parsedData.certifications || [],
+            parsedData.education || "",
+            parsedData.experienceYears || 0,
+            parsedData.linkedinUrl || "",
+            parsedData.githubUrl || "",
+            primaryCandidateId
+          ]
+        );
+
+        // Attach the new resume to the existing profile.
+        await queryGlobal(
+          `INSERT INTO candidate_documents (id, tenant_id, candidate_id, title, file_url, document_type)
+           VALUES ($1, $2, $3, $4, (SELECT file_url FROM resume_inbox WHERE id = $5), 'Resume');`,
+          [crypto.randomUUID(), tenantId, primaryCandidateId, inboxRecord.file_name, inboxId]
+        );
+
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+           VALUES ($1, 'duplicate_application', $2, $3);`,
+          [primaryCandidateId, `Repeat application received (${dupReason}). Existing profile updated; no duplicate record created.`, tenantId]
+        );
+
+        await queryGlobal(
+          `UPDATE resume_inbox SET
+             status = 'Duplicate',
+             candidate_id = $1,
+             error_message = $2,
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = $3;`,
+          [primaryCandidateId, `Repeat application from an existing candidate. ${dupReason}`, inboxId]
+        );
+
+        await logProcessingStep(tenantId, inboxId, primaryCandidateId, "Matching", "Success", providerName, Date.now() - startTime, "Merged into existing candidate profile.");
+        return;
+      }
+
+      candidateId = crypto.randomUUID();
+      const candidateStatus = "applied";
 
       await queryGlobal(
         `INSERT INTO candidates (
@@ -564,7 +628,10 @@ export async function parseAndEvalResume(
         [
           candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
           inferCandidateRole(parsedData),
-          parsedData.skillsScore || 70, parsedData.skillsScore || 70, parsedData.experienceYears,
+          // Score starts at the AI skills score, or 0 when the AI did not produce
+          // one — never an arbitrary 70. The real match score is written by the
+          // job-matching step immediately below.
+          parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, parsedData.experienceYears,
           parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
           parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
           parsedData.city, parsedData.state, parsedData.country,
@@ -592,15 +659,10 @@ export async function parseAndEvalResume(
       await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
 
       // Application acknowledgement email sending is deferred until after scoring and assessment invitation status is determined.
-
-      // If duplicate, link it in duplicate_candidates table
-      if (primaryCandidateId) {
-        await queryGlobal(
-          `INSERT INTO duplicate_candidates (id, tenant_id, candidate_id, duplicate_candidate_id, reason, confidence_score)
-           VALUES ($1, $2, $3, $4, $5, 100.00);`,
-          [crypto.randomUUID(), tenantId, primaryCandidateId, candidateId, dupReason]
-        );
-      }
+      //
+      // NOTE: repeat applications are merged into the existing candidate above and
+      // return early, so control only reaches here for genuinely new candidates.
+      // The old duplicate_candidates linking is therefore no longer needed.
 
       // 6. Job Matching
       const matchStart = Date.now();
@@ -682,13 +744,25 @@ export async function parseAndEvalResume(
         }
       }
 
-      // Without an explicit (open) target job, require a minimum match before we
-      // attach the candidate to a requisition; otherwise leave them unmapped for
-      // HR review instead of forcing a poor match.
-      if (!targetJobIsOpen && highestMatchScore < PIPELINE_THRESHOLDS.JOB_MATCH_FLOOR) {
-        matchedJobId = null;
-        matchedJobTitle = "";
-        matchedJobDesc = "";
+      // Strict mapping: an applicant belongs to the opening they applied for.
+      //
+      // When we could not determine that opening from the application itself, we
+      // leave the candidate UNMAPPED for HR review rather than attaching them to
+      // the highest-scoring role. Auto-attaching by best match is what produced
+      // applicants filed under roles they never applied for.
+      if (!targetJobIsOpen) {
+        if (isStrictJobMapping()) {
+          if (matchedJobId) {
+            console.log(`[Worker] Strict job mapping is on: not auto-attaching candidate ${candidateId} to best-match job "${matchedJobTitle}" (${highestMatchScore}%). Routing to HR review for manual mapping.`);
+          }
+          matchedJobId = null;
+          matchedJobTitle = "";
+          matchedJobDesc = "";
+        } else if (highestMatchScore < PIPELINE_THRESHOLDS.JOB_MATCH_FLOOR) {
+          matchedJobId = null;
+          matchedJobTitle = "";
+          matchedJobDesc = "";
+        }
       }
 
       // Automated AI screening pipeline trigger

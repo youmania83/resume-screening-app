@@ -62,9 +62,13 @@ export class KekaCandidatesService {
         }
       }
 
-      const initialScore = (c.aiScore && c.aiScore > 0)
-        ? c.aiScore
-        : (c.experience && c.experience >= 5 ? 84 : c.experience && c.experience >= 3 ? 76 : c.experience && c.experience >= 1 ? 68 : 64);
+      // Score 0 means "not yet screened" — never a guess.
+      //
+      // This previously invented a score from years of experience alone
+      // (5+ yrs -> 84, 3+ -> 76, 1+ -> 68, else 64). 84 clears the 80% shortlist
+      // bar, so any Keka candidate with 5 years' experience was auto-shortlisted
+      // and emailed an assessment invitation without a resume ever being read.
+      const initialScore = (c.aiScore && c.aiScore > 0) ? c.aiScore : 0;
 
       await query(`
         INSERT INTO candidates (
@@ -80,13 +84,14 @@ export class KekaCandidatesService {
           phone = EXCLUDED.phone,
           role = CASE WHEN candidates.role = 'Candidate' THEN EXCLUDED.role ELSE candidates.role END,
           experience_years = EXCLUDED.experience_years,
-          status = CASE 
-            WHEN candidates.status NOT IN ('applied') THEN candidates.status
-            WHEN EXCLUDED.status = 'rejected' THEN 'rejected'
-            ELSE candidates.status 
-          END,
+          -- Local pipeline status is authoritative and is NEVER overwritten by Keka.
+          -- Keka's own stage names ("Talent Pool", "Interviewing", ...) leaking into
+          -- this column is what produced the mismatched statuses in the portal.
+          status = candidates.status,
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
+          -- keka_status is informational only (shown as "source stage"); it must not
+          -- drive any pipeline decision.
           keka_status = EXCLUDED.keka_status,
           applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
           job_id = COALESCE(EXCLUDED.job_id, candidates.job_id),
@@ -131,14 +136,27 @@ export class KekaCandidatesService {
     let processedCount = 0;
     let hasMore = true;
 
+    const { getIngestionCutoffIso } = await import("../../../lib/appConfig.js");
+    const cutoffIso = getIngestionCutoffIso();
+
     while (hasMore) {
-      // Pick ALL 0 score candidates
+      // Unscreened candidates received since the cutoff, attached to an OPEN job.
+      //
+      // This previously selected every zero-score candidate in the table with no
+      // date bound and no job filter, so each run re-screened the entire history
+      // (burning AI credits) and screened applicants for closed requisitions.
       const unscreened = await query(
-        `SELECT id, name, source_system, job_id 
-         FROM candidates 
-         WHERE (score = 0 OR score IS NULL)
-         ORDER BY applied_date DESC NULLS LAST, created_at DESC 
-         LIMIT 50;`
+        `SELECT c.id, c.name, c.source_system, c.job_id
+         FROM candidates c
+         JOIN jobs j ON c.job_id = j.id
+           AND COALESCE(j.status, 'active') = 'active'
+           AND j.sync_status IS DISTINCT FROM 'removed'
+         WHERE (c.score = 0 OR c.score IS NULL)
+           AND c.created_at >= $1::timestamptz
+           AND LOWER(COALESCE(c.status, '')) NOT IN ('rejected', 'hired', 'selected', 'duplicate', 'withdrawn')
+         ORDER BY c.applied_date DESC NULLS LAST, c.created_at DESC
+         LIMIT 50;`,
+        [cutoffIso]
       );
 
       if (!unscreened.rowCount || unscreened.rowCount === 0) {

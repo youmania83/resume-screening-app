@@ -44,6 +44,7 @@ import { redisClient, isRedisConnected } from "./middleware/security.js";
 import { connection } from "./queue.js";
 import { parseAndEvalResume } from "../worker/resumeWorker.js";
 import { assertAppUrlConfigured, getAppUrl, getIngestionCutoffIso, ResumeParserBootCheck } from "../lib/serverBootChecks.js";
+import { ASSESSMENT_REMINDER_DAYS, daysSinceInvite } from "../lib/appConfig.js";
 dotenv.config();
 
 // Fail loudly at boot on misconfiguration whose failure mode is otherwise silent
@@ -253,19 +254,26 @@ async function processAssessmentReminders(tag: string = "Cron") {
     const { queryGlobal } = await import("../lib/tenantDb.js");
     const { sendAssessmentReminderEmail } = await import("../lib/email.js");
 
-    // Remind only candidates who were actually invited, whose token is still
-    // valid, and whose job opening is still open.
+    // Remind only candidates who were actually invited, have not completed the
+    // assessment, whose token is still valid, and whose job opening is still open.
+    //
+    // `assessment_reminder_sent_at` makes this exactly-once per candidate. The old
+    // guard compared against an exact activity-log message string, so any change
+    // to the wording silently re-enabled duplicate reminders.
     const candidatesRes = await queryGlobal(
-      `SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry, c.tenant_id,
+      `SELECT c.id, c.name, c.email, c.assessment_token, c.assessment_token_expiry,
+              c.assessment_invited_at, c.tenant_id,
               COALESCE(j.title, c.role) as job_title
        FROM candidates c
        JOIN jobs j ON c.job_id = j.id
          AND COALESCE(j.status, 'active') = 'active'
          AND j.sync_status IS DISTINCT FROM 'removed'
        WHERE LOWER(c.status) = 'shortlisted'
-         AND c.assessment_status = 'pending'
+         AND COALESCE(c.assessment_status, 'pending') = 'pending'
          AND c.assessment_token IS NOT NULL
          AND c.assessment_invited_at IS NOT NULL
+         AND c.assessment_reminder_sent_at IS NULL
+         AND c.assessment_completed_at IS NULL
          AND c.assessment_token_expiry > CURRENT_TIMESTAMP
          AND c.created_at >= $1::timestamptz
          AND c.email IS NOT NULL AND c.email LIKE '%@%';`,
@@ -275,42 +283,48 @@ async function processAssessmentReminders(tag: string = "Cron") {
     let remindersSent = 0;
 
     for (const candidate of candidatesRes.rows) {
-      const expiry = new Date(candidate.assessment_token_expiry).getTime();
-      const now = Date.now();
-      const msDiff = expiry - now;
-      const remainingDays = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+      // Fire on the configured day(s) after the invitation was sent (default 3-4),
+      // rather than counting backwards from the expiry date.
+      const elapsedDay = daysSinceInvite(candidate.assessment_invited_at);
+      if (!ASSESSMENT_REMINDER_DAYS.includes(elapsedDay)) {
+        continue;
+      }
 
-      if (remainingDays === 3 || remainingDays === 1) {
-        const thresholdMsg = `Assessment reminder sent. ${remainingDays} days remaining.`;
+      const expiryMs = new Date(candidate.assessment_token_expiry).getTime();
+      const remainingDays = Math.max(1, Math.ceil((expiryMs - Date.now()) / 86400000));
 
-        const checkLog = await queryGlobal(`
-          SELECT COUNT(*) as count 
-          FROM candidate_activity_logs 
-          WHERE candidate_id = $1 
-            AND event_type = 'assessment_reminder' 
-            AND message = $2;
-        `, [candidate.id, thresholdMsg]);
+      console.log(`✉️ [${tag}] Sending assessment reminder to ${candidate.email} (day ${elapsedDay} since invite, ${remainingDays} day(s) remaining)`);
 
-        if (Number(checkLog.rows[0].count) === 0) {
-          console.log(`✉️ [${tag}] Sending assessment reminder to ${candidate.email} (${remainingDays} days remaining)`);
-          
-          await sendAssessmentReminderEmail({
-            candidateName: candidate.name,
-            candidateEmail: candidate.email,
-            jobTitle: candidate.job_title,
-            token: candidate.assessment_token,
-            remainingDays,
-            tenantId: candidate.tenant_id,
-            candidateId: candidate.id
-          } as any);
+      try {
+        await sendAssessmentReminderEmail({
+          candidateName: candidate.name,
+          candidateEmail: candidate.email,
+          jobTitle: candidate.job_title,
+          token: candidate.assessment_token,
+          remainingDays,
+          tenantId: candidate.tenant_id,
+          candidateId: candidate.id
+        } as any);
 
-          await queryGlobal(`
-            INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
-            VALUES ($1, 'assessment_reminder', $2, $3);
-          `, [candidate.id, thresholdMsg, candidate.tenant_id]);
+        // Stamp immediately so a later failure in this loop cannot cause a re-send.
+        await queryGlobal(
+          `UPDATE candidates SET assessment_reminder_sent_at = NOW() WHERE id = $1;`,
+          [candidate.id]
+        );
 
-          remindersSent++;
-        }
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+           VALUES ($1, 'assessment_reminder', $2, $3);`,
+          [
+            candidate.id,
+            `Assessment reminder sent on day ${elapsedDay} after invitation (${remainingDays} day(s) remaining).`,
+            candidate.tenant_id
+          ]
+        );
+
+        remindersSent++;
+      } catch (remErr: any) {
+        console.error(`[${tag}] Failed to send reminder to ${candidate.email}:`, remErr.message || remErr);
       }
     }
 

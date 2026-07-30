@@ -9,6 +9,7 @@ import {
   getIngestionCutoffIso,
   nextBusinessDaySlot,
   PIPELINE_THRESHOLDS,
+  isStrictJobMapping,
 } from "../lib/appConfig.js";
 import crypto from "crypto";
 
@@ -113,7 +114,27 @@ export class AutonomousRecruitmentService {
       }
 
       // 2.6 Autonomous Candidate-Job Role Remapping & Matching
+      //
+      // Under strict job mapping (the default) this pass is DISABLED entirely.
+      // An applicant belongs to the opening they applied for; a periodic
+      // best-match sweep that reassigns job_id is precisely what moved the same
+      // candidate between roles over successive cycles and made already-selected
+      // people resurface under other openings. Unmapped applicants wait for HR.
       try {
+        if (isStrictJobMapping()) {
+          const unmappedRes = await queryGlobal(
+            `SELECT COUNT(*)::int AS count
+               FROM candidates
+              WHERE created_at >= $1::timestamptz
+                AND job_id IS NULL
+                AND LOWER(COALESCE(status, '')) NOT IN ('rejected', 'hired', 'selected', 'withdrawn');`,
+            [cutoffIso]
+          );
+          const unmapped = unmappedRes.rows[0]?.count || 0;
+          if (unmapped > 0) {
+            console.log(`ℹ️ [Autonomous Cycle] ${unmapped} applicant(s) await manual job mapping by HR (strict job mapping is enabled). No automatic reassignment performed.`);
+          }
+        } else {
         const { inferCandidateRole, isGenericRoleTitle } = await import("../lib/roleInference.js");
 
         // Only *open* openings are matching targets.
@@ -232,6 +253,7 @@ export class AutonomousRecruitmentService {
         if (autoRemappedCount > 0) {
           console.log(`✨ [Autonomous Cycle] Autonomously remapped/matched ${autoRemappedCount} candidates to active jobs and inferred professional roles.`);
         }
+        } // end: non-strict job mapping
       } catch (remapErr: any) {
         console.error("🚨 [Autonomous Cycle] Candidate role remapping error:", remapErr.message);
       }

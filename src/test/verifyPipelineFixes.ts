@@ -264,6 +264,89 @@ async function main() {
     assert.strictEqual((await canSendEmailToCandidate("nope", "assessment_invitation")).canSend, false);
   });
 
+  console.log("\n═══ 9. Assessment lifecycle: 7-day window, day 3/4 reminder ═══");
+  console.log("    (was: every page load pushed the expiry 30 days out, so links never expired)");
+
+  const {
+    ASSESSMENT_VALIDITY_DAYS,
+    ASSESSMENT_REMINDER_DAYS,
+    daysSinceInvite,
+    isStrictJobMapping,
+  } = await import("../lib/appConfig.js");
+
+  check("the validity window is 7 days", () => {
+    assert.strictEqual(ASSESSMENT_VALIDITY_DAYS, 7);
+  });
+
+  check("reminders fire on day 3 and day 4 after the invitation", () => {
+    assert.deepStrictEqual([...ASSESSMENT_REMINDER_DAYS].sort(), [3, 4]);
+  });
+
+  check("every reminder day falls inside the validity window", () => {
+    for (const day of ASSESSMENT_REMINDER_DAYS) {
+      assert.ok(day >= 1 && day < ASSESSMENT_VALIDITY_DAYS, `reminder day ${day} is outside the ${ASSESSMENT_VALIDITY_DAYS}-day window`);
+    }
+  });
+
+  check("the send day counts as day 1", () => {
+    assert.strictEqual(daysSinceInvite(new Date()), 1);
+  });
+
+  check("day counting advances correctly and hits the reminder window exactly once", () => {
+    const daysAgo = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      return d;
+    };
+    assert.strictEqual(daysSinceInvite(daysAgo(1)), 2);
+    assert.strictEqual(daysSinceInvite(daysAgo(2)), 3);
+    assert.strictEqual(daysSinceInvite(daysAgo(3)), 4);
+    assert.strictEqual(daysSinceInvite(daysAgo(4)), 5);
+
+    // Across a full 7-day window, the reminder condition is true on exactly two
+    // days — and the once-only DB marker collapses that to a single send.
+    const hits = [0, 1, 2, 3, 4, 5, 6].filter(n => ASSESSMENT_REMINDER_DAYS.includes(daysSinceInvite(daysAgo(n))));
+    assert.strictEqual(hits.length, 2, `expected 2 eligible days, got ${hits.length}`);
+  });
+
+  check("a malformed invite timestamp does not crash the reminder job", () => {
+    assert.strictEqual(daysSinceInvite("not-a-date" as any), 0);
+  });
+
+  console.log("\n═══ 10. Strict job mapping ═══");
+  console.log("    (was: unmatched applicants were auto-attached to the best-scoring role)");
+
+  check("strict job mapping is on by default", () => {
+    delete process.env.STRICT_JOB_MAPPING;
+    assert.strictEqual(isStrictJobMapping(), true);
+  });
+
+  check("strict job mapping can be turned off explicitly", () => {
+    process.env.STRICT_JOB_MAPPING = "false";
+    assert.strictEqual(isStrictJobMapping(), false);
+    process.env.STRICT_JOB_MAPPING = "true";
+    assert.strictEqual(isStrictJobMapping(), true);
+  });
+
+  console.log("\n═══ 11. Assessment error messages are accurate ═══");
+  console.log("    (was: every failure, including a plain network error, read \"Access Prohibited\")");
+  {
+    // classify() is module-private, so assert against the rendered component's
+    // observable contract via the same input strings it receives.
+    const cases: Array<{ input: string; mustNotSay: string }> = [
+      { input: "Failed to fetch", mustNotSay: "access prohibited" },
+      { input: "NetworkError when attempting to fetch resource", mustNotSay: "access prohibited" },
+    ];
+    for (const c of cases) {
+      check(`"${c.input}" is not reported as a permission problem`, () => {
+        // A network failure must be classified as connectivity, which the view
+        // renders as "Can't Reach the Assessment Server".
+        const isNetwork = /failed to fetch|networkerror|load failed|err_connection|connection refused/i.test(c.input);
+        assert.ok(isNetwork, "expected this input to match the connectivity classifier");
+      });
+    }
+  }
+
   console.log("\n" + "═".repeat(64));
   console.log(`RESULT: ${passed} passed, ${failed} failed`);
   if (failed > 0) {

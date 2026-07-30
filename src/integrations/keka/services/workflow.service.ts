@@ -16,11 +16,32 @@ import { isKekaEnabled } from "../config/keka.config.js";
 import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic } from "../../../lib/aiEvaluationCache.js";
 
 // Define the threshold mapping configurations
+//
+// DEPRECATED for decision-making. These values (60 / 75 / 85) disagreed with the
+// pipeline thresholds in appConfig (60 / 80), so a candidate scoring 78 was
+// "HR Review" to Keka but "shortlisted" to the pipeline — whichever wrote last won.
+// Retained only for backwards-compatible imports; use PIPELINE_THRESHOLDS instead.
 export const STAGE_ROUTING_THRESHOLDS = {
   REJECT_THRESHOLD: 60,
   HR_REVIEW_THRESHOLD: 75,
   ASSESSMENT_THRESHOLD: 85
 };
+
+/**
+ * Whether Keka is allowed to own candidate status / stage decisions.
+ *
+ * Default FALSE. Keka is an inbound source of JOB OPENINGS and RESUMES only;
+ * this application owns scoring, status, stage transitions and all candidate
+ * email. Two systems writing `candidates.status` with different thresholds is
+ * what produced the mismatched "Talent Pool" / "Interviewing" states in the
+ * portal, plus duplicate assessment invitations.
+ *
+ * Outbound mirroring (pushing OUR decision into Keka so recruiters see the same
+ * stage there) is still performed — that is one-way and safe.
+ */
+function kekaOwnsCandidateStatus(): boolean {
+  return process.env.KEKA_OWNS_CANDIDATE_STATUS === "true";
+}
 
 function buildEvaluatePrompt(jobDescription: string, resumeText: string): string {
   return `You are an expert ATS parser and recruiter. Evaluate the following candidate resume against the Job Description.
@@ -376,16 +397,43 @@ export class KekaWorkflowService {
 
     // Fetch candidate name, job details, and existing assessment state
     const candRes = await query(`
-      SELECT c.name, c.email, c.job_id, c.assessment_token, c.assessment_status, j.title, j.description 
-      FROM candidates c 
-      LEFT JOIN jobs j ON c.job_id = j.id 
+      SELECT c.name, c.email, c.job_id, c.assessment_token, c.assessment_status, j.title, j.description
+      FROM candidates c
+      LEFT JOIN jobs j ON c.job_id = j.id
       WHERE c.id = $1
     `, [candidateId]);
-    
+
     if (!candRes.rowCount || candRes.rowCount === 0) {
       throw new Error(`Candidate details query failed for ${candidateId}`);
     }
     const { name, email, job_id: jobId, assessment_token: existingToken, assessment_status: existingStatus, title: jobTitle, description: jobDesc } = candRes.rows[0];
+
+    // ── Keka is an inbound source only ───────────────────────────────────────
+    // Unless explicitly re-enabled, this method no longer writes candidate
+    // status, mints assessment tokens or sends invitation emails. The resume
+    // worker and the autonomous cycle own those decisions, using a single set of
+    // thresholds. Running both produced conflicting statuses and a second
+    // assessment invitation from a different code path.
+    if (!kekaOwnsCandidateStatus()) {
+      const mirrored =
+        aiScore < 60 ? "Rejected" : aiScore < 80 ? "HR Review" : "Assessment";
+
+      // One-way mirror of OUR decision into Keka, so recruiters see the same
+      // stage there. No local writes, no email.
+      try {
+        await kekaApplicationsService.moveCandidateStage(candidateId, mirrored);
+      } catch (mirrorErr: any) {
+        console.warn(`[Keka] Could not mirror stage "${mirrored}" for candidate ${candidateId}:`, mirrorErr?.message || mirrorErr);
+      }
+
+      return {
+        candidateId,
+        score: aiScore,
+        targetStage: mirrored,
+        status: "unchanged",
+        log: `Keka stage mirrored to "${mirrored}". Candidate status and assessment dispatch are owned by the local pipeline (KEKA_OWNS_CANDIDATE_STATUS=false).`
+      };
+    }
 
     if (aiScore < 60) {
       targetStage = "Rejected";
@@ -466,11 +514,35 @@ export class KekaWorkflowService {
    */
   async handleAssessmentCompletion(candidateId: string, finalScore: number): Promise<any> {
     console.log(`Processing assessment completion hook for candidate: ${candidateId} (Integrated Score: ${finalScore})`);
-    
+
     let targetStage = "HR Review";
     let status = "shortlisted";
     let logMessage = "";
     let interviewDate: Date | null = null;
+
+    // ── Keka is an inbound source only ───────────────────────────────────────
+    // Previously this wrote `candidates.status` AND scheduled its own interview
+    // (a flat +2 calendar days, weekends included) before the caller's own
+    // scheduling ran — producing double bookings, weekend slots and a status that
+    // fought with the submit route. It now mirrors the stage into Keka only, and
+    // returns no interview date so the caller schedules exactly once.
+    if (!kekaOwnsCandidateStatus()) {
+      const mirrored = finalScore >= 80 ? "Interview" : finalScore >= 60 ? "HR Review" : "Rejected";
+      try {
+        await kekaApplicationsService.moveCandidateStage(candidateId, mirrored);
+      } catch (mirrorErr: any) {
+        console.warn(`[Keka] Could not mirror assessment-completion stage "${mirrored}" for candidate ${candidateId}:`, mirrorErr?.message || mirrorErr);
+      }
+
+      return {
+        candidateId,
+        finalScore,
+        targetStage: mirrored,
+        status: "unchanged",
+        log: `Keka stage mirrored to "${mirrored}". Interview scheduling and status are owned by the local pipeline.`,
+        interviewDate: null
+      };
+    }
 
     if (finalScore >= 80) {
       targetStage = "Interview";

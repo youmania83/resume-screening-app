@@ -211,27 +211,53 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     const score = parsedResult.score || 0;
     const applicationSource = req.body.applicationSource || "Careers Page";
     
-    let jobId = crypto.randomUUID();
-    const targetJobTitle = jobTitle || parsedResult.role || "SCM Executive";
+    let jobId: string;
+    const targetJobTitle = jobTitle || parsedResult.role || "";
     const targetJobDesc = parsedJD ? (parsedJD.description || jobDescription) : jobDescription;
     const targetDept = parsedJD?.department || "Operations";
     const targetLoc = parsedJD?.location || "Bengaluru, India";
     const targetExp = parsedJD?.experience || "2-5 Years";
 
+    // Resolve to an EXISTING, ACTIVE opening.
+    //
+    // This used to CREATE a job whenever the title did not match — using
+    // `parsedResult.role` (an AI-inferred role) and, failing that, the hard-coded
+    // literal "SCM Executive", with an invented department, location and
+    // experience range. That is a direct source of job openings appearing in the
+    // portal that HR never created.
+    let resolvedJobId: string | null = null;
+    if (!targetJobTitle.trim()) {
+      res.status(400).json({
+        error: "A job title is required. Applications must reference an existing active opening.",
+        code: "NO_JOB_TITLE"
+      });
+      return;
+    }
     try {
-      const jobRes = await queryTenant(`SELECT id FROM jobs WHERE title = $1 AND tenant_id = :tenant_id LIMIT 1;`, [targetJobTitle]);
+      const jobRes = await queryTenant(
+        `SELECT id FROM jobs
+          WHERE LOWER(title) = LOWER($1) AND tenant_id = :tenant_id
+            AND COALESCE(status, 'active') = 'active'
+            AND sync_status IS DISTINCT FROM 'removed'
+          LIMIT 1;`,
+        [targetJobTitle]
+      );
       if (jobRes.rowCount && jobRes.rowCount > 0) {
-        jobId = jobRes.rows[0].id;
-      } else {
-        await queryTenant(
-          `INSERT INTO jobs (id, title, description, department, location, experience_required, tenant_id)
-           VALUES ($1, $2, $3, $4, $5, $6, :tenant_id);`,
-          [jobId, targetJobTitle, targetJobDesc, targetDept, targetLoc, targetExp]
-        );
+        resolvedJobId = jobRes.rows[0].id;
       }
     } catch (dbJobErr) {
       console.error("Failed to map candidate to job:", dbJobErr);
     }
+
+    if (!resolvedJobId) {
+      res.status(409).json({
+        error: `No active job opening matches "${targetJobTitle}". Create or re-open the opening first — applications are never filed against an auto-generated role.`,
+        code: "NO_ACTIVE_JOB"
+      });
+      return;
+    }
+
+    jobId = resolvedJobId;
 
     const emailCheck = parsedResult.email ? String(parsedResult.email).trim().toLowerCase() : "";
     if (emailCheck) {

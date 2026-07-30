@@ -33,7 +33,14 @@ router.get("/metrics", async (req, res, next) => {
       recruiterProductivity,
       sourceQuality
     ] = await Promise.all([
-      queryTenant("SELECT COUNT(*)::int as count FROM jobs WHERE tenant_id = :tenant_id;"),
+      // Count OPEN openings only — a closed or ATS-removed requisition is not an
+      // "active job" and must not inflate the dashboard tile.
+      queryTenant(
+        `SELECT COUNT(*)::int as count FROM jobs
+          WHERE tenant_id = :tenant_id
+            AND COALESCE(status, 'active') = 'active'
+            AND sync_status IS DISTINCT FROM 'removed';`
+      ),
       queryTenant("SELECT COUNT(*)::int as count FROM candidates WHERE status NOT IN ('Hired', 'Rejected') AND tenant_id = :tenant_id;"),
       queryTenant("SELECT COUNT(*)::int as count FROM interviews WHERE status = 'scheduled' AND tenant_id = :tenant_id;"),
       queryTenant("SELECT COUNT(*)::int as count FROM offers WHERE status = 'sent' AND tenant_id = :tenant_id;"),

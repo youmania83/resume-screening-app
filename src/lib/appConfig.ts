@@ -153,6 +153,69 @@ function numFromEnv(key: string, fallback: number): number {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+ * 5a. Job mapping strictness
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * When true (the default), an applicant is only ever attached to the specific
+ * active opening they actually applied for — as identified from the application
+ * email (subject line, job code, or ATS job reference).
+ *
+ * If the target job cannot be determined, the candidate is routed to HR Review
+ * *unmapped* rather than being auto-assigned to the "best matching" opening.
+ *
+ * The previous best-match behaviour is what put applicants under roles they never
+ * applied for, and — combined with the periodic re-matching pass — moved the same
+ * person between several different roles over time.
+ */
+export function isStrictJobMapping(): boolean {
+  return process.env.STRICT_JOB_MAPPING !== "false";
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * 5b. Assessment lifecycle
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** How long an assessment invitation stays valid, in days. */
+export const ASSESSMENT_VALIDITY_DAYS = numFromEnv("ASSESSMENT_VALIDITY_DAYS", 7);
+
+/**
+ * Day(s) after the invitation on which a reminder is sent, if the assessment is
+ * still incomplete. Day 1 is the day the invitation went out.
+ *
+ * Default [3, 4] gives the candidate a nudge mid-window while still leaving
+ * several days to complete. Exactly one reminder is sent per candidate: the
+ * first matching day wins, and the email guard prevents a second.
+ */
+export const ASSESSMENT_REMINDER_DAYS: number[] = (() => {
+  const raw = process.env.ASSESSMENT_REMINDER_DAYS;
+  if (raw && raw.trim()) {
+    const parsed = raw
+      .split(",")
+      .map(v => Number(v.trim()))
+      .filter(v => Number.isFinite(v) && v >= 1);
+    if (parsed.length > 0) return parsed;
+  }
+  return [3, 4];
+})();
+
+/**
+ * Whole days elapsed since the invitation was sent, where the send day is day 1.
+ */
+export function daysSinceInvite(invitedAt: Date | string): number {
+  const sent = new Date(invitedAt);
+  if (isNaN(sent.getTime())) return 0;
+
+  const startOfSendDay = new Date(sent);
+  startOfSendDay.setHours(0, 0, 0, 0);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const dayDiff = Math.round((startOfToday.getTime() - startOfSendDay.getTime()) / 86400000);
+  return dayDiff + 1; // send day counts as day 1
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
  * 6. Business-day interview scheduling
  * ──────────────────────────────────────────────────────────────────────────── */
 
