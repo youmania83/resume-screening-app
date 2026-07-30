@@ -49,6 +49,37 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
         const c = payload.candidate;
         if (!c || !c.id) throw new Error("Missing candidate data in payload");
         
+        let mappedJobId: string | null = null;
+        let roleTitle: string | null = null;
+
+        if (c.jobId) {
+          const jobCheck = await query(
+            `SELECT id, title FROM jobs WHERE (id = $1 OR external_id = $1) AND (sync_status IS DISTINCT FROM 'removed' AND status = 'active') LIMIT 1;`,
+            [c.jobId]
+          );
+          if (jobCheck.rowCount && jobCheck.rowCount > 0) {
+            mappedJobId = jobCheck.rows[0].id;
+            roleTitle = jobCheck.rows[0].title;
+          }
+        }
+
+        if (!mappedJobId && c.jobTitle) {
+          const titleCheck = await query(
+            `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND (sync_status IS DISTINCT FROM 'removed' AND status = 'active') LIMIT 1;`,
+            [c.jobTitle]
+          );
+          if (titleCheck.rowCount && titleCheck.rowCount > 0) {
+            mappedJobId = titleCheck.rows[0].id;
+            roleTitle = titleCheck.rows[0].title;
+          }
+        }
+
+        // REQUIREMENT: Only candidates with a mapped active job role should be processed.
+        if (!mappedJobId || !roleTitle) {
+          console.log(`[Keka Webhook] Skipping webhook candidate "${c.name}" (${c.email}): Job "${c.jobId || c.jobTitle || 'Unspecified'}" is not an active open position.`);
+          break;
+        }
+
         await query(`
           INSERT INTO candidates (
             id, name, email, phone, role, score, match_percent, experience_years, 
@@ -59,6 +90,7 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
             name = EXCLUDED.name,
             email = EXCLUDED.email,
             phone = EXCLUDED.phone,
+            role = EXCLUDED.role,
             keka_status = EXCLUDED.keka_status,
             job_id = EXCLUDED.job_id,
             last_synced_at = NOW()
@@ -67,7 +99,7 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           c.name,
           c.email,
           c.phone || null,
-          c.jobTitle || "Candidate",
+          roleTitle,
           c.aiScore || 0,
           c.aiScore || 0,
           c.experienceYears || 0,
@@ -75,7 +107,7 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           c.source || "Keka Webhook",
           c.currentStage || "Applied",
           c.appliedDate || new Date().toISOString(),
-          c.jobId || null,
+          mappedJobId,
           c.id,
           "Keka",
           "synced"

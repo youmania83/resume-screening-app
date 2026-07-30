@@ -1,10 +1,6 @@
 // src/integrations/keka/services/candidates.service.ts
 
-import { getKekaAdapter } from "../adapters/index.js";
-import { KekaCandidate } from "../interfaces/Candidate.js";
-import { query } from "../../../lib/db.js";
-
-import { inferCandidateRole } from "../../../lib/roleInference.js";
+import { ACTIVE_JOB_SQL } from "../../../lib/appConfig.js";
 
 export class KekaCandidatesService {
   private getAdapter() {
@@ -50,16 +46,35 @@ export class KekaCandidatesService {
     const candidates = await this.getCandidates();
     for (const c of candidates) {
       let mappedJobId: string | null = null;
-      let roleTitle = (c as any).jobTitle || inferCandidateRole({ skills: c.skills, experienceYears: c.experience, name: c.name });
+      let roleTitle: string | null = null;
+
       if (c.jobId) {
         const jobCheck = await query(
-          "SELECT id, title FROM jobs WHERE id = $1 OR external_id = $1 LIMIT 1;",
+          `SELECT id, title FROM jobs WHERE (id = $1 OR external_id = $1) AND ${ACTIVE_JOB_SQL} LIMIT 1;`,
           [c.jobId]
         );
         if (jobCheck.rowCount && jobCheck.rowCount > 0) {
           mappedJobId = jobCheck.rows[0].id;
           roleTitle = jobCheck.rows[0].title;
         }
+      }
+
+      if (!mappedJobId && (c as any).jobTitle) {
+        const titleCheck = await query(
+          `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND ${ACTIVE_JOB_SQL} LIMIT 1;`,
+          [(c as any).jobTitle]
+        );
+        if (titleCheck.rowCount && titleCheck.rowCount > 0) {
+          mappedJobId = titleCheck.rows[0].id;
+          roleTitle = titleCheck.rows[0].title;
+        }
+      }
+
+      // REQUIREMENT: Only candidates with a mapped active job role should be processed.
+      // If the candidate's job is not an active open position, skip them completely (no random candidates).
+      if (!mappedJobId || !roleTitle) {
+        console.log(`[Keka Sync] Skipping candidate "${c.name}" (${c.email}): Job "${c.jobId || (c as any).jobTitle || 'Unspecified'}" is not an active open position.`);
+        continue;
       }
 
       // Score 0 means "not yet screened" — never a guess.
