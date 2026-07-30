@@ -8,6 +8,7 @@ import { KekaInterview } from "../interfaces/Interview.js";
 import { KekaOffer } from "../interfaces/Offer.js";
 import { KekaDocument } from "../interfaces/Document.js";
 import { kekaConfig } from "../config/keka.config.js";
+import { getIngestionCutoff } from "../../../lib/appConfig.js";
 
 export class RealKekaAdapter implements ATSAdapter {
   private cachedToken: string | null = null;
@@ -159,15 +160,14 @@ export class RealKekaAdapter implements ATSAdapter {
     const result = await response.json() as any;
     const rawCandidates = (result.data || []) as any[];
 
-    // Strict filter: Ingest ONLY candidates applied today or after
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // Strict filter: Ingest candidates applied on or after cutoff date
+    const cutoff = getIngestionCutoff();
 
     const filtered = rawCandidates.filter((cand: any) => {
       const appliedSec = parseFloat(cand.jobApplicationDetails?.appliedOn || "0");
       if (!appliedSec) return true;
       const appliedMs = appliedSec * 1000;
-      return appliedMs >= todayStart.getTime();
+      return appliedMs >= cutoff.getTime();
     });
 
     return filtered.map((cand: any) => ({
