@@ -179,8 +179,8 @@ git checkout '${GIT_BRANCH}'
 git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
-export NODE_ENV=development
-npm install --include=dev
+unset NODE_ENV
+npm ci --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
@@ -190,8 +190,8 @@ echo '==> 4/6 Running database migration...'
 npm run init-db
 
 echo '==> 5/6 Building production frontend...'
-rm -rf .next
-export NODE_ENV=production
+rm -rf .next node_modules/.cache
+unset NODE_ENV
 npm run build
 
 echo '==> 6/6 Restarting PM2 services...'
