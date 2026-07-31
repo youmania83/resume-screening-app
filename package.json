@@ -6,7 +6,7 @@
   "scripts": {
     "dev:full": "concurrently \"npm run backend\" \"npm run dev\"",
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx src/worker/resumeWorker.ts",
