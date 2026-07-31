@@ -66,15 +66,17 @@ ${jobDescription ? `Compare the resume details against this Job Description:\n${
 CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
 
 Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown backticks or include any other text.
+IMPORTANT: If a field is not found in the resume, return an empty string "" or empty array []. NEVER return placeholder strings such as "Not Found", "Candidate Name Not Found", "N/A", or "Unknown".
+
 {
   "isResume": boolean (true if the text represents a professional resume or curriculum vitae of a candidate, false if the document is a payslip, receipt, invoice, course certificate, mark sheet, dashboard screenshot, agreement, or any other non-resume document),
-  "firstName": "string (first name or empty)",
-  "lastName": "string (last name or empty)",
-  "email": "string (email or empty)",
-  "phone": "string (phone or empty)",
-  "city": "string (city or empty)",
-  "state": "string (state/region or empty)",
-  "country": "string (country or empty)",
+  "firstName": "string (first name or empty string '')",
+  "lastName": "string (last name or empty string '')",
+  "email": "string (email address or empty string '')",
+  "phone": "string (phone number or empty string '')",
+  "city": "string (city or empty string '')",
+  "state": "string (state/region or empty string '')",
+  "country": "string (country or empty string '')",
   "skills": ["array of skills"],
   "certifications": ["array of certifications"],
   "education": "string (highest degree earned)",
@@ -291,10 +293,34 @@ function validateParsedData(data: any, providerName: string): ParsedResumeData {
     data.isResume = looksLikeResume;
   }
 
-  if (typeof data.firstName !== "string") data.firstName = "";
-  if (typeof data.lastName !== "string") data.lastName = "";
-  if (typeof data.email !== "string") data.email = "";
-  if (typeof data.phone !== "string") data.phone = "";
+  const isPlaceholder = (val: any): boolean => {
+    if (!val || typeof val !== "string") return true;
+    const clean = val.trim().toLowerCase();
+    return (
+      !clean ||
+      clean === "not found" ||
+      clean === "candidate name not found" ||
+      clean === "name not found" ||
+      clean === "email not found" ||
+      clean === "phone not found" ||
+      clean === "unknown candidate" ||
+      clean === "unknown" ||
+      clean === "n/a" ||
+      clean === "na" ||
+      clean === "none" ||
+      clean === "null" ||
+      clean === "undefined" ||
+      clean.includes("not found")
+    );
+  };
+
+  if (isPlaceholder(data.firstName)) data.firstName = "";
+  if (isPlaceholder(data.lastName)) data.lastName = "";
+  if (isPlaceholder(data.email)) data.email = "";
+  if (isPlaceholder(data.phone)) data.phone = "";
+  if (isPlaceholder(data.city)) data.city = "";
+  if (isPlaceholder(data.state)) data.state = "";
+  if (isPlaceholder(data.country)) data.country = "";
 
   return data as ParsedResumeData;
 }

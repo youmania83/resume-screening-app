@@ -82,30 +82,23 @@ export class KekaCandidatesService {
         }
       }
 
-      // REQUIREMENT: Only candidates with a mapped active job role should be processed.
-      // If the candidate's job is not an active open position, skip them completely (no random candidates).
+      // REQUIREMENT: Skip candidates with invalid placeholder names or invalid job mappings
+      const cleanNameStr = (c.name || "").trim();
+      if (!cleanNameStr || /candidate name not found|name not found|not found|unknown candidate|unknown/i.test(cleanNameStr)) {
+        console.log(`[Keka Sync] Skipping candidate with placeholder name: "${c.name}" (${c.email})`);
+        continue;
+      }
+
       if (!mappedJobId || !roleTitle) {
         console.log(`[Keka Sync] Skipping candidate "${c.name}" (${c.email}): Job "${c.jobId || (c as any).jobTitle || 'Unspecified'}" is not an active open position.`);
         continue;
       }
 
-      // Score 0 means "not yet screened" — never a guess.
-      //
-      // This previously invented a score from years of experience alone
-      // (5+ yrs -> 84, 3+ -> 76, 1+ -> 68, else 64). 84 clears the 80% shortlist
-      // bar, so any Keka candidate with 5 years' experience was auto-shortlisted
-      // and emailed an assessment invitation without a resume ever being read.
+      const candidateSkills = Array.isArray(c.skills) ? c.skills : [];
+      const matchedSkills = candidateSkills.slice(0, 5);
+
       const initialScore = (c.aiScore && c.aiScore > 0) ? c.aiScore : 0;
 
-      // Cross-source dedup: if a candidate with this email (or, failing that,
-      // this phone number) already exists under a different id — most commonly
-      // because they applied by email/upload before Keka synced the same
-      // person — merge onto that existing row instead of inserting a second
-      // record for the same person. The ON CONFLICT clause below already knows
-      // how to merge Keka fields onto an existing candidate without clobbering
-      // locally-owned status/source_system; redirecting the insert id onto the
-      // existing row is what makes that merge actually happen instead of
-      // creating a duplicate keyed by Keka's own candidate id.
       let targetId = c.id;
       if (c.email) {
         const dupCheck = await query(
@@ -134,10 +127,11 @@ export class KekaCandidatesService {
       await query(`
         INSERT INTO candidates (
           id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
+          skills, matched_skills, education,
           status, application_source, assessment_score, keka_status, applied_date,
           job_id, external_id, source_system, sync_status, last_synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
         ON CONFLICT (id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           name = EXCLUDED.name,
@@ -145,14 +139,12 @@ export class KekaCandidatesService {
           phone = EXCLUDED.phone,
           role = CASE WHEN candidates.role = 'Candidate' THEN EXCLUDED.role ELSE candidates.role END,
           experience_years = EXCLUDED.experience_years,
-          -- Local pipeline status is authoritative and is NEVER overwritten by Keka.
-          -- Keka's own stage names ("Talent Pool", "Interviewing", ...) leaking into
-          -- this column is what produced the mismatched statuses in the portal.
+          skills = CASE WHEN array_length(EXCLUDED.skills, 1) > 0 THEN EXCLUDED.skills ELSE candidates.skills END,
+          matched_skills = CASE WHEN array_length(EXCLUDED.matched_skills, 1) > 0 THEN EXCLUDED.matched_skills ELSE candidates.matched_skills END,
+          education = COALESCE(EXCLUDED.education, candidates.education),
           status = candidates.status,
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
-          -- keka_status is informational only (shown as "source stage"); it must not
-          -- drive any pipeline decision.
           keka_status = EXCLUDED.keka_status,
           applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
           job_id = COALESCE(EXCLUDED.job_id, candidates.job_id),
@@ -174,6 +166,9 @@ export class KekaCandidatesService {
         initialScore,
         initialScore, 
         c.experience || 0,
+        candidateSkills,
+        matchedSkills,
+        c.education || null,
         c.status === "rejected" ? "rejected" : "applied", 
         "Keka Integration", 
         c.assessmentScore ?? null,

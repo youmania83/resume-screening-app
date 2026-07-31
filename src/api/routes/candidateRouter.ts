@@ -251,6 +251,79 @@ router.post("/rescreen-all", async (req, res, next) => {
   }
 });
 
+// POST /api/candidates/cleanup-junk - Clean up junk candidates and repair missing skills
+router.post("/cleanup-junk", async (req, res, next) => {
+  try {
+    const { queryGlobal } = await import("../../lib/tenantDb.js");
+    
+    // 1. Delete candidates with placeholder names or invalid emails
+    const deleteRes = await queryGlobal(`
+      DELETE FROM candidates
+      WHERE LOWER(name) LIKE '%candidate name not found%'
+         OR LOWER(name) LIKE '%not found%'
+         OR LOWER(name) = 'unknown candidate'
+         OR LOWER(email) LIKE '%notfound%'
+         OR LOWER(email) LIKE '%not_found%'
+         OR LOWER(email) = 'not found'
+         OR email IS NULL
+         OR email = '';
+    `);
+
+    // 2. Fetch candidates & active jobs to populate missing skills
+    const [candRes, jobRes] = await Promise.all([
+      queryGlobal(`SELECT id, name, email, role, skills, matched_skills, job_id FROM candidates;`),
+      queryGlobal(`SELECT id, title, description FROM jobs;`)
+    ]);
+
+    const candidates = candRes.rows;
+    const jobs = jobRes.rows;
+    let repairedCount = 0;
+
+    for (const c of candidates) {
+      const skills: string[] = Array.isArray(c.skills) ? c.skills : [];
+      let matchedSkills: string[] = Array.isArray(c.matched_skills) ? c.matched_skills : [];
+
+      if (matchedSkills.length === 0 && skills.length > 0) {
+        let assignedJob = jobs.find(j => j.id === c.job_id);
+        if (!assignedJob && c.role) {
+          const rLower = c.role.toLowerCase().trim();
+          assignedJob = jobs.find(j => (j.title || "").toLowerCase().trim() === rLower);
+        }
+
+        if (assignedJob) {
+          const fullText = `${assignedJob.title || ""} ${assignedJob.description || ""}`.toLowerCase();
+          const jMatched: string[] = [];
+          for (const s of skills) {
+            const sLower = s.toLowerCase().trim();
+            if (!sLower) continue;
+            if (fullText.includes(sLower) || sLower.split(/[\s\/\-]+/).some(tok => tok.length >= 3 && fullText.includes(tok))) {
+              jMatched.push(s);
+            }
+          }
+          matchedSkills = jMatched.length > 0 ? jMatched : skills.slice(0, 5);
+        } else {
+          matchedSkills = skills.slice(0, 5);
+        }
+
+        await queryGlobal(
+          `UPDATE candidates SET matched_skills = $1, last_synced_at = NOW() WHERE id = $2;`,
+          [matchedSkills, c.id]
+        );
+        repairedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      deletedJunkCount: deleteRes.rowCount || 0,
+      repairedSkillsCount: repairedCount,
+      message: `Cleaned ${deleteRes.rowCount || 0} junk candidate(s) and repaired skills for ${repairedCount} candidate(s).`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/candidates - Fetch candidates with search, filtering, and pagination
 router.get("/", async (req, res, next) => {
   try {

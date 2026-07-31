@@ -243,11 +243,23 @@ export function CandidatesView({
                     <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">{formatDisplayDate(c.appliedDate)}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[280px]">
-                        {c.matchedSkills.map(s => (
-                          <Badge key={s} variant="outline" className="text-[8px] bg-secondary/40 px-1 border border-border text-foreground/90 font-semibold select-none">
-                            {s}
-                          </Badge>
-                        ))}
+                        {(() => {
+                          const displaySkills = (c.matchedSkills && c.matchedSkills.length > 0)
+                            ? c.matchedSkills
+                            : (c.skills && c.skills.length > 0)
+                            ? c.skills.slice(0, 5)
+                            : [];
+                          if (displaySkills.length === 0) {
+                            return (
+                              <span className="text-[10px] text-muted-foreground italic select-none">No skills listed</span>
+                            );
+                          }
+                          return displaySkills.map(s => (
+                            <Badge key={s} variant="outline" className="text-[8px] bg-secondary/40 px-1 border border-border text-foreground/90 font-semibold select-none">
+                              {s}
+                            </Badge>
+                          ));
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell>

@@ -64,15 +64,29 @@ export function useCandidates(isLoggedIn?: boolean) {
         if (data && data.success && Array.isArray(data.candidates)) {
           // Normalize backend mapping
           const mapped: Candidate[] = data.candidates.map((c: any) => {
+            const rawName = (c.name || "").trim();
+            const rawEmail = (c.email || "").trim();
+
+            const isJunkNameStr = !rawName || /candidate name not found|name not found|not found|unknown candidate|unknown/i.test(rawName);
+            const isJunkEmailStr = !rawEmail || /not found|not_found|unknown/i.test(rawEmail);
+
+            const cleanEmail = isJunkEmailStr ? "" : rawEmail;
+            const fallbackNameFromEmail = cleanEmail.includes("@") ? cleanEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) : "";
+            const cleanName = isJunkNameStr ? (fallbackNameFromEmail || "Candidate") : rawName;
+
+            const candSkills = Array.isArray(c.skills) ? c.skills : [];
+            const candMatchedSkills = Array.isArray(c.matched_skills) ? c.matched_skills : [];
+            const finalMatchedSkills = candMatchedSkills.length > 0 ? candMatchedSkills : candSkills.slice(0, 5);
+
             const cleanRole = !isGenericRoleTitle(c.role)
               ? c.role
-              : inferCandidateRole({ skills: c.skills, experienceYears: c.experience_years, name: c.name, role: c.role });
+              : inferCandidateRole({ skills: candSkills, experienceYears: c.experience_years, name: cleanName, role: c.role });
             const cleanJobTitle = (c.job_title && !isGenericRoleTitle(c.job_title)) ? c.job_title : cleanRole;
             const cleanJobLocation = (c.job_location && !/not specified/i.test(c.job_location) && c.job_location !== "null") ? c.job_location : undefined;
 
             return {
               id: c.id,
-              name: c.name,
+              name: cleanName,
               role: cleanRole,
               score: c.score,
               matchPercent: c.match_percent,
@@ -84,15 +98,15 @@ export function useCandidates(isLoggedIn?: boolean) {
               strengths: c.strengths || [],
               weaknesses: c.weaknesses || [],
               missingSkills: c.missing_skills || [],
-              matchedSkills: c.matched_skills || [],
-              skills: c.skills || [],
+              matchedSkills: finalMatchedSkills,
+              skills: candSkills,
               certifications: c.certifications || [],
               projects: c.projects || [],
               keywords: c.keywords || [],
               riskFactors: c.risk_factors || [],
               status: c.status,
               education: c.education,
-              email: c.email,
+              email: cleanEmail,
               phone: c.phone,
               appliedDate: c.applied_date,
               applicationSource: c.application_source,

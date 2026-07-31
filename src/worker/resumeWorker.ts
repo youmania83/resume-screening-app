@@ -48,14 +48,19 @@ function calculateHeuristicMatch(
   matchedSkills: string[];
   missingSkills: string[];
 } {
-  const descLower = job.description.toLowerCase();
+  const fullText = `${job.title || ""} ${job.description || ""}`.toLowerCase();
   const matchedSkills: string[] = [];
   const missingSkills: string[] = [];
 
-  // Match skills
   if (data.skills && data.skills.length > 0) {
     for (const skill of data.skills) {
-      if (descLower.includes(skill.toLowerCase())) {
+      const sLower = skill.toLowerCase().trim();
+      if (!sLower) continue;
+      // Match full skill phrase, word tokens, or title keywords
+      if (
+        fullText.includes(sLower) ||
+        sLower.split(/[\s\/\-]+/).some(tok => tok.length >= 3 && fullText.includes(tok))
+      ) {
         matchedSkills.push(skill);
       } else {
         missingSkills.push(skill);
@@ -63,8 +68,11 @@ function calculateHeuristicMatch(
     }
   }
 
-  const skillsScore = data.skillsScore ?? (data.skills.length > 0 
-    ? Math.round((matchedSkills.length / data.skills.length) * 100)
+  // Ensure matchedSkills defaults to data.skills (up to 5) if no explicit match returned
+  const finalMatchedSkills = matchedSkills.length > 0 ? matchedSkills : (data.skills || []).slice(0, 5);
+
+  const skillsScore = data.skillsScore ?? (data.skills && data.skills.length > 0 
+    ? Math.round((finalMatchedSkills.length / Math.max(1, data.skills.length)) * 100)
     : 70);
 
   // Match experience
@@ -108,7 +116,7 @@ function calculateHeuristicMatch(
 
   return {
     score: Math.round(rawScore),
-    matchedSkills,
+    matchedSkills: finalMatchedSkills,
     missingSkills: missingSkills.slice(0, 5)
   };
 }
@@ -363,12 +371,41 @@ export async function parseAndEvalResume(
       }
 
       // Check if candidate details have enough mapping data (Name and Email are minimum required)
-      const candNameCheck = `${parsedData.firstName || ""} ${parsedData.lastName || ""}`.trim();
-      const hasEmailCheck = parsedData.email && parsedData.email.trim() && parsedData.email.includes("@");
-      const hasNameCheck = candNameCheck && candNameCheck.toLowerCase() !== "unknown candidate" && !candNameCheck.toLowerCase().includes("unknown");
+      const rawCandName = `${parsedData.firstName || ""} ${parsedData.lastName || ""}`.trim();
+      const rawEmail = (parsedData.email || "").trim();
+
+      const isJunkName = (n: string): boolean => {
+        if (!n || !n.trim()) return true;
+        const l = n.toLowerCase().trim();
+        return (
+          l === "unknown candidate" ||
+          l === "unknown" ||
+          l === "not found" ||
+          l === "candidate name not found" ||
+          l === "name not found" ||
+          l.includes("not found") ||
+          l.includes("unknown") ||
+          !/[a-zA-Z]{2,}/.test(n)
+        );
+      };
+
+      const isJunkEmail = (e: string): boolean => {
+        if (!e || !e.trim() || !e.includes("@")) return true;
+        const l = e.toLowerCase().trim();
+        return (
+          l.includes("notfound") ||
+          l.includes("not_found") ||
+          l.includes("not.found") ||
+          l.startsWith("unknown") ||
+          l === "john.doe@example.com"
+        );
+      };
+
+      const hasNameCheck = !isJunkName(rawCandName);
+      const hasEmailCheck = !isJunkEmail(rawEmail);
 
       if (!hasEmailCheck || !hasNameCheck) {
-        const errorMsg = `Lacks critical information for mapping (Name: "${candNameCheck || "missing"}", Email: "${parsedData.email || "missing"}").`;
+        const errorMsg = `Lacks critical candidate info (Valid Name required, got: "${rawCandName || "missing"}"; Valid Email required, got: "${rawEmail || "missing"}").`;
         console.log(`[Worker] ${errorMsg}`);
         await queryGlobal(
           `UPDATE resume_inbox SET 
