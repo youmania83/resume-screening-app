@@ -63,14 +63,21 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           }
         }
 
+        // Only auto-map by title when it identifies exactly one active job.
+        // Multiple open postings can share a title at different locations
+        // (e.g. "Project Engineer"); guessing between them with LIMIT 1
+        // silently collapsed every applicant onto whichever posting synced
+        // first, regardless of the specific Job ID they actually applied to.
         if (!mappedJobId && c.jobTitle) {
           const titleCheck = await query(
-            `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND (sync_status IS DISTINCT FROM 'removed' AND status = 'active') LIMIT 1;`,
+            `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND (sync_status IS DISTINCT FROM 'removed' AND status = 'active');`,
             [c.jobTitle]
           );
-          if (titleCheck.rowCount && titleCheck.rowCount > 0) {
+          if (titleCheck.rowCount === 1) {
             mappedJobId = titleCheck.rows[0].id;
             roleTitle = titleCheck.rows[0].title;
+          } else if (titleCheck.rowCount && titleCheck.rowCount > 1) {
+            console.warn(`[Keka Webhook] Candidate "${c.name}" (${c.email}): Job ID "${c.jobId}" did not match a known posting and title "${c.jobTitle}" matches ${titleCheck.rowCount} active postings. Refusing to guess.`);
           }
         }
 
@@ -80,9 +87,23 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           break;
         }
 
+        // Cross-source dedup: merge onto an existing candidate with the same
+        // email (e.g. already ingested via the email/upload pipeline) instead
+        // of inserting a second row keyed by Keka's own candidate id.
+        let targetId = c.id;
+        if (c.email) {
+          const dupCheck = await query(
+            `SELECT id FROM candidates WHERE LOWER(email) = LOWER($1) AND id != $2 LIMIT 1;`,
+            [c.email, c.id]
+          );
+          if (dupCheck.rowCount && dupCheck.rowCount > 0) {
+            targetId = dupCheck.rows[0].id;
+          }
+        }
+
         await query(`
           INSERT INTO candidates (
-            id, name, email, phone, role, score, match_percent, experience_years, 
+            id, name, email, phone, role, score, match_percent, experience_years,
             status, application_source, keka_status, applied_date, job_id, external_id, source_system, sync_status, last_synced_at
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
@@ -95,7 +116,7 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
             job_id = EXCLUDED.job_id,
             last_synced_at = NOW()
         `, [
-          c.id,
+          targetId,
           c.name,
           c.email,
           c.phone || null,
@@ -116,16 +137,16 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
         // Trigger automated screening if it is a new candidate and score is not computed yet
         if (eventType === "candidate.created" && (c.aiScore === undefined || c.aiScore === null)) {
           // Trigger async automated resume screening
-          kekaWorkflowService.screenCandidate(c.id).catch(err => {
-            console.error(`❌ Automated screening failed for candidate ${c.id}:`, err);
+          kekaWorkflowService.screenCandidate(targetId).catch(err => {
+            console.error(`❌ Automated screening failed for candidate ${targetId}:`, err);
           });
         }
 
         // Onboarding Trigger Check
         if (c.currentStage && (c.currentStage.toLowerCase() === "hired" || c.currentStage.toLowerCase() === "offer accepted" || c.currentStage.toLowerCase() === "offer_accepted")) {
-          console.log(`Candidate ${c.id} updated to finalized stage (${c.currentStage}). Triggering onboarding...`);
-          kekaWorkflowService.onboardCandidate(c.id).catch(err => {
-            console.error(`❌ Automated onboarding failed for candidate ${c.id}:`, err);
+          console.log(`Candidate ${targetId} updated to finalized stage (${c.currentStage}). Triggering onboarding...`);
+          kekaWorkflowService.onboardCandidate(targetId).catch(err => {
+            console.error(`❌ Automated onboarding failed for candidate ${targetId}:`, err);
           });
         }
         break;

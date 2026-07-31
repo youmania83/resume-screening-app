@@ -88,7 +88,7 @@ export class ZohoMailService {
       // Only OPEN openings: applications must never be mapped onto a job that HR
       // closed or that the ATS sync removed.
       const jobsRes = await query(
-        `SELECT id, title FROM jobs
+        `SELECT id, title, location, job_code, external_id FROM jobs
           WHERE COALESCE(status, 'active') = 'active'
             AND sync_status IS DISTINCT FROM 'removed';`
       );
@@ -141,15 +141,50 @@ export class ZohoMailService {
             continue;
           }
 
-          // 4. Map candidate to Job ID by searching for job title match in subject line (case-insensitive)
+          // 4. Map candidate to a Job ID.
+          //
+          // Exact Job ID / job code / external ID match first (this is what the
+          // user should be identified by whenever the application references
+          // it). Only fall back to title matching when no ID reference is
+          // present, and even then, only auto-assign when the title identifies
+          // exactly ONE active posting — multiple open roles can share a title
+          // at different locations (e.g. several "Project Engineer" openings),
+          // and guessing between them via first-match previously collapsed
+          // every applicant onto whichever posting happened to sync first,
+          // regardless of the specific opening (Job ID) they actually applied to.
           let jobId: string | null = null;
           let matchedRole = "Candidate";
+          const subjectLower = msg.subject.toLowerCase();
+          const bodyLower = (msg.body || "").toLowerCase();
+          const haystack = `${subjectLower}\n${bodyLower}`;
 
           for (const job of activeJobs) {
-            if (msg.subject.toLowerCase().includes(job.title.toLowerCase())) {
+            const refs = [job.id, job.job_code, job.external_id].filter((v): v is string => !!v && String(v).trim().length > 0);
+            const matchedRef = refs.find(ref => haystack.includes(String(ref).trim().toLowerCase()));
+            if (matchedRef) {
               jobId = job.id;
               matchedRole = job.title;
               break;
+            }
+          }
+
+          if (!jobId) {
+            const titleMatches = activeJobs.filter(job => subjectLower.includes(job.title.toLowerCase()));
+            if (titleMatches.length === 1) {
+              jobId = titleMatches[0].id;
+              matchedRole = titleMatches[0].title;
+            } else if (titleMatches.length > 1) {
+              const withLocation = titleMatches.find(job => {
+                const loc = (job.location || "").toLowerCase().trim();
+                const city = loc.split(",")[0].trim();
+                return city && loc !== "remote" && haystack.includes(city);
+              });
+              if (withLocation) {
+                jobId = withLocation.id;
+                matchedRole = withLocation.title;
+              } else {
+                console.warn(`[Zoho Mail Sync] Subject "${msg.subject}" matches ${titleMatches.length} active postings with the same title and no location/Job ID could disambiguate. Leaving unmapped for HR review.`);
+              }
             }
           }
 

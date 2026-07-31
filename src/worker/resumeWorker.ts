@@ -19,6 +19,7 @@ import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "
 import { isNonResumeFile } from "../lib/fileFilters.js";
 import { inferCandidateRole } from "../lib/roleInference.js";
 import { ACTIVE_JOB_SQL, PIPELINE_THRESHOLDS, isStrictJobMapping } from "../lib/appConfig.js";
+import { ensureNonBlankRemarks } from "../lib/aiEvaluationCache.js";
 
 dotenv.config();
 
@@ -451,10 +452,15 @@ export async function parseAndEvalResume(
         if (candidateScore >= 80) {
           candidateId = crypto.randomUUID();
           const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";
-          
+          const candidateRole = inferCandidateRole(parsedData);
+          const remarks = ensureNonBlankRemarks(
+            { recommendation: parsedData.recommendationReason, strengths: parsedData.strengths, skills: parsedData.skills },
+            { role: candidateRole, score: candidateScore, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
+          );
+
           await queryGlobal(
             `INSERT INTO candidates (
-              id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
+              id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
               skills, certifications, education, linkedin_url, github_url, recommendation,
               first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
               requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date
@@ -463,13 +469,13 @@ export async function parseAndEvalResume(
             );`,
             [
               candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-              inferCandidateRole(parsedData),
+              candidateRole,
               candidateScore, candidateScore, parsedData.experienceYears,
               parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
-              parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
+              remarks.recommendation, parsedData.firstName, parsedData.lastName,
               parsedData.city, parsedData.state, parsedData.country,
               parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
-              parsedData.requiresSponsorship, parsedData.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills
+              parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills
             ]
           );
 
@@ -615,10 +621,21 @@ export async function parseAndEvalResume(
 
       candidateId = crypto.randomUUID();
       const candidateStatus = "applied";
+      const candidateRole = inferCandidateRole(parsedData);
+
+      // recommendation/strengths are set once here, before the job-matching
+      // score below is known — a sparse resume can leave the AI's own fields
+      // empty, so fill them from what's already available (skills score,
+      // experience, skills) rather than storing blanks the profile page would
+      // otherwise render as an empty review.
+      const remarks = ensureNonBlankRemarks(
+        { recommendation: parsedData.recommendationReason, strengths: parsedData.strengths, skills: parsedData.skills },
+        { role: candidateRole, score: parsedData.skillsScore ?? 0, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
+      );
 
       await queryGlobal(
         `INSERT INTO candidates (
-          id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
+          id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
           skills, certifications, education, linkedin_url, github_url, recommendation,
           first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
           requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date
@@ -627,16 +644,16 @@ export async function parseAndEvalResume(
         );`,
         [
           candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-          inferCandidateRole(parsedData),
+          candidateRole,
           // Score starts at the AI skills score, or 0 when the AI did not produce
           // one — never an arbitrary 70. The real match score is written by the
           // job-matching step immediately below.
           parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, parsedData.experienceYears,
           parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
-          parsedData.recommendationReason || "", parsedData.firstName, parsedData.lastName,
+          remarks.recommendation, parsedData.firstName, parsedData.lastName,
           parsedData.city, parsedData.state, parsedData.country,
           parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
-          parsedData.requiresSponsorship, parsedData.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
+          parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
           candidateStatus, "Manual Upload"
         ]
       );

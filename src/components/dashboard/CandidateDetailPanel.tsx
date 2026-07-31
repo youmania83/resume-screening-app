@@ -203,16 +203,14 @@ export function CandidateDetailPanel({
             </div>
 
             {/* AI Evaluation Recommendation */}
-            {candidate.recommendation && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <span>AI Recommendation Summary</span>
-                </h4>
-                <p className="text-xs leading-relaxed text-foreground/90 font-medium bg-card p-3.5 rounded-lg border border-border shadow-xs">
-                  {candidate.recommendation}
-                </p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span>AI Recommendation Summary</span>
+              </h4>
+              <p className="text-xs leading-relaxed text-foreground/90 font-medium bg-card p-3.5 rounded-lg border border-border shadow-xs">
+                {candidate.recommendation || "This candidate has not been screened by the AI reviewer yet. Recommendation will appear here once screening completes."}
+              </p>
+            </div>
 
             {/* Experience & Skills Alignment */}
             <div className="space-y-3 bg-card border border-border rounded-xl p-4 shadow-xs">

@@ -13,7 +13,8 @@ import { kekaAssessmentService } from "./assessment.service.js";
 import { kekaDocumentsService } from "./documents.service.js";
 import { callDeepSeek } from "../../../lib/deepseek.js";
 import { isKekaEnabled } from "../config/keka.config.js";
-import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic } from "../../../lib/aiEvaluationCache.js";
+import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic, ensureNonBlankRemarks } from "../../../lib/aiEvaluationCache.js";
+import { PIPELINE_THRESHOLDS } from "../../../lib/appConfig.js";
 
 // Define the threshold mapping configurations
 //
@@ -275,6 +276,16 @@ export class KekaWorkflowService {
     }
     console.log(`AI screening complete. Score: ${score}/100`);
 
+    // A sparse/low-information resume can leave the AI's own recommendation/
+    // strengths fields empty — fill only what the model left blank so the
+    // candidate's review is never rendered as an empty section in the portal.
+    const remarks = ensureNonBlankRemarks(parsedResult, {
+      role: parsedResult.role || candidate.role,
+      score,
+      experienceYears: parsedResult.experienceYears || candidate.experience_years,
+      skills: parsedResult.skills
+    });
+
     // 5. Update Candidate Record in Database
     await query(`
       UPDATE candidates
@@ -305,11 +316,11 @@ export class KekaWorkflowService {
       parsedResult.role || candidate.role,
       score,
       parsedResult.experienceYears || 0,
-      parsedResult.experienceMatch || "",
-      parsedResult.recommendation || "",
+      remarks.experienceMatch,
+      remarks.recommendation,
       parsedResult.confidence || "",
       parsedResult.riskLevel || "Low",
-      parsedResult.strengths || [],
+      remarks.strengths,
       parsedResult.weaknesses || [],
       parsedResult.missingSkills || [],
       parsedResult.matchedSkills || [],
@@ -397,7 +408,7 @@ export class KekaWorkflowService {
 
     // Fetch candidate name, job details, and existing assessment state
     const candRes = await query(`
-      SELECT c.name, c.email, c.job_id, c.assessment_token, c.assessment_status, j.title, j.description
+      SELECT c.name, c.email, c.status, c.job_id, c.assessment_token, c.assessment_status, j.title, j.description
       FROM candidates c
       LEFT JOIN jobs j ON c.job_id = j.id
       WHERE c.id = $1
@@ -406,7 +417,7 @@ export class KekaWorkflowService {
     if (!candRes.rowCount || candRes.rowCount === 0) {
       throw new Error(`Candidate details query failed for ${candidateId}`);
     }
-    const { name, email, job_id: jobId, assessment_token: existingToken, assessment_status: existingStatus, title: jobTitle, description: jobDesc } = candRes.rows[0];
+    const { name, email, status: currentStatus, job_id: jobId, assessment_token: existingToken, assessment_status: existingStatus, title: jobTitle, description: jobDesc } = candRes.rows[0];
 
     // ── Keka is an inbound source only ───────────────────────────────────────
     // Unless explicitly re-enabled, this method no longer writes candidate
@@ -416,38 +427,46 @@ export class KekaWorkflowService {
     // assessment invitation from a different code path.
     if (!kekaOwnsCandidateStatus()) {
       const mirrored =
-        aiScore < 60 ? "Rejected" : aiScore < 80 ? "HR Review" : "Assessment";
+        aiScore < PIPELINE_THRESHOLDS.REVIEW ? "Rejected" : aiScore < PIPELINE_THRESHOLDS.SHORTLIST ? "HR Review" : "Assessment";
+      const localStatus = mirrored === "Rejected" ? "rejected" : mirrored === "HR Review" ? "Review" : "shortlisted";
 
-      // One-way mirror of OUR decision into Keka, so recruiters see the same
-      // stage there. No local writes, no email.
+      // Mirror OUR decision into Keka so recruiters see the same stage there,
+      // AND set the local status using the same thresholds the resume worker
+      // and autonomous cycle use. Only applied while the candidate is still at
+      // the initial "applied" state, so a later manual HR decision is never
+      // clobbered by a rescreen.
       try {
         await kekaApplicationsService.moveCandidateStage(candidateId, mirrored);
       } catch (mirrorErr: any) {
         console.warn(`[Keka] Could not mirror stage "${mirrored}" for candidate ${candidateId}:`, mirrorErr?.message || mirrorErr);
       }
 
+      if (String(currentStatus || "").toLowerCase() === "applied") {
+        await query(`UPDATE candidates SET status = $1 WHERE id = $2;`, [localStatus, candidateId]);
+      }
+
       return {
         candidateId,
         score: aiScore,
         targetStage: mirrored,
-        status: "unchanged",
-        log: `Keka stage mirrored to "${mirrored}". Candidate status and assessment dispatch are owned by the local pipeline (KEKA_OWNS_CANDIDATE_STATUS=false).`
+        status: localStatus,
+        log: `Candidate status set to "${localStatus}" (Score ${aiScore}/100). Keka stage mirrored to "${mirrored}".`
       };
     }
 
-    if (aiScore < 60) {
+    if (aiScore < PIPELINE_THRESHOLDS.REVIEW) {
       targetStage = "Rejected";
       status = "rejected";
-      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < 60). Moved to Rejected Pool in Keka.`;
-      
+      activityLog = `Candidate automatically rejected (Score ${aiScore}/100 < ${PIPELINE_THRESHOLDS.REVIEW}). Moved to Rejected Pool in Keka.`;
+
       await kekaApplicationsService.moveCandidateStage(candidateId, "Rejected");
       await query(`UPDATE candidates SET status = 'rejected' WHERE id = $1;`, [candidateId]);
-    } 
-    else if (aiScore < 75) {
+    }
+    else if (aiScore < PIPELINE_THRESHOLDS.SHORTLIST) {
       targetStage = "HR Review";
       status = "Review";
-      activityLog = `Candidate placed on Hold (Score ${aiScore}/100 is between 60 and 74). Moved to HR Review in Keka.`;
-      
+      activityLog = `Candidate placed on Hold (Score ${aiScore}/100 is between ${PIPELINE_THRESHOLDS.REVIEW} and ${PIPELINE_THRESHOLDS.SHORTLIST - 1}). Moved to HR Review in Keka.`;
+
       await kekaApplicationsService.moveCandidateStage(candidateId, "HR Review");
       await query(`UPDATE candidates SET status = 'Review' WHERE id = $1;`, [candidateId]);
     }
@@ -527,7 +546,7 @@ export class KekaWorkflowService {
     // fought with the submit route. It now mirrors the stage into Keka only, and
     // returns no interview date so the caller schedules exactly once.
     if (!kekaOwnsCandidateStatus()) {
-      const mirrored = finalScore >= 80 ? "Interview" : finalScore >= 60 ? "HR Review" : "Rejected";
+      const mirrored = finalScore >= PIPELINE_THRESHOLDS.INTERVIEW ? "Interview" : finalScore >= PIPELINE_THRESHOLDS.REVIEW ? "HR Review" : "Rejected";
       try {
         await kekaApplicationsService.moveCandidateStage(candidateId, mirrored);
       } catch (mirrorErr: any) {

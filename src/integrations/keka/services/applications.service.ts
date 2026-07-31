@@ -4,6 +4,36 @@ import { getKekaAdapter } from "../adapters/index.js";
 import { KekaApplication } from "../interfaces/Application.js";
 import { query } from "../../../lib/db.js";
 
+/**
+ * Maps a Keka pipeline stage name to our local `candidates.status` vocabulary.
+ *
+ * Returns `null` for any stage name we don't recognize, so the caller can leave
+ * `status` untouched. Previously every stage other than "Rejected" collapsed to
+ * a hard-coded "applied" default — that regressed candidates who had already
+ * been screened to "Review" or "shortlisted" back down to "applied" every time
+ * *any* stage mirror call fired, which is why statuses looked permanently stuck
+ * on "Applied" in the portal.
+ */
+function mapKekaStageToLocalStatus(stageNameOrId: string): string | null {
+  const normalized = stageNameOrId.trim().toLowerCase();
+  const table: Record<string, string> = {
+    "rejected": "rejected",
+    "reject": "rejected",
+    "hr review": "Review",
+    "hr_review": "Review",
+    "assessment": "shortlisted",
+    "interview": "interviewing",
+    "interviewing": "interviewing",
+    "offer": "offered",
+    "offer accepted": "hired",
+    "offer_accepted": "hired",
+    "hired": "hired",
+    "selected": "selected",
+    "withdrawn": "withdrawn",
+  };
+  return table[normalized] ?? null;
+}
+
 export class KekaApplicationsService {
   private getAdapter() {
     return getKekaAdapter();
@@ -15,9 +45,32 @@ export class KekaApplicationsService {
 
   async moveCandidateStage(candidateId: string, stageNameOrId: string): Promise<KekaApplication | null> {
     const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
+
+    // Reflect the stage locally FIRST, independent of the outbound push below.
+    // RealKekaAdapter.moveCandidateStage() is not implemented against the live
+    // Keka Hire API (it unconditionally throws), which used to abort this whole
+    // method before the local DB write below ever ran — so local status never
+    // changed and every candidate stayed on whatever it was set to at insert.
+    // `status` is only touched when the stage maps to a known local status;
+    // unrecognized stage names leave the pipeline's own status decision alone.
+    // Matches on external_id too: a candidate synced from Keka can be merged
+    // onto a pre-existing local row keyed by a different id (cross-source
+    // dedup, e.g. they had already applied by email) while Keka's own id is
+    // preserved in external_id — later events keyed by Keka's raw id must
+    // still resolve to that merged row.
+    await query(`
+      UPDATE candidates
+      SET keka_status = $1, status = COALESCE($2, status), last_synced_at = NOW()
+      WHERE id = $3 OR external_id = $3
+    `, [
+      stageNameOrId,
+      mapKekaStageToLocalStatus(stageNameOrId),
+      candidateId
+    ]);
+
     try {
       const app = await this.getAdapter().moveCandidateStage(candidateId, stageNameOrId);
-      
+
       // Update local applications table
       await query(`
         INSERT INTO applications (id, tenant_id, candidate_id, job_id, application_date, status, stage, source, external_id, source_system, sync_status, last_synced_at)
@@ -42,20 +95,9 @@ export class KekaApplicationsService {
         "synced"
       ]);
 
-      // Also update currentStage in candidates table
-      await query(`
-        UPDATE candidates 
-        SET keka_status = $1, status = $2, last_synced_at = NOW()
-        WHERE id = $3
-      `, [
-        stageNameOrId,
-        stageNameOrId.toLowerCase() === "rejected" ? "rejected" : "applied",
-        candidateId
-      ]);
-
       return app;
     } catch (e: any) {
-      console.warn(`⚠️ [Keka Applications Service] Failed to move stage to "${stageNameOrId}" in external Keka system for candidate ${candidateId}:`, e.message || e);
+      console.warn(`⚠️ [Keka Applications Service] Could not push stage "${stageNameOrId}" to the external Keka API for candidate ${candidateId} (local status was still updated):`, e.message || e);
       return null;
     }
   }

@@ -88,15 +88,15 @@ export default function ResumeTab({ candidate, resumeDocument }: ResumeTabProps)
             </div>
           </div>
 
-          {candidate.recommendation && (
-            <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 flex gap-2">
-              <Brain size={16} className="text-violet-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase">AI Recommendation</div>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">{candidate.recommendation}</p>
-              </div>
+          <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 flex gap-2">
+            <Brain size={16} className="text-violet-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase">AI Recommendation</div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                {candidate.recommendation || "This candidate has not been screened by the AI reviewer yet. Recommendation will appear here once screening completes."}
+              </p>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Matched vs Missing Skills Card */}

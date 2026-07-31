@@ -313,6 +313,41 @@ export default function CandidateProfilePage() {
     );
   }
 
+  // A network hiccup, a 500 from the API, or a malformed response leaves
+  // `candidate` null after loading finishes without being a 404 (which already
+  // redirects above). Every tab below reads candidate fields directly without
+  // null-checks, so rendering them against a null candidate previously crashed
+  // the page to a blank screen instead of showing anything actionable.
+  if (!candidate) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-3 text-center px-4">
+          <div className="text-sm font-semibold text-slate-300">Couldn&apos;t load this candidate profile.</div>
+          <div className="text-xs text-slate-500 max-w-sm">
+            This is usually a temporary network or server issue. Try reloading the page.
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={() => {
+                setLoading(true);
+                loadAllData();
+              }}
+              className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const latestResume = documents.find((doc) => doc.document_type === "resume") || null;
 
   return (

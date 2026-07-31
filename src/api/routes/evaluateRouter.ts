@@ -6,7 +6,7 @@ import fs from "fs";
 import { callDeepSeek } from "../../lib/deepseek.js";
 import { queryTenant } from "../../lib/tenantDb.js";
 import crypto from "crypto";
-import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation } from "../../lib/aiEvaluationCache.js";
+import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, ensureNonBlankRemarks } from "../../lib/aiEvaluationCache.js";
 import { ensureJobAssessment } from "../../lib/assessmentService.js";
 import { sendAssessmentInviteEmail, sendApplicationAcknowledgementEmail } from "../../lib/email.js";
 import { creditCheck } from "../middleware/creditMiddleware.js";
@@ -324,12 +324,22 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       { date: new Date().toISOString(), message: logMessage }
     ];
 
+    // A sparse/low-information resume can make the AI legitimately return
+    // empty recommendation/strengths/experienceMatch — this fills only the
+    // fields the model left blank so the candidate's review is never empty.
+    const remarks = ensureNonBlankRemarks(parsedResult, {
+      role: parsedResult.role || targetJobTitle,
+      score,
+      experienceYears: parsedResult.experienceYears,
+      skills: parsedResult.skills
+    });
+
     try {
       await queryTenant(
         `INSERT INTO candidates (
-          id, name, email, phone, role, score, match_percent, experience_years, 
-          experience_match, recommendation, confidence, risk_level, strengths, 
-          weaknesses, missing_skills, matched_skills, skills, certifications, 
+          id, name, email, phone, role, score, match_percent, experience_years,
+          experience_match, recommendation, confidence, risk_level, strengths,
+          weaknesses, missing_skills, matched_skills, skills, certifications,
           projects, keywords, status, application_source, keka_status, applied_date,
           job_id, assessment_token, assessment_token_expiry, assessment_status, tenant_id
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, :tenant_id);`,
@@ -342,11 +352,11 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
           score,
           score,
           parsedResult.experienceYears || 0,
-          parsedResult.experienceMatch || "",
-          parsedResult.recommendation || "",
+          remarks.experienceMatch,
+          remarks.recommendation,
           parsedResult.confidence || "",
           parsedResult.riskLevel || "Low",
-          parsedResult.strengths || [],
+          remarks.strengths,
           parsedResult.weaknesses || [],
           parsedResult.missingSkills || [],
           parsedResult.matchedSkills || [],

@@ -101,3 +101,47 @@ export function evaluateProfileHeuristic(profile: {
     risk_factors: []
   };
 }
+
+/**
+ * Guarantees a resume evaluation always carries user-facing remarks, even when
+ * the underlying resume is too sparse for the AI to fill every field.
+ *
+ * The AI prompt asks for `recommendation`/`strengths`/`experienceMatch`, but a
+ * thin or low-information resume can legitimately make the model return empty
+ * strings/arrays for them. Those empty values were previously stored verbatim,
+ * leaving the candidate's AI review section blank in the portal. This fills
+ * only the fields the model left blank — a real AI response is never
+ * overwritten — using the same score/experience/skills already computed.
+ */
+export function ensureNonBlankRemarks(
+  result: any,
+  context: { role?: string; score?: number; experienceYears?: number; skills?: string[] }
+): any {
+  const score = typeof context.score === "number" ? context.score : Number(result?.score) || 0;
+  const skills: string[] = (Array.isArray(result?.skills) && result.skills.length > 0)
+    ? result.skills
+    : (context.skills || []);
+  const exp = context.experienceYears ?? (Number(result?.experienceYears) || 0);
+  const role = context.role || result?.role || "the applied role";
+
+  const recommendation = (typeof result?.recommendation === "string" && result.recommendation.trim())
+    ? result.recommendation
+    : score >= 80
+      ? `Strong match for ${role} based on the available resume details (score ${score}/100). Recommended to proceed to the next stage.`
+      : score >= 60
+        ? `Partial match for ${role} based on the available resume details (score ${score}/100). Limited resume detail — recommend HR review before advancing.`
+        : `Limited alignment with ${role} based on the available resume details (score ${score}/100).`;
+
+  const strengths = (Array.isArray(result?.strengths) && result.strengths.length > 0)
+    ? result.strengths
+    : [
+        exp > 0 ? `${exp} year(s) of documented experience` : "Resume submitted and registered for evaluation",
+        skills.length > 0 ? `Relevant skills noted: ${skills.slice(0, 3).join(", ")}` : `Candidate profile matched to ${role}`
+      ];
+
+  const experienceMatch = (typeof result?.experienceMatch === "string" && result.experienceMatch.trim())
+    ? result.experienceMatch
+    : `${exp} year(s) of experience recorded against the ${role} requirement.`;
+
+  return { ...result, recommendation, strengths, experienceMatch };
+}

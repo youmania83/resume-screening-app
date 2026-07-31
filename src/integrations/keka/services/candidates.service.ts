@@ -62,14 +62,23 @@ export class KekaCandidatesService {
         }
       }
 
+      // Title fallback only fires when the Job ID lookup above found nothing
+      // (e.g. the two Keka sync jobs disagree on ID scheme for this posting).
+      // It must never guess between same-titled postings at different
+      // locations — that collapsed every "Project Engineer" applicant onto
+      // whichever same-titled row happened to sync first (e.g. "...- Assam"),
+      // regardless of which specific opening (Job ID) they actually applied
+      // to. Only auto-map when the title identifies exactly one active job.
       if (!mappedJobId && (c as any).jobTitle) {
         const titleCheck = await query(
-          `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND ${ACTIVE_JOB_SQL} LIMIT 1;`,
+          `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND ${ACTIVE_JOB_SQL};`,
           [(c as any).jobTitle]
         );
-        if (titleCheck.rowCount && titleCheck.rowCount > 0) {
+        if (titleCheck.rowCount === 1) {
           mappedJobId = titleCheck.rows[0].id;
           roleTitle = titleCheck.rows[0].title;
+        } else if (titleCheck.rowCount && titleCheck.rowCount > 1) {
+          console.warn(`[Keka Sync] Candidate "${c.name}" (${c.email}): Job ID "${c.jobId}" did not match a known posting and title "${(c as any).jobTitle}" matches ${titleCheck.rowCount} active postings (likely different locations). Refusing to guess — candidate will be skipped for HR to map manually.`);
         }
       }
 
@@ -88,10 +97,44 @@ export class KekaCandidatesService {
       // and emailed an assessment invitation without a resume ever being read.
       const initialScore = (c.aiScore && c.aiScore > 0) ? c.aiScore : 0;
 
+      // Cross-source dedup: if a candidate with this email (or, failing that,
+      // this phone number) already exists under a different id — most commonly
+      // because they applied by email/upload before Keka synced the same
+      // person — merge onto that existing row instead of inserting a second
+      // record for the same person. The ON CONFLICT clause below already knows
+      // how to merge Keka fields onto an existing candidate without clobbering
+      // locally-owned status/source_system; redirecting the insert id onto the
+      // existing row is what makes that merge actually happen instead of
+      // creating a duplicate keyed by Keka's own candidate id.
+      let targetId = c.id;
+      if (c.email) {
+        const dupCheck = await query(
+          `SELECT id FROM candidates WHERE tenant_id = $1 AND LOWER(email) = LOWER($2) AND id != $3 LIMIT 1;`,
+          [targetTenantId, c.email, c.id]
+        );
+        if (dupCheck.rowCount && dupCheck.rowCount > 0) {
+          targetId = dupCheck.rows[0].id;
+        }
+      }
+      if (targetId === c.id && c.phone) {
+        const phoneDigits = c.phone.replace(/[^0-9]/g, "");
+        if (phoneDigits.length >= 10) {
+          const dupCheck = await query(
+            `SELECT id FROM candidates
+             WHERE tenant_id = $1 AND phone IS NOT NULL AND phone != ''
+               AND regexp_replace(phone, '[^0-9]', '', 'g') = $2 AND id != $3 LIMIT 1;`,
+            [targetTenantId, phoneDigits, c.id]
+          );
+          if (dupCheck.rowCount && dupCheck.rowCount > 0) {
+            targetId = dupCheck.rows[0].id;
+          }
+        }
+      }
+
       await query(`
         INSERT INTO candidates (
-          id, tenant_id, name, email, phone, role, score, match_percent, experience_years, 
-          status, application_source, assessment_score, keka_status, applied_date, 
+          id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
+          status, application_source, assessment_score, keka_status, applied_date,
           job_id, external_id, source_system, sync_status, last_synced_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
@@ -122,7 +165,7 @@ export class KekaCandidatesService {
           sync_status = EXCLUDED.sync_status,
           last_synced_at = EXCLUDED.last_synced_at
       `, [
-        c.id,
+        targetId,
         targetTenantId,
         c.name,
         c.email,
