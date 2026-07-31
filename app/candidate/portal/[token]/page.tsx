@@ -120,7 +120,7 @@ export default function CandidatePortalPage() {
     }
   };
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const loadPortalData = useCallback(async () => {
     try {

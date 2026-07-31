@@ -30,7 +30,7 @@ export default function CandidateProfilePage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const fetchWithCredentials = useCallback(async (url: string, options: RequestInit = {}) => {
     return fetch(url, {

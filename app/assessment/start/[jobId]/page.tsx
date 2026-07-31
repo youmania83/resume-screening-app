@@ -31,7 +31,7 @@ export default function PublicAssessmentRegistrationPage() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   // Force light theme for consistency
   useEffect(() => {
@@ -47,14 +47,29 @@ export default function PublicAssessmentRegistrationPage() {
       try {
         const resp = await fetch(`${apiBase}/assessment/job-info/${jobId}`);
         if (!resp.ok) {
-          const errData = await resp.json();
-          throw new Error(errData.error || "Failed to load job details.");
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || "This link does not point to a valid, open position.");
         }
         const data = await resp.json();
         setJobTitle(data.title);
         setLoading(false);
       } catch (err: any) {
-        setError(err.message || "Invalid or expired assessment link.");
+        // A failed fetch (no server reachable, DNS, CORS) throws "Failed to
+        // fetch" / "NetworkError" / "Load failed" — that is NOT the same as an
+        // invalid link, and telling a candidate their link is bad when the
+        // real problem is our API being unreachable sends them away for the
+        // wrong reason instead of prompting a retry.
+        const msg = (err.message || "").toLowerCase();
+        const isNetworkError =
+          msg.includes("failed to fetch") ||
+          msg.includes("networkerror") ||
+          msg.includes("load failed") ||
+          msg.includes("err_connection");
+        setError(
+          isNetworkError
+            ? "We couldn't reach the assessment service. Please check your connection and try again in a moment."
+            : err.message || "We couldn't load this assessment link. Please try again or contact HR."
+        );
         setLoading(false);
       }
     };

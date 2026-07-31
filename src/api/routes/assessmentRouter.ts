@@ -1146,16 +1146,30 @@ router.get("/results/get", async (req: any, res: any) => {
 router.get("/job-info/:jobId", async (req: any, res: any) => {
   try {
     const { jobId } = req.params;
-    const jobRes = await queryGlobal(`SELECT title, description FROM jobs WHERE id = $1 LIMIT 1;`, [jobId]);
+    const jobRes = await queryGlobal(
+      `SELECT title, description, COALESCE(status, 'active') as status, sync_status
+       FROM jobs WHERE id = $1 LIMIT 1;`,
+      [jobId]
+    );
     if (!jobRes.rowCount || jobRes.rowCount === 0) {
       return res.status(404).json({ error: "Job opening not found." });
     }
     const job = jobRes.rows[0];
-    // Check if there is an active assessment for this job
-    const assessmentRes = await queryGlobal(`SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`, [jobId]);
-    if (!assessmentRes.rowCount || assessmentRes.rowCount === 0) {
-      return res.status(404).json({ error: "No assessment configured for this job opening." });
+    if (job.status !== "active" || job.sync_status === "removed") {
+      return res.status(409).json({ error: "This position is no longer open." });
     }
+
+    // Ensure an assessment exists for this job instead of 404ing on it.
+    //
+    // A job newly synced from the ATS has no assessment until someone is
+    // actually invited (see POST /public-register and POST /send, which both
+    // already call ensureJobAssessment). This GET used to just check for one
+    // and fail closed — so a candidate opening the public link for ANY job
+    // that hadn't yet had a candidate register saw "No assessment configured",
+    // even though registering was the very next step and would have created
+    // it anyway. That made every brand-new job's link fail on first click.
+    await ensureJobAssessment(jobId, job.title, job.description || job.title);
+
     res.json({ title: job.title, description: job.description });
   } catch (err: any) {
     console.error("Failed to load job details:", err);

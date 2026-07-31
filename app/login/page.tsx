@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     const checkSilentLogin = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
       try {
         const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST", credentials: "include" });
         if (res.ok) {
@@ -43,7 +43,7 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async (token: string) => {
     setIsLoading(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
     try {
       const res = await fetch(`${apiBase}/auth/google-login`, {
@@ -112,7 +112,7 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
     try {
       const res = await fetch(`${apiBase}/auth/login`, {

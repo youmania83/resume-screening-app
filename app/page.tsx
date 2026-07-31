@@ -32,7 +32,7 @@ export default function Dashboard() {
     const saved = localStorage.getItem("ira_user")
     if (!saved) {
       const trySilentLogin = async () => {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
         try {
           const res = await fetch(`${apiBase}/auth/silent-login`, { method: "POST", credentials: "include" });
           if (res.ok) {
@@ -59,7 +59,7 @@ export default function Dashboard() {
   }, [router])
 
   const handleLogout = async () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api"
     try {
       await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "include" })
     } catch (e) {
@@ -179,7 +179,7 @@ export default function Dashboard() {
     setIsSyncingEmail(true)
     const toastId = toast.loading("Checking email inbox for fresh resumes...")
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api"
       const resp = await fetch(`${apiBase}/inbox/email-sync`, {
         method: "POST",
         headers: {
