@@ -191,7 +191,12 @@ npm run init-db
 
 echo '==> 5/6 Building production frontend...'
 rm -rf .next node_modules/.cache
-npx next build
+# --webpack is required here: Next 16 defaults to Turbopack, which fails on
+# this VPS with a workspace-root inference error (it climbs above the project
+# directory looking for next/package.json and gets confused by the parent
+# directory structure). package.json's own \"build\" script already pins
+# --webpack for this reason; the deploy script had drifted from it.
+npx next build --webpack
 
 echo '==> 6/6 Restarting PM2 services...'
 pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production
