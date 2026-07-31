@@ -1,13 +1,8 @@
 // next.config.js (ESM)
-import { fileURLToPath } from 'url';
-import path from 'path';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbopack: {
-    root: __dirname,
-  },
+  reactStrictMode: true,
   // NOTE: the `eslint` key was removed — Next 16 no longer supports it and emitted
   // an "Unrecognized key(s)" warning on every build. Lint runs via `npm run lint`.
   //
