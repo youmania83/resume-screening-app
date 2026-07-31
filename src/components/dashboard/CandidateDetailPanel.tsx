@@ -92,6 +92,16 @@ export function CandidateDetailPanel({
             </div>
 
             <div className="flex items-center gap-2">
+              <a
+                href={`/profile/${candidate.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-colors border border-indigo-500/20"
+                title="Open full candidate profile"
+              >
+                <span>Full Profile</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
               {handleDeleteCandidate && (
                 <button
                   onClick={() => {

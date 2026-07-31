@@ -81,6 +81,8 @@ export default function CandidatePortalPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
+
   // Support state hooks
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportSubject, setSupportSubject] = useState("General Query");
@@ -119,8 +121,6 @@ export default function CandidatePortalPage() {
       setIsSubmittingSupport(false);
     }
   };
-
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
   const loadPortalData = useCallback(async () => {
     try {
