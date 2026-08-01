@@ -88,14 +88,13 @@ git status --porcelain | grep -q . && warn "Local modifications present on the s
 git pull --ff-only origin main || fail "git pull failed. Resolve manually, then re-run."
 ok "Now at $(git log --oneline -1)"
 
-step "5. Install dependencies"
-
+rm -rf .next node_modules
 if [ -f package-lock.json ]; then
   npm ci || npm install || fail "npm ci failed"
 else
   npm install || fail "npm install failed"
 fi
-ok "Dependencies installed"
+ok "Dependencies cleanly installed"
 
 step "6. Type check (build now fails on type errors by design)"
 
