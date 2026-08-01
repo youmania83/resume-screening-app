@@ -92,6 +92,7 @@ step "5. Install dependencies"
 
 pm2 stop all 2>/dev/null || true
 rm -rf .next node_modules
+npm cache clean --force 2>/dev/null || true
 if [ -f package-lock.json ]; then
   NODE_ENV=development npm ci --include=dev || NODE_ENV=development npm install --include=dev || fail "npm ci failed"
 else
