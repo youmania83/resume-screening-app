@@ -91,7 +91,7 @@ ok "Now at $(git log --oneline -1)"
 step "5. Install dependencies"
 
 if [ -f package-lock.json ]; then
-  npm ci --omit=dev --ignore-scripts=false 2>/dev/null || npm ci || fail "npm ci failed"
+  npm ci || npm install || fail "npm ci failed"
 else
   npm install || fail "npm install failed"
 fi
