@@ -41,9 +41,9 @@ export function AssessmentsView({
     toast.success("Assessment invite link copied to clipboard!");
   };
 
-  const handleSendAssessmentInvite = async (id: string) => {
+  const handleSendAssessmentInvite = async (id: string, isResend = false) => {
     setIsSendingInvite(prev => ({ ...prev, [id]: true }));
-    toast.loading("Sending AI assessment invitation...", { id: "invite-loader" });
+    toast.loading(isResend ? "Re-sending AI assessment invitation..." : "Sending AI assessment invitation...", { id: "invite-loader" });
 
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
@@ -51,18 +51,18 @@ export function AssessmentsView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ candidateId: id })
+        body: JSON.stringify({ candidateId: id, resend: isResend })
       });
 
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.success) {
-          toast.success("Assessment invitation sent successfully!", { id: "invite-loader" });
-          await loadCandidates();
-          return;
-        }
+      const data = await resp.json().catch(() => ({}));
+
+      if (resp.ok && data && data.success) {
+        toast.success(isResend ? "Assessment invitation re-sent successfully!" : "Assessment invitation sent successfully!", { id: "invite-loader" });
+        await loadCandidates();
+        return;
       }
-      throw new Error("Failed to send assessment invite.");
+
+      throw new Error(data.error || "Failed to send assessment invite.");
     } catch (e: any) {
       console.warn("Backend send invite failed:", e);
       toast.error(e.message || "Failed to send assessment invitation.", { id: "invite-loader" });
@@ -329,7 +329,7 @@ export function AssessmentsView({
                               <Button
                                 size="sm"
                                 className="bg-slate-900 hover:bg-slate-800 text-white text-[10px] px-2 py-1 font-bold rounded"
-                                onClick={() => handleSendAssessmentInvite(c.id)}
+                                onClick={() => handleSendAssessmentInvite(c.id, true)}
                                 disabled={isSendingInvite[c.id]}
                               >
                                 Resend
