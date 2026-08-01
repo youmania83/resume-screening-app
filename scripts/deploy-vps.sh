@@ -88,11 +88,11 @@ git status --porcelain | grep -q . && warn "Local modifications present on the s
 git pull --ff-only origin main || fail "git pull failed. Resolve manually, then re-run."
 ok "Now at $(git log --oneline -1)"
 
-rm -rf .next node_modules
+rm -rf .next
 if [ -f package-lock.json ]; then
-  npm ci || npm install || fail "npm ci failed"
+  NODE_ENV=development npm ci --include=dev || NODE_ENV=development npm install --include=dev || fail "npm ci failed"
 else
-  npm install || fail "npm install failed"
+  NODE_ENV=development npm install --include=dev || fail "npm install failed"
 fi
 ok "Dependencies cleanly installed"
 
