@@ -140,6 +140,10 @@ jobs:
               })();
             " || echo "⚠️ Migration script failed (non-blocking)"
 
+            # 4c. Run experience data remediation script
+            echo "🗄️ Running experience normalizer remediation script..."
+            npx tsx src/scripts/remediateExperienceDiscrepancies.ts || echo "⚠️ Experience remediation script failed (non-blocking)"
+
             # 5. Automated Health Check & Verification Loop
             echo "🧪 Verifying service readiness..."
             
