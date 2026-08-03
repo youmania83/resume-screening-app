@@ -59,5 +59,32 @@ if (pavanResult.experienceYears === 10) {
   process.exit(1);
 }
 
+// Test Case 3: Anurag Singh
+// Raw parsed experienceYears = 0.5 (6 months)
+// Recommendation text = "Candidate has 6 months of experience as a civil site engineer at Gayatri construction, which aligns with the entry-level requirement of 0-2 years..."
+const anuragInput = {
+  experienceYears: 0.5,
+  recommendation: "Candidate has 6 months of experience as a civil site engineer at Gayatri construction, which aligns with the entry-level requirement of 0-2 years, but lacks specific exposure to CNG/CGD projects.",
+  experienceMatch: "Candidate has 6 months of experience as a civil site engineer at Gayatri construction, which aligns with the entry-level requirement of 0-2 years.",
+  strengths: [
+    "Educational background in civil engineering with a good GPA (8.20)",
+    "Basic site supervision experience at a construction company"
+  ],
+  role: "Project Engineer"
+};
+
+const anuragResult = reconcileExperienceData(anuragInput);
+console.log("\n--- Candidate 3: Anurag Singh ---");
+console.log("Input experienceYears:", anuragInput.experienceYears);
+console.log("Output experienceYears:", anuragResult.experienceYears);
+console.log("Output experienceMatch:", anuragResult.experienceMatch);
+
+if (anuragResult.experienceYears === 0.5) {
+  console.log("✅ PASS: Anurag's experienceYears preserved at 0.5 (6 months) and NOT wrongly elevated to 2!");
+} else {
+  console.error("❌ FAIL: Expected 0.5, got", anuragResult.experienceYears);
+  process.exit(1);
+}
+
 console.log("\n🎉 All Experience Normalizer tests passed cleanly!");
 process.exit(0);

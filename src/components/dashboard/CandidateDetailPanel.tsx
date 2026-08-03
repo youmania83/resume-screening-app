@@ -137,7 +137,9 @@ export function CandidateDetailPanel({
 
               <div className="bg-card border border-border rounded-lg p-3">
                 <span className="text-[9px] uppercase font-bold text-muted-foreground block">Experience</span>
-                <span className="text-xs font-bold text-foreground mt-1 block">{candidate.experienceYears} Years</span>
+                <span className="text-xs font-bold text-foreground mt-1 block">
+                  {candidate.experienceYears < 1 && candidate.experienceYears > 0 ? `${Math.round(candidate.experienceYears * 12)} Months` : `${candidate.experienceYears} ${candidate.experienceYears === 1 ? "Year" : "Years"}`}
+                </span>
               </div>
 
               <div className="bg-card border border-border rounded-lg p-3">

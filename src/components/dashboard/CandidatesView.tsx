@@ -239,7 +239,9 @@ export function CandidatesView({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-semibold">{c.experienceYears} Years</TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-semibold">
+                      {c.experienceYears < 1 && c.experienceYears > 0 ? `${Math.round(c.experienceYears * 12)} Months` : `${c.experienceYears} ${c.experienceYears === 1 ? "Year" : "Years"}`}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">{formatDisplayDate(c.appliedDate)}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[280px]">

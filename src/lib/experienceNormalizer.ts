@@ -83,19 +83,49 @@ export function calculateExperienceFromDateSpans(text: string): number {
 export function extractExperienceYearsFromText(text: string): number | null {
   if (!text || typeof text !== "string") return null;
 
-  // Patterns matching "10+ years", "8+ years", "Over 10 years", "10+ years of", "has 8 years of", "3+ years of experience"
+  // 1. Remove job requirement phrases and ranges (e.g. "requirement of 0-2 years", "0-2 years", "2-5 years")
+  const cleanedText = text
+    .replace(/(?:requirement|requires?|required|target|criteria|range|threshold|job description)\s*(?:of|for|is:?)?\s*\d+(?:\.\d+)?(?:\s*[-–to\/]\s*\d+(?:\.\d+)?)?\s*(?:years?|yrs?|months?|mths?)?/gi, "")
+    .replace(/(?:aligns?|compared|evaluated)\s*(?:with|against|to)?\s*(?:the)?\s*(?:entry-level|mid-level|senior)?\s*(?:requirement|criteria)?\s*(?:of)?\s*\d+(?:\.\d+)?(?:\s*[-–to\/]\s*\d+(?:\.\d+)?)?\s*(?:years?|yrs?|months?|mths?)?/gi, "")
+    .replace(/\b\d+(?:\.\d+)?\s*[-–to]\s*\d+(?:\.\d+)?\s*(?:years?|yrs?|months?|mths?)\b/gi, "");
+
+  // 2. Check for explicit month mentions for sub-year experience (e.g. "6 months of experience", "6 months")
+  const monthPatterns = [
+    /(\d+(?:\.\d+)?)\s*(?:months?|mths?)\s*of\s*(?:[a-z0-9\-–&/]+\s+){0,4}experience/gi,
+    /has\s*(\d+(?:\.\d+)?)\s*(?:months?|mths?)/gi,
+    /documented\s*(\d+(?:\.\d+)?)\s*(?:months?|mths?)/gi,
+    /(\d+(?:\.\d+)?)\s*(?:months?|mths?)\s*(?:exp|experience)/gi
+  ];
+
+  let foundMonths: number | null = null;
+  for (const pattern of monthPatterns) {
+    const matches = cleanedText.matchAll(pattern);
+    for (const match of matches) {
+      if (match && match[1]) {
+        const parsedM = parseFloat(match[1]);
+        if (!isNaN(parsedM) && parsedM > 0 && parsedM <= 120) {
+          const inYears = Math.round((parsedM / 12) * 10) / 10;
+          if (foundMonths === null || inYears > foundMonths) {
+            foundMonths = inYears;
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Patterns matching "10+ years", "8+ years", "Over 10 years", "10+ years of", "has 8 years of"
   const patterns = [
     /(?:over|around|more than|approx(?:imately)?)\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
     /(\d+(?:\.\d+)?)\s*\+\s*years?/gi,
     /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*of\s*(?:[a-z0-9\-–&/]+\s+){0,4}experience/gi,
     /has\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
     /documented\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
-    /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:exp|experience)?/gi
+    /(?:with|possessing)\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi
   ];
 
-  let maxFound: number | null = null;
+  let maxFound: number | null = foundMonths;
   for (const pattern of patterns) {
-    const matches = text.matchAll(pattern);
+    const matches = cleanedText.matchAll(pattern);
     for (const match of matches) {
       if (match && match[1]) {
         const parsed = parseFloat(match[1]);
@@ -138,17 +168,25 @@ export function reconcileExperienceData(data: ExperienceReconciliationInput): Ex
   if (data.rawText) textSamples.push(data.rawText.substring(0, 1500)); // check resume summary header
 
   let highestTextExp: number | null = null;
+  let explicitCandidateExp: number | null = null;
   for (const sample of textSamples) {
     const extracted = extractExperienceYearsFromText(sample);
     if (extracted !== null) {
       if (highestTextExp === null || extracted > highestTextExp) {
         highestTextExp = extracted;
       }
+      if (/candidate has\s*(\d+(?:\.\d+)?)\s*(?:months?|mths?|years?|yrs?)/gi.test(sample)) {
+        explicitCandidateExp = extracted;
+      }
     }
   }
 
-  // Elevate if narrative identifies higher domain experience (e.g. 3+ or 8+ or 10+ years)
-  if (highestTextExp !== null && highestTextExp > expYears) {
+  // Elevate if narrative identifies higher domain experience (e.g. 3+ or 8+ or 10+ years),
+  // OR correct down if narrative explicitly states exact lower candidate experience (e.g. 6 months = 0.5 years)
+  if (explicitCandidateExp !== null && explicitCandidateExp < expYears) {
+    console.log(`⚡ [Experience Normalizer] Correcting inflated experienceYears (${expYears} -> ${explicitCandidateExp}) to match explicit narrative experience.`);
+    expYears = explicitCandidateExp;
+  } else if (highestTextExp !== null && highestTextExp > expYears) {
     console.log(`⚡ [Experience Normalizer] Elevating parsed experienceYears (${expYears} -> ${highestTextExp}) based on AI domain narrative.`);
     expYears = highestTextExp;
   }
