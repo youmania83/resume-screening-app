@@ -6,6 +6,7 @@ import { logTimelineEvent } from "../../lib/timeline.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
 import { sendApplicationAcknowledgementEmail } from "../../lib/email.js";
+import { reconcileExperienceData } from "../../lib/experienceNormalizer.js";
 
 import candidateNotesRouter from "./candidateNotesRouter.js";
 import candidateTagsRouter from "./candidateTagsRouter.js";
@@ -398,9 +399,33 @@ router.get("/", async (req, res, next) => {
     ]);
     const total = parseInt(countRes.rows[0].total) || 0;
 
+    const candidates = candidatesRes.rows.map(c => {
+      const rawExp = Number(c.experience_years) || 0;
+      const reconciled = reconcileExperienceData({
+        experienceYears: rawExp,
+        recommendation: c.recommendation || "",
+        strengths: Array.isArray(c.strengths) ? c.strengths : [],
+        experienceMatch: c.experience_match || "",
+        role: c.role || ""
+      });
+
+      if (reconciled.experienceYears !== rawExp || reconciled.experienceMatch !== (c.experience_match || "")) {
+        c.experience_years = reconciled.experienceYears;
+        c.experience_match = reconciled.experienceMatch;
+        c.strengths = reconciled.strengths;
+        // Asynchronously update database record so DB stays in sync
+        queryTenant(
+          `UPDATE candidates SET experience_years = $1, experience_match = $2, strengths = $3 WHERE id = $4 AND tenant_id = :tenant_id;`,
+          [reconciled.experienceYears, reconciled.experienceMatch, reconciled.strengths, c.id]
+        ).catch(e => console.error(`Failed background DB sync for candidate ${c.id}:`, e));
+      }
+
+      return c;
+    });
+
     res.json({
       success: true,
-      candidates: candidatesRes.rows,
+      candidates,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) }
     });
   } catch (err) {
@@ -426,7 +451,27 @@ router.get("/:id", async (req, res, next) => {
        return;
     }
 
-    res.json({ success: true, candidate: result.rows[0] });
+    const cand = result.rows[0];
+    const rawExp = Number(cand.experience_years) || 0;
+    const reconciled = reconcileExperienceData({
+      experienceYears: rawExp,
+      recommendation: cand.recommendation || "",
+      strengths: Array.isArray(cand.strengths) ? cand.strengths : [],
+      experienceMatch: cand.experience_match || "",
+      role: cand.role || ""
+    });
+
+    if (reconciled.experienceYears !== rawExp || reconciled.experienceMatch !== (cand.experience_match || "")) {
+      cand.experience_years = reconciled.experienceYears;
+      cand.experience_match = reconciled.experienceMatch;
+      cand.strengths = reconciled.strengths;
+      queryTenant(
+        `UPDATE candidates SET experience_years = $1, experience_match = $2, strengths = $3 WHERE id = $4 AND tenant_id = :tenant_id;`,
+        [reconciled.experienceYears, reconciled.experienceMatch, reconciled.strengths, cand.id]
+      ).catch(e => console.error(`Failed background DB sync for candidate ${cand.id}:`, e));
+    }
+
+    res.json({ success: true, candidate: cand });
   } catch (err) {
     next(err);
   }

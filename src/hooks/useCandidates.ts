@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Candidate } from "../types/index";
 import { inferCandidateRole, isGenericRoleTitle } from "../lib/roleInference";
+import { reconcileExperienceData } from "../lib/experienceNormalizer";
 
 export interface CandidateStats {
   totalApplicants: number;
@@ -84,18 +85,26 @@ export function useCandidates(isLoggedIn?: boolean) {
             const cleanJobTitle = (c.job_title && !isGenericRoleTitle(c.job_title)) ? c.job_title : cleanRole;
             const cleanJobLocation = (c.job_location && !/not specified/i.test(c.job_location) && c.job_location !== "null") ? c.job_location : undefined;
 
+            const reconciledExp = reconcileExperienceData({
+              experienceYears: c.experience_years,
+              recommendation: c.recommendation,
+              strengths: c.strengths,
+              experienceMatch: c.experience_match,
+              role: cleanRole
+            });
+
             return {
               id: c.id,
               name: cleanName,
               role: cleanRole,
               score: c.score,
               matchPercent: c.match_percent,
-              experienceYears: c.experience_years,
-              experienceMatch: c.experience_match,
-              recommendation: c.recommendation,
+              experienceYears: reconciledExp.experienceYears,
+              experienceMatch: reconciledExp.experienceMatch,
+              recommendation: reconciledExp.recommendation,
               confidence: c.confidence || "90% (High)",
               riskLevel: c.risk_level || "Low",
-              strengths: c.strengths || [],
+              strengths: reconciledExp.strengths.length > 0 ? reconciledExp.strengths : (c.strengths || []),
               weaknesses: c.weaknesses || [],
               missingSkills: c.missing_skills || [],
               matchedSkills: finalMatchedSkills,

@@ -491,7 +491,12 @@ export async function parseAndEvalResume(
           const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";
           const candidateRole = inferCandidateRole(parsedData);
           const remarks = ensureNonBlankRemarks(
-            { recommendation: parsedData.recommendationReason, strengths: parsedData.strengths, skills: parsedData.skills },
+            {
+              recommendation: parsedData.recommendationReason || (parsedData as any).recommendation,
+              experienceMatch: (parsedData as any).experienceMatch || (parsedData as any).experience_match,
+              strengths: parsedData.strengths,
+              skills: parsedData.skills
+            },
             { role: candidateRole, score: candidateScore, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
           );
 
@@ -500,9 +505,11 @@ export async function parseAndEvalResume(
               id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
               skills, certifications, education, linkedin_url, github_url, recommendation,
               first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
-              requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date
+              requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
+              experience_match
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'talent_pool', 'Manual Upload', CURRENT_DATE::text
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'talent_pool', 'Manual Upload', CURRENT_DATE::text,
+              $33
             );`,
             [
               candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
@@ -512,7 +519,8 @@ export async function parseAndEvalResume(
               remarks.recommendation, parsedData.firstName, parsedData.lastName,
               parsedData.city, parsedData.state, parsedData.country,
               parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
-              parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills
+              parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
+              remarks.experienceMatch
             ]
           );
 
@@ -666,7 +674,12 @@ export async function parseAndEvalResume(
       // experience, skills) rather than storing blanks the profile page would
       // otherwise render as an empty review.
       const remarks = ensureNonBlankRemarks(
-        { recommendation: parsedData.recommendationReason, strengths: parsedData.strengths, skills: parsedData.skills },
+        {
+          recommendation: parsedData.recommendationReason || (parsedData as any).recommendation,
+          experienceMatch: (parsedData as any).experienceMatch || (parsedData as any).experience_match,
+          strengths: parsedData.strengths,
+          skills: parsedData.skills
+        },
         { role: candidateRole, score: parsedData.skillsScore ?? 0, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
       );
 
@@ -675,23 +688,23 @@ export async function parseAndEvalResume(
           id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
           skills, certifications, education, linkedin_url, github_url, recommendation,
           first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
-          requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date
+          requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
+          experience_match
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, CURRENT_DATE::text
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, CURRENT_DATE::text,
+          $35
         );`,
         [
           candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
           candidateRole,
-          // Score starts at the AI skills score, or 0 when the AI did not produce
-          // one — never an arbitrary 70. The real match score is written by the
-          // job-matching step immediately below.
           parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, remarks.experienceYears ?? parsedData.experienceYears,
           parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
           remarks.recommendation, parsedData.firstName, parsedData.lastName,
           parsedData.city, parsedData.state, parsedData.country,
           parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
           parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
-          candidateStatus, "Manual Upload"
+          candidateStatus, "Manual Upload",
+          remarks.experienceMatch
         ]
       );
 

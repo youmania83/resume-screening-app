@@ -83,24 +83,26 @@ export function calculateExperienceFromDateSpans(text: string): number {
 export function extractExperienceYearsFromText(text: string): number | null {
   if (!text || typeof text !== "string") return null;
 
-  // Patterns matching "10+ years", "8+ years", "Over 10 years", "10+ years of", "has 8 years of"
+  // Patterns matching "10+ years", "8+ years", "Over 10 years", "10+ years of", "has 8 years of", "3+ years of experience"
   const patterns = [
-    /(?:over|around|more than|approx(?:imately)?)\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i,
-    /(\d+(?:\.\d+)?)\s*\+\s*years?/i,
-    /(\d+(?:\.\d+)?)\s*years?\s*of\s*(?:professional|extensive|hands-on|relevant|industry|work|graphic|engineering|fabrication|design|technical)?\s*experience/i,
-    /has\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i,
-    /documented\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i,
-    /(\d+(?:\.\d+)?)\s*yrs?\s*exp/i
+    /(?:over|around|more than|approx(?:imately)?)\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
+    /(\d+(?:\.\d+)?)\s*\+\s*years?/gi,
+    /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*of\s*(?:[a-z0-9\-–&/]+\s+){0,4}experience/gi,
+    /has\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
+    /documented\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/gi,
+    /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:exp|experience)?/gi
   ];
 
   let maxFound: number | null = null;
   for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const parsed = parseFloat(match[1]);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
-        if (maxFound === null || parsed > maxFound) {
-          maxFound = parsed;
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      if (match && match[1]) {
+        const parsed = parseFloat(match[1]);
+        if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
+          if (maxFound === null || parsed > maxFound) {
+            maxFound = parsed;
+          }
         }
       }
     }
@@ -132,6 +134,7 @@ export function reconcileExperienceData(data: ExperienceReconciliationInput): Ex
   if (data.recommendation) textSamples.push(data.recommendation);
   if (data.experienceMatch) textSamples.push(data.experienceMatch);
   if (Array.isArray(data.strengths)) textSamples.push(...data.strengths);
+  if (Array.isArray(data.weaknesses)) textSamples.push(...data.weaknesses);
   if (data.rawText) textSamples.push(data.rawText.substring(0, 1500)); // check resume summary header
 
   let highestTextExp: number | null = null;
@@ -144,7 +147,7 @@ export function reconcileExperienceData(data: ExperienceReconciliationInput): Ex
     }
   }
 
-  // Elevate if narrative identifies higher domain experience (e.g. 8+ or 10+ years)
+  // Elevate if narrative identifies higher domain experience (e.g. 3+ or 8+ or 10+ years)
   if (highestTextExp !== null && highestTextExp > expYears) {
     console.log(`⚡ [Experience Normalizer] Elevating parsed experienceYears (${expYears} -> ${highestTextExp}) based on AI domain narrative.`);
     expYears = highestTextExp;
@@ -158,7 +161,7 @@ export function reconcileExperienceData(data: ExperienceReconciliationInput): Ex
   if (!experienceMatch.trim()) {
     experienceMatch = `${expYears}+ year(s) of experience recorded against the ${data.role || "applied role"} requirement.`;
   } else {
-    // If experienceMatch contains a conflicting year number (e.g., "1.0 Years" when expYears is 10), update it
+    // If experienceMatch contains a conflicting year number (e.g., "1.0 Years" when expYears is 3), update it
     experienceMatch = experienceMatch.replace(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)/gi, (fullMatch, numStr) => {
       const num = parseFloat(numStr);
       if (num !== expYears && num < expYears) {
