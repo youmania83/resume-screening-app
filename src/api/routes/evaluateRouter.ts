@@ -14,6 +14,9 @@ import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext, tenantStorage } from "../../lib/tenantContext.js";
 import { detectPromptInjection } from "../../lib/guardrails.js";
 import { rateLimiter } from "../middleware/security.js";
+import { resolvePrecisionJobId } from "../../lib/jobMapper.js";
+import { cleanCandidateName } from "../../lib/nameSanitizer.js";
+import { calculatePrecisionCandidateScore } from "../../lib/scoreCalculator.js";
 
 const upload = multer({
   dest: "uploads/",
@@ -209,7 +212,6 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
 
     const candidateId = crypto.randomUUID();
     const appliedDate = new Date().toISOString().split("T")[0];
-    const score = parsedResult.score || 0;
     const applicationSource = req.body.applicationSource || "Careers Page";
     
     let jobId: string;
@@ -219,35 +221,30 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     const targetLoc = parsedJD?.location || "Bengaluru, India";
     const targetExp = parsedJD?.experience || "2-5 Years";
 
-    // Resolve to an EXISTING, ACTIVE opening.
-    //
-    // This used to CREATE a job whenever the title did not match — using
-    // `parsedResult.role` (an AI-inferred role) and, failing that, the hard-coded
-    // literal "SCM Executive", with an invented department, location and
-    // experience range. That is a direct source of job openings appearing in the
-    // portal that HR never created.
-    let resolvedJobId: string | null = null;
-    if (!targetJobTitle.trim()) {
-      res.status(400).json({
-        error: "A job title is required. Applications must reference an existing active opening.",
-        code: "NO_JOB_TITLE"
-      });
-      return;
-    }
-    try {
-      const jobRes = await queryTenant(
-        `SELECT id FROM jobs
-          WHERE LOWER(title) = LOWER($1) AND tenant_id = :tenant_id
-            AND COALESCE(status, 'active') = 'active'
-            AND sync_status IS DISTINCT FROM 'removed'
-          LIMIT 1;`,
-        [targetJobTitle]
-      );
-      if (jobRes.rowCount && jobRes.rowCount > 0) {
-        resolvedJobId = jobRes.rows[0].id;
+    // Resolve to an EXISTING, ACTIVE opening using location-aware precision mapping.
+    let resolvedJobId: string | null = await resolvePrecisionJobId({
+      targetJobTitle,
+      targetLocation: parsedJD?.location || targetLoc,
+      candidateCity: parsedResult.city,
+      candidateState: parsedResult.state
+    });
+
+    if (!resolvedJobId && targetJobTitle.trim()) {
+      try {
+        const jobRes = await queryTenant(
+          `SELECT id FROM jobs
+            WHERE LOWER(title) = LOWER($1) AND tenant_id = :tenant_id
+              AND COALESCE(status, 'active') = 'active'
+              AND sync_status IS DISTINCT FROM 'removed'
+            LIMIT 1;`,
+          [targetJobTitle]
+        );
+        if (jobRes.rowCount && jobRes.rowCount > 0) {
+          resolvedJobId = jobRes.rows[0].id;
+        }
+      } catch (dbJobErr) {
+        console.error("Failed to map candidate to job:", dbJobErr);
       }
-    } catch (dbJobErr) {
-      console.error("Failed to map candidate to job:", dbJobErr);
     }
 
     if (!resolvedJobId) {
@@ -259,6 +256,29 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
     }
 
     jobId = resolvedJobId;
+
+    const cleanName = cleanCandidateName(parsedResult.name, parsedResult.email, rawText);
+
+    // Reconcile experience and remarks
+    const remarks = ensureNonBlankRemarks(parsedResult, {
+      role: parsedResult.role || targetJobTitle,
+      score: parsedResult.score || 0,
+      experienceYears: parsedResult.experienceYears,
+      skills: parsedResult.skills
+    });
+
+    const reconciledExp = remarks.experienceYears ?? parsedResult.experienceYears ?? 0;
+
+    // Recalculate precision score using reconciled candidate experience and skills
+    const score = calculatePrecisionCandidateScore({
+      candidateExperienceYears: reconciledExp,
+      requiredExperienceText: targetExp,
+      candidateSkills: parsedResult.skills || [],
+      jobRequiredSkills: parsedJD?.requiredSkills || [],
+      candidateRole: parsedResult.role || targetJobTitle,
+      jobTitle: targetJobTitle,
+      baseAiScore: parsedResult.score || 0
+    });
 
     const emailCheck = parsedResult.email ? String(parsedResult.email).trim().toLowerCase() : "";
     if (emailCheck) {
@@ -317,23 +337,12 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       assessmentStatusVal = "pending";
     }
 
-
     const activityLogs = [
       { date: new Date().toISOString(), message: `Application received through ${applicationSource}` },
       { date: new Date().toISOString(), message: `AI resume parsing complete.` },
       { date: new Date().toISOString(), message: `JD Matching & AI Scoring: Overall score is ${score}/100.` },
       { date: new Date().toISOString(), message: logMessage }
     ];
-
-    // A sparse/low-information resume can make the AI legitimately return
-    // empty recommendation/strengths/experienceMatch — this fills only the
-    // fields the model left blank so the candidate's review is never empty.
-    const remarks = ensureNonBlankRemarks(parsedResult, {
-      role: parsedResult.role || targetJobTitle,
-      score,
-      experienceYears: parsedResult.experienceYears,
-      skills: parsedResult.skills
-    });
 
     try {
       await queryTenant(
@@ -346,13 +355,13 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, :tenant_id);`,
         [
           candidateId,
-          parsedResult.name || "Unknown Candidate",
+          cleanName,
           parsedResult.email || "",
           parsedResult.phone || "",
           parsedResult.role || targetJobTitle,
           score,
           score,
-          remarks.experienceYears ?? parsedResult.experienceYears ?? 0,
+          reconciledExp,
           remarks.experienceMatch,
           remarks.recommendation,
           parsedResult.confidence || "",

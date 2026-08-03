@@ -8,6 +8,7 @@ export interface ExperienceReconciliationInput {
   weaknesses?: string[];
   skills?: string[];
   role?: string;
+  rawText?: string;
 }
 
 export interface ExperienceReconciliationOutput {
@@ -15,6 +16,64 @@ export interface ExperienceReconciliationOutput {
   recommendation: string;
   strengths: string[];
   experienceMatch: string;
+}
+
+/**
+ * Calculates total years of experience from explicit date spans in resume text.
+ * e.g., "2018 - 2024" => 6 years, "01/2017 to Present" => ~9.5 years.
+ */
+export function calculateExperienceFromDateSpans(text: string): number {
+  if (!text || typeof text !== "string") return 0;
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+
+  let totalMonths = 0;
+  const spansFound: Array<{ startYear: number; startMonth: number; endYear: number; endMonth: number }> = [];
+
+  // Pattern 1: Month Year - Month Year / Present (e.g., "Jan 2018 - Mar 2023", "June 2015 to Present")
+  const monthNames = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec";
+  const monthMap: Record<string, number> = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+  };
+
+  const regexMonthYear = new RegExp(
+    `(?:(${monthNames})[a-z]*\\.?\\s*)?(\\d{4})\\s*(?:-|to|–|until|\\/)\\s*(?:(${monthNames})[a-z]*\\.?\\s*)?(\\d{4}|present|current|now|till date)`,
+    "gi"
+  );
+
+  let match: RegExpExecArray | null;
+  while ((match = regexMonthYear.exec(text)) !== null) {
+    const startMStr = (match[1] || "").toLowerCase().slice(0, 3);
+    const startYear = parseInt(match[2], 10);
+    const endMStr = (match[3] || "").toLowerCase().slice(0, 3);
+    const endStr = match[4].toLowerCase();
+
+    const startMonth = monthMap[startMStr] || 1;
+    let endYear = currentYear;
+    let endMonth = currentMonth;
+
+    if (!/present|current|now|till date/.test(endStr)) {
+      endYear = parseInt(endStr, 10);
+      endMonth = monthMap[endMStr] || 12;
+    }
+
+    if (!isNaN(startYear) && !isNaN(endYear) && startYear >= 1970 && startYear <= currentYear + 1 && endYear >= startYear) {
+      spansFound.push({ startYear, startMonth, endYear, endMonth });
+    }
+  }
+
+  // Calculate non-overlapping total months
+  for (const span of spansFound) {
+    const months = (span.endYear - span.startYear) * 12 + (span.endMonth - span.startMonth);
+    if (months > 0 && months <= 600) { // cap single role at 50 years max
+      totalMonths += months;
+    }
+  }
+
+  const calculatedYears = Math.round((totalMonths / 12) * 10) / 10;
+  return calculatedYears;
 }
 
 /**
@@ -30,36 +89,50 @@ export function extractExperienceYearsFromText(text: string): number | null {
     /(\d+(?:\.\d+)?)\s*\+\s*years?/i,
     /(\d+(?:\.\d+)?)\s*years?\s*of\s*(?:professional|extensive|hands-on|relevant|industry|work|graphic|engineering|fabrication|design|technical)?\s*experience/i,
     /has\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i,
-    /documented\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i
+    /documented\s*(\d+(?:\.\d+)?)\s*\+?\s*years?/i,
+    /(\d+(?:\.\d+)?)\s*yrs?\s*exp/i
   ];
 
+  let maxFound: number | null = null;
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       const parsed = parseFloat(match[1]);
       if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
-        return parsed;
+        if (maxFound === null || parsed > maxFound) {
+          maxFound = parsed;
+        }
       }
     }
   }
 
-  return null;
+  return maxFound;
 }
 
 /**
- * Reconciles numeric experience_years with AI narrative text (strengths, recommendation, experienceMatch)
- * to ensure 100% consistency across Table and Modal views.
+ * Reconciles numeric experience_years with raw resume date spans & AI narrative text
+ * (strengths, recommendation, experienceMatch) to ensure 100% consistency across all views.
  */
 export function reconcileExperienceData(data: ExperienceReconciliationInput): ExperienceReconciliationOutput {
   let expYears = typeof data.experienceYears === "number"
     ? data.experienceYears
     : parseFloat(String(data.experienceYears || 0)) || 0;
 
-  // Collect text samples to inspect explicit domain experience claims
+  // 1. Calculate from date spans if rawText is provided
+  if (data.rawText) {
+    const dateSpanYears = calculateExperienceFromDateSpans(data.rawText);
+    if (dateSpanYears > expYears) {
+      console.log(`⚡ [Experience Normalizer] Date-span calculation elevated experienceYears (${expYears} -> ${dateSpanYears})`);
+      expYears = dateSpanYears;
+    }
+  }
+
+  // 2. Collect text samples to inspect explicit domain experience claims
   const textSamples: string[] = [];
   if (data.recommendation) textSamples.push(data.recommendation);
   if (data.experienceMatch) textSamples.push(data.experienceMatch);
   if (Array.isArray(data.strengths)) textSamples.push(...data.strengths);
+  if (data.rawText) textSamples.push(data.rawText.substring(0, 1500)); // check resume summary header
 
   let highestTextExp: number | null = null;
   for (const sample of textSamples) {
@@ -71,12 +144,14 @@ export function reconcileExperienceData(data: ExperienceReconciliationInput): Ex
     }
   }
 
-  // If narrative explicitly identifies higher domain experience (e.g. 8+ or 10+ years)
-  // while numeric parser was lower (e.g. 6 or 1), elevate experienceYears to match domain narrative.
+  // Elevate if narrative identifies higher domain experience (e.g. 8+ or 10+ years)
   if (highestTextExp !== null && highestTextExp > expYears) {
     console.log(`⚡ [Experience Normalizer] Elevating parsed experienceYears (${expYears} -> ${highestTextExp}) based on AI domain narrative.`);
     expYears = highestTextExp;
   }
+
+  // Round cleanly to 1 decimal place if float (e.g. 6.5) or integer (e.g. 8)
+  expYears = Math.round(expYears * 10) / 10;
 
   // Ensure experienceMatch text uses consistent figure
   let experienceMatch = data.experienceMatch || "";
