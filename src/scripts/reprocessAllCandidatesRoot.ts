@@ -131,7 +131,7 @@ async function reprocessAllCandidates() {
         newExpYears,
         remarks.experienceMatch,
         remarks.recommendation,
-        JSON.stringify(remarks.strengths),
+        remarks.strengths,
         newScore,
         newJobId,
         c.id
