@@ -36,7 +36,10 @@ export async function submitAnswers(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, answers, sessionId, timeTaken }),
   });
-  if (!resp.ok) throw new Error("Failed to submit assessment answers.");
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => null);
+    throw new Error(errData?.error || "Failed to submit assessment answers.");
+  }
 
   const resultResp = await fetch(`${apiBase}/assessment/results/get?token=${token}`);
   if (!resultResp.ok) {

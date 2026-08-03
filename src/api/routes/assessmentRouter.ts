@@ -712,9 +712,16 @@ router.post("/submit", async (req: any, res: any) => {
       return res.status(400).json({ error: "Assessment has already been submitted." });
     }
 
-    // Verify session
+    // Session mismatch here does not mean a hijack attempt — GET /:token already
+    // transfers the active session to whichever device/tab last loaded the page
+    // ("failure-proof access" for candidates who reopen the link, refresh, or
+    // switch devices mid-test). If submit still hard-rejected on mismatch, the
+    // candidate's own final click could be invalidated by their own earlier
+    // page load. Since the token already uniquely identifies the candidate,
+    // adopt the incoming session instead of blocking the submission.
     if (attempt.session_id !== sessionId) {
-      return res.status(403).json({ error: "Invalid session credentials" });
+      console.log(`[Session Transfer] Submit from session ${sessionId} differs from stored ${attempt.session_id}; adopting submitting session.`);
+      await queryGlobal(`UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`, [sessionId, attempt.id]);
     }
 
     // Calculate score
