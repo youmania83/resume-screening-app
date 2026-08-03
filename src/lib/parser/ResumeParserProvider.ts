@@ -64,6 +64,7 @@ function buildParserPrompt(rawText: string, jobDescription?: string): string {
 ${jobDescription ? `Compare the resume details against this Job Description:\n${jobDescription}\n` : ""}
 
 CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
+CRITICAL EXPERIENCE CONSISTENCY RULE: "experienceYears" MUST be an accurate numeric integer/float representing total professional and domain experience. ANY mention of experience years in "recommendationReason", "strengths", or narrative text MUST EXACTLY MATCH "experienceYears". Do not state conflicting year figures across JSON fields.
 
 Return ONLY a valid JSON object matching the following schema. Do NOT wrap in markdown backticks or include any other text.
 IMPORTANT: If a field is not found in the resume, return an empty string "" or empty array []. NEVER return placeholder strings such as "Not Found", "Candidate Name Not Found", "N/A", or "Unknown".

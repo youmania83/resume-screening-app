@@ -507,7 +507,7 @@ export async function parseAndEvalResume(
             [
               candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
               candidateRole,
-              candidateScore, candidateScore, parsedData.experienceYears,
+              candidateScore, candidateScore, remarks.experienceYears ?? parsedData.experienceYears,
               parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
               remarks.recommendation, parsedData.firstName, parsedData.lastName,
               parsedData.city, parsedData.state, parsedData.country,
@@ -685,7 +685,7 @@ export async function parseAndEvalResume(
           // Score starts at the AI skills score, or 0 when the AI did not produce
           // one — never an arbitrary 70. The real match score is written by the
           // job-matching step immediately below.
-          parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, parsedData.experienceYears,
+          parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, remarks.experienceYears ?? parsedData.experienceYears,
           parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
           remarks.recommendation, parsedData.firstName, parsedData.lastName,
           parsedData.city, parsedData.state, parsedData.country,

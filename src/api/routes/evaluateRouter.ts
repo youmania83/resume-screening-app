@@ -37,6 +37,7 @@ function buildEvaluatePrompt(jobDescription: string, resumeText: string): string
   return `You are an expert ATS parser and recruiter. Evaluate the following candidate resume against the Job Description.
 
 CRITICAL EVALUATION RULE: This job and candidate are based in India. Do NOT mention or list any weaknesses, gaps, risk factors, or concerns regarding US work authorization, US visa status (H1B, OPT, CPT, Green Card, etc.), or lack of US experience/market exposure. These are completely irrelevant for Indian domestic roles.
+CRITICAL EXPERIENCE CONSISTENCY RULE: "experienceYears" MUST be an accurate numeric integer/float representing total professional and domain experience. ANY mention of experience years in "recommendation", "strengths", or "experienceMatch" MUST EXACTLY MATCH "experienceYears". Do not state conflicting year figures across JSON fields.
 
 Job Description:
 ${jobDescription}
@@ -351,7 +352,7 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
           parsedResult.role || targetJobTitle,
           score,
           score,
-          parsedResult.experienceYears || 0,
+          remarks.experienceYears ?? parsedResult.experienceYears ?? 0,
           remarks.experienceMatch,
           remarks.recommendation,
           parsedResult.confidence || "",

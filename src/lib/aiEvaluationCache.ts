@@ -1,6 +1,7 @@
 // src/lib/aiEvaluationCache.ts
 
 import crypto from "crypto";
+import { reconcileExperienceData } from "./experienceNormalizer.js";
 
 interface CachedResult {
   data: any;
@@ -121,10 +122,10 @@ export function ensureNonBlankRemarks(
   const skills: string[] = (Array.isArray(result?.skills) && result.skills.length > 0)
     ? result.skills
     : (context.skills || []);
-  const exp = context.experienceYears ?? (Number(result?.experienceYears) || 0);
+  const rawExp = context.experienceYears ?? (Number(result?.experienceYears) || 0);
   const role = context.role || result?.role || "the applied role";
 
-  const recommendation = (typeof result?.recommendation === "string" && result.recommendation.trim())
+  let recommendation = (typeof result?.recommendation === "string" && result.recommendation.trim())
     ? result.recommendation
     : score >= 80
       ? `Strong match for ${role} based on the available resume details (score ${score}/100). Recommended to proceed to the next stage.`
@@ -132,16 +133,32 @@ export function ensureNonBlankRemarks(
         ? `Partial match for ${role} based on the available resume details (score ${score}/100). Limited resume detail — recommend HR review before advancing.`
         : `Limited alignment with ${role} based on the available resume details (score ${score}/100).`;
 
-  const strengths = (Array.isArray(result?.strengths) && result.strengths.length > 0)
+  let strengths = (Array.isArray(result?.strengths) && result.strengths.length > 0)
     ? result.strengths
     : [
-        exp > 0 ? `${exp} year(s) of documented experience` : "Resume submitted and registered for evaluation",
+        rawExp > 0 ? `${rawExp} year(s) of documented experience` : "Resume submitted and registered for evaluation",
         skills.length > 0 ? `Relevant skills noted: ${skills.slice(0, 3).join(", ")}` : `Candidate profile matched to ${role}`
       ];
 
-  const experienceMatch = (typeof result?.experienceMatch === "string" && result.experienceMatch.trim())
+  let experienceMatch = (typeof result?.experienceMatch === "string" && result.experienceMatch.trim())
     ? result.experienceMatch
-    : `${exp} year(s) of experience recorded against the ${role} requirement.`;
+    : `${rawExp} year(s) of experience recorded against the ${role} requirement.`;
 
-  return { ...result, recommendation, strengths, experienceMatch };
+  const reconciled = reconcileExperienceData({
+    experienceYears: rawExp,
+    recommendation,
+    strengths,
+    experienceMatch,
+    role
+  });
+
+  return {
+    ...result,
+    experienceYears: reconciled.experienceYears,
+    experience_years: reconciled.experienceYears,
+    recommendation: reconciled.recommendation,
+    strengths: reconciled.strengths,
+    experienceMatch: reconciled.experienceMatch
+  };
 }
+
