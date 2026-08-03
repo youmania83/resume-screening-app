@@ -124,8 +124,7 @@ async function reprocessAllCandidates() {
             strengths = $5,
             score = $6,
             match_percent = $6,
-            job_id = $7,
-            updated_at = CURRENT_TIMESTAMP
+            job_id = $7
         WHERE id = $8;
       `, [
         cleanName,
