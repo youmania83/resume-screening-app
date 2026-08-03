@@ -403,9 +403,9 @@ cron.schedule("*/5 * * * *", () => {
       console.error("🚨 [Cron] Zoho Mail sync failed:", err.message || err);
     }
   });
-});// Techsol Engineers Keka Careers active jobs sync runs every 3 hours (Lock TTL = 1 hour)
-cron.schedule("0 */3 * * *", () => {
-  runWithLock("cron:keka-careers-active-sync", 3600, async () => {
+});// Techsol Engineers Keka Careers active jobs sync runs every 30 minutes (Lock TTL = 15 minutes)
+cron.schedule("*/30 * * * *", () => {
+  runWithLock("cron:keka-careers-active-sync", 900, async () => {
     try {
       const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
       const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
