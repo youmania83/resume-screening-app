@@ -127,24 +127,6 @@ app.use(cookieParser());
 app.use(json({ limit: "10mb" }));
 app.use(urlencoded({ extended: true, limit: "10mb" }));
 
-// Testing Cutoff Lock Guard (Enforces automatic backend access lock after 8 PM tomorrow)
-app.use((req, res, next) => {
-  const targetLockDate = new Date("2026-08-06T20:00:00+05:30");
-  const isUnlockedHeader = req.headers["x-admin-unlocked"] === "true";
-  
-  if (req.path === "/api/health" || req.path === "/api/auth/silent-login" || req.path.startsWith("/api/webhooks")) {
-    return next();
-  }
-
-  if (new Date() >= targetLockDate && !isUnlockedHeader && process.env.PORTAL_FORCE_UNLOCKED !== "true") {
-    return res.status(403).json({
-      success: false,
-      code: "TESTING_ENDED",
-      error: "Portal testing period ended at 8:00 PM IST on August 6, 2026. Access is restricted."
-    });
-  }
-  next();
-});
 
 // Request logging middleware
 app.use((req, res, next) => {

@@ -23,8 +23,6 @@ import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthVie
 import { HRInterviewDashboard } from "@/src/components/dashboard/HRInterviewDashboard"
 import InboxView from "@/src/components/inbox/InboxView"
 import { CandidateDetailPanel } from "@/src/components/dashboard/CandidateDetailPanel"
-import { TestingTimerBanner } from "@/src/components/ui/TestingTimerBanner"
-import { PortalLockOverlay } from "@/src/components/ui/PortalLockOverlay"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -226,8 +224,7 @@ export default function Dashboard() {
   }
 
   return (
-    <PortalLockOverlay>
-      <div className="flex h-screen overflow-hidden bg-background font-sans antialiased text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background font-sans antialiased text-foreground">
       {/* 1. LEFT SIDEBAR */}
       <aside className="w-[220px] flex-shrink-0 bg-card border-r border-border flex flex-col justify-between z-20 select-none">
         <div>
@@ -318,7 +315,6 @@ export default function Dashboard() {
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TestingTimerBanner />
         <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 z-10 select-none">
           <div className="flex items-center gap-4">
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Enterprise Console</span>
@@ -463,6 +459,5 @@ export default function Dashboard() {
         />
       </div>
     </div>
-    </PortalLockOverlay>
   )
 }
