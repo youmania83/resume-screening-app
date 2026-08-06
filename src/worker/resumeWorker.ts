@@ -982,7 +982,8 @@ export async function parseAndEvalResume(
             candidateName,
             candidateEmail: parsedData.email || "",
             tenantId,
-            candidateId: candidateId || undefined
+            candidateId: candidateId || undefined,
+            appliedDate: inboxRecord.created_at
           } as any);
         } catch (ackErr) {
           console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);

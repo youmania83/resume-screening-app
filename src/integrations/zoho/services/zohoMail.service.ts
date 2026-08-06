@@ -9,6 +9,8 @@ import { kekaWorkflowService } from "../../keka/services/workflow.service.js";
 import { isNonResumeFile } from "../../../lib/fileFilters.js";
 import { getIngestionCutoff } from "../../../lib/appConfig.js";
 import { DEFAULT_TENANT_ID } from "../../../lib/tenantContext.js";
+import { isLikelyApplicationEmail } from "../../../lib/emailClassification.js";
+import { sendApplicationAcknowledgementEmail } from "../../../lib/email.js";
 
 /**
  * Resolves the tenant that inbound Zoho Mail applications belong to.
@@ -116,6 +118,7 @@ export class ZohoMailService {
       const applicationsToInsert: any[][] = [];
       const logsToInsert: any[][] = [];
       const candidateIdsToScreen: string[] = [];
+      const candidatesToAcknowledge: { candidateId: string; name: string; email: string; appliedDate: Date }[] = [];
 
       // Only ingest applications received at/after the configured cutoff. The
       // IMAP path (EmailSyncService) already enforced this; this OAuth path did
@@ -139,6 +142,38 @@ export class ZohoMailService {
           if (msgTime < cutoff.getTime()) {
             console.log(`[Zoho Mail Sync] Skipping message ${msg.id} received before the ${cutoff.toISOString()} cutoff.`);
             continue;
+          }
+
+          // 3a. Relevance filter: this mailbox receives more than just applications
+          // (newsletters, vendor mail, out-of-office replies, internal notes). Unlike
+          // the IMAP path (EmailSyncService), this OAuth path previously had no
+          // classification step at all and turned any unread message into a
+          // candidate record. Skip anything that doesn't look like an application.
+          const attachmentNames = (msg.attachments || []).map(a => a.filename);
+          if (!isLikelyApplicationEmail(msg.subject, attachmentNames)) {
+            console.log(`[Zoho Mail Sync] Skipping message ${msg.id} ("${msg.subject}"): does not look like a job application.`);
+            continue;
+          }
+
+          // 3b. Cross-channel dedup by email / phone. Other ingestion paths already
+          // check this (resumeWorker.ts, the Keka webhook); this OAuth path only
+          // checked its own external_id, so a repeat applicant via this channel (or
+          // one who also applied through another channel) got a second candidate row.
+          if (msg.fromEmail) {
+            const emailDupRes = await query(
+              "SELECT id FROM candidates WHERE tenant_id = $1 AND LOWER(email) = LOWER($2) LIMIT 1;",
+              [syncTenantId, msg.fromEmail]
+            );
+            if ((emailDupRes.rowCount || 0) > 0) {
+              const existingCandidateId = emailDupRes.rows[0].id;
+              console.log(`[Zoho Mail Sync] Skipping message ${msg.id}: ${msg.fromEmail} already exists as candidate ${existingCandidateId}.`);
+              await query(
+                `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
+                 VALUES ($1, 'application_received', $2, $3);`,
+                [existingCandidateId, `Additional application email received via Zoho Mail (message ${msg.id}). Not created as a duplicate candidate record.`, syncTenantId]
+              );
+              continue;
+            }
           }
 
           // 4. Map candidate to a Job ID.
@@ -310,6 +345,7 @@ export class ZohoMailService {
           ]);
 
           candidateIdsToScreen.push(candidateId);
+          candidatesToAcknowledge.push({ candidateId, name: msg.fromName, email: msg.fromEmail, appliedDate: new Date(msg.date) });
           syncedCandidatesCount++;
         } catch (innerErr: any) {
           console.error(`Error processing email message ${msg.id}:`, innerErr);
@@ -342,7 +378,24 @@ export class ZohoMailService {
           ], logsToInsert);
         });
 
-        // 9. Fire AI Screening workflows asynchronously
+        // 9a. Send the application acknowledgement email. Previously this channel —
+        // the primary live ingestion path whenever Zoho OAuth creds are configured —
+        // never sent this email at all; only IMAP-fed uploads, manual add, and direct
+        // upload did. sendApplicationAcknowledgementEmail enforces the acknowledgement
+        // cutoff and once-per-candidate guard itself.
+        for (const cand of candidatesToAcknowledge) {
+          sendApplicationAcknowledgementEmail({
+            candidateName: cand.name,
+            candidateEmail: cand.email,
+            tenantId: syncTenantId,
+            candidateId: cand.candidateId,
+            appliedDate: cand.appliedDate
+          }).catch(err => {
+            console.error(`❌ Failed to send application acknowledgement for Zoho candidate ${cand.candidateId}:`, err);
+          });
+        }
+
+        // 9b. Fire AI Screening workflows asynchronously
         for (const candidateId of candidateIdsToScreen) {
           kekaWorkflowService.screenCandidate(candidateId)
             .then(result => {

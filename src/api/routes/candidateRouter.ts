@@ -535,7 +535,12 @@ router.post("/", async (req: any, res, next) => {
       await sendApplicationAcknowledgementEmail({
         candidateName: c.name,
         candidateEmail: c.email || "",
-        tenantId
+        tenantId,
+        candidateId: c.id || undefined,
+        // Respect an explicitly supplied applied date (HR backfilling an older
+        // candidate record) rather than always using "now" — otherwise a manually
+        // added historical candidate would incorrectly get today's acknowledgement.
+        appliedDate
       });
     } catch (ackErr) {
       console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
@@ -705,7 +710,8 @@ router.post("/:id/decision", async (req: any, res, next) => {
         jobTitle,
         decision: normalizedDecision,
         remarks: remarks || undefined,
-        tenantId: req.user?.tenantId || undefined
+        tenantId: req.user?.tenantId || undefined,
+        candidateId: id
       }).then(result => {
         console.log(`📧 Decision notification (${normalizedDecision}) email delivery result for ${candidate.email}:`, result);
       }).catch(err => {

@@ -34,13 +34,28 @@ export class KekaAssessmentService {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + 7);
 
-    await sendAssessmentInviteEmail({
+    // This is the send path for every Zoho-sourced shortlisted candidate
+    // (workflow.service.ts:screenCandidate calls it unconditionally). Previously it
+    // never passed candidateId or stamped assessment_invited_at, which broke
+    // exactly-once tracking and permanently excluded these candidates from the 3-4
+    // day reminder (that query requires assessment_invited_at IS NOT NULL).
+    const inviteResult = await sendAssessmentInviteEmail({
       candidateName,
       candidateEmail,
       jobTitle,
       token,
-      expiryDate
+      expiryDate,
+      candidateId
     });
+
+    if (!inviteResult?.success) {
+      console.warn(`[Keka Assessment] Assessment invitation for candidate ${candidateId} was not delivered (${inviteResult?.reason || "unknown reason"}). It will be retried by the autonomous cycle.`);
+      return;
+    }
+
+    await query(`
+      UPDATE candidates SET assessment_invited_at = NOW() WHERE id = $1;
+    `, [candidateId]);
 
     await query(`
       INSERT INTO candidate_activity_logs (candidate_id, event_type, message)

@@ -107,6 +107,39 @@ export function getIngestionCutoffIso(): string {
   return getIngestionCutoff().toISOString();
 }
 
+/**
+ * Only applicants whose application arrived at/after this instant receive the
+ * "Application Received" acknowledgement email.
+ *
+ * Deliberately a *separate* cutoff from `INGESTION_CUTOFF_DATE`: that one pins the
+ * date processing/screening went live, which is normally in the past by the time this
+ * acknowledgement requirement is turned on. Reusing it would acknowledge every
+ * applicant who arrived between the two go-live dates, not just "from now onwards."
+ *
+ * Configure `ACKNOWLEDGEMENT_CUTOFF_DATE` (an ISO date) to pin it to a fixed instant.
+ * If unset, falls back to the start of the current local day — same rationale as
+ * `getIngestionCutoff()`: a fixed date avoids a rolling boundary silently changing
+ * which applicants qualify as the clock crosses midnight.
+ */
+export function getAcknowledgementCutoff(): Date {
+  const raw = process.env.ACKNOWLEDGEMENT_CUTOFF_DATE;
+  if (raw && raw.trim()) {
+    const parsed = new Date(raw.trim());
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    console.warn(`⚠️  [Config] ACKNOWLEDGEMENT_CUTOFF_DATE="${raw}" is not a valid date. Falling back to start of today.`);
+  }
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  return todayStart;
+}
+
+/** ISO string form of the acknowledgement cutoff, for use as a SQL bind parameter. */
+export function getAcknowledgementCutoffIso(): string {
+  return getAcknowledgementCutoff().toISOString();
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * 4. HR notification recipient
  * ──────────────────────────────────────────────────────────────────────────── */

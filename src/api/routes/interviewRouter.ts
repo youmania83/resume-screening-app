@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { queryTenant } from "../../lib/tenantDb.js";
 import { sendInterviewScheduleEmail } from "../../lib/email.js";
 import { logTimelineEvent } from "../../lib/timeline.js";
+import { resolveHrEmail } from "./assessmentRouter.js";
 
 const router = Router();
 
@@ -58,15 +59,22 @@ router.post("/schedule", async (req: any, res: any, next: any) => {
 
     // Check if interview already exists scoped by tenant
     const checkInterview = await queryTenant(
-      `SELECT id FROM interviews WHERE candidate_id = $1 AND tenant_id = :tenant_id LIMIT 1;`,
+      `SELECT id, scheduled_date FROM interviews WHERE candidate_id = $1 AND tenant_id = :tenant_id LIMIT 1;`,
       [candidateId]
     );
 
-    const interviewId = checkInterview.rowCount && checkInterview.rowCount > 0
-      ? checkInterview.rows[0].id
-      : crypto.randomUUID();
+    const existingInterview = checkInterview.rowCount && checkInterview.rowCount > 0 ? checkInterview.rows[0] : null;
+    const interviewId = existingInterview ? existingInterview.id : crypto.randomUUID();
 
-    if (checkInterview.rowCount && checkInterview.rowCount > 0) {
+    // A reschedule (existing interview, real date/time change) must bypass the
+    // once-per-candidate email guard so the candidate is told about the new time —
+    // previously the guard silently swallowed that notification forever, since the
+    // first invite (automatic or manual) had already consumed the one-time send.
+    // A resubmit with the *same* date/time is not a real change and must not re-send.
+    const isReschedule = !!existingInterview && new Date(existingInterview.scheduled_date).getTime() !== sDate.getTime();
+    const isNoOpResubmit = !!existingInterview && !isReschedule;
+
+    if (existingInterview) {
       await queryTenant(
         `UPDATE interviews SET scheduled_date = $1, status = 'scheduled' WHERE id = $2 AND tenant_id = :tenant_id;`,
         [sDate, interviewId]
@@ -111,19 +119,32 @@ router.post("/schedule", async (req: any, res: any, next: any) => {
       ? Number(candidate.final_score)
       : Number(((resumeScore * 0.4) + (assessmentScore * 0.6)).toFixed(1));
 
-    try {
-      await sendInterviewScheduleEmail({
-        candidateName: candidate.name,
-        candidateEmail: candidate.email,
-        jobTitle: candidate.role,
-        resumeScore,
-        assessmentScore,
-        finalScore,
-        scheduledDate: sDate,
-        hrEmail: req.user?.email || "yogeshkumarwadhwa@localhost.com",
-      });
-    } catch (mailErr) {
-      console.error("Failed to send manual interview schedule email:", mailErr);
+    if (isNoOpResubmit) {
+      console.log(`[Interview Schedule] No date/time change for candidate ${candidateId}; skipping duplicate notification email.`);
+    } else {
+      try {
+        const hrEmail = req.user?.email || (await resolveHrEmail(candidate.tenant_id)) || undefined;
+        await sendInterviewScheduleEmail({
+          candidateName: candidate.name,
+          candidateEmail: candidate.email,
+          jobTitle: candidate.role,
+          resumeScore,
+          assessmentScore,
+          finalScore,
+          scheduledDate: sDate,
+          hrEmail,
+          tenantId: candidate.tenant_id,
+          candidateId,
+          interviewId,
+          // Bypass the once-per-candidate guard only for a genuine reschedule — a
+          // first-time schedule still goes through the guard normally so it can't
+          // double-send if the automatic post-assessment path already emailed this
+          // candidate.
+          skipGuard: isReschedule,
+        });
+      } catch (mailErr) {
+        console.error("Failed to send manual interview schedule email:", mailErr);
+      }
     }
 
     res.json({

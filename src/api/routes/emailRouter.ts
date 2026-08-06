@@ -7,6 +7,7 @@ import fs from "fs";
 import { queryTenant } from "../../lib/tenantDb.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
 import { encrypt, decrypt } from "../../lib/crypto.js";
+import { canSendEmailToCandidate, recordEmailLog } from "../../lib/email.js";
 
 const router = Router();
 
@@ -519,6 +520,18 @@ router.post("/send", async (req: any, res: any, next: any) => {
     const jobTitle = candidate.job_title || "Position";
     const companyName = candidate.company_name || "Techsol Engineers";
 
+    // Idempotency: this route overlaps semantically with the automated decision/
+    // interview senders in lib/email.ts (shortlist/reject/invite copy for the same
+    // candidate), so it must go through the same email_logs-backed guard rather than
+    // sending unconditionally — otherwise HR (or a script) calling both this route and
+    // the automated pipeline for the same event would double-mail the candidate.
+    const emailLogTemplate = `email_send_${String(emailType).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+    const sendGuard = await canSendEmailToCandidate(candidate.email, emailLogTemplate, candidate.id);
+    if (!sendGuard.canSend) {
+      res.json({ success: false, skipped: true, message: `Email not sent: ${sendGuard.reason}` });
+      return;
+    }
+
     // Map internal API type to seeded template name
     let templateName = emailType;
     if (emailType === "invite") templateName = "Interview Invite";
@@ -626,7 +639,21 @@ router.post("/send", async (req: any, res: any, next: any) => {
     // Attempt to use custom tenant transporter
     const customConfig = await getTenantTransporter(tenantId);
     let sentFrom = "";
-    
+
+    if (process.env.DRY_RUN_EMAILS === "true") {
+      console.log(`🧪 [DRY_RUN_EMAILS] Would send "${emailLogTemplate}" ("${subject}") to ${candidate.email}. No real email sent.`);
+      sentFrom = customConfig?.from || process.env.SMTP_FROM || `"Techsol Engineers" <recruiting@techsolengineers.com>`;
+      await recordEmailLog(candidate.id, candidate.email, subject, emailLogTemplate, tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
+
+      const historyId = crypto.randomUUID();
+      res.json({
+        success: true,
+        message: `${emailType} email dry-run only (DRY_RUN_EMAILS=true) for ${candidate.email}`,
+        historyId,
+      });
+      return;
+    }
+
     if (customConfig) {
       console.log(`[Email Integration] Sending ${emailType} email using custom tenant config...`);
       try {
@@ -683,6 +710,8 @@ router.post("/send", async (req: any, res: any, next: any) => {
         console.log(`✉️ [Mock Email] Written to ${logFile} for ${candidate.email}`);
       }
     }
+
+    await recordEmailLog(candidate.id, candidate.email, subject, emailLogTemplate, tenantId, "sent");
 
     // Save history in email_communication_history
     const historyId = crypto.randomUUID();

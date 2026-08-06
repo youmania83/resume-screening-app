@@ -391,7 +391,9 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
           await sendApplicationAcknowledgementEmail({
             candidateName: parsedResult.name || "Candidate",
             candidateEmail: parsedResult.email || "",
-            tenantId
+            tenantId,
+            candidateId: candidateId || undefined,
+            appliedDate: new Date()
           });
         } catch (ackErr) {
           console.error("⚠️ [Side-Effect] Failed to send Application Acknowledgement Email:", ackErr);
@@ -413,20 +415,33 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
 
       if (score >= 80 && assessmentToken && assessmentTokenExpiry) {
         await ensureJobAssessment(jobId, targetJobTitle, targetJobDesc);
-        
-        await sendAssessmentInviteEmail({
+
+        const inviteResult = await sendAssessmentInviteEmail({
           candidateName: parsedResult.name || "Candidate",
           candidateEmail: parsedResult.email || "",
           jobTitle: targetJobTitle,
           token: assessmentToken,
           expiryDate: assessmentTokenExpiry,
-          tenantId
+          tenantId,
+          candidateId
         });
 
-        await queryTenant(
-          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) VALUES ($1, $2, $3, :tenant_id);`,
-          [candidateId, "assessment_invited", `Assessment invitation email sent to candidate. Token: ${assessmentToken}`]
-        );
+        if (inviteResult?.success) {
+          // Stamp the invite time so the 30-minute autonomous cycle doesn't re-select
+          // this candidate forever, and so they become eligible for the 3-4 day
+          // reminder (its query requires assessment_invited_at IS NOT NULL).
+          await queryTenant(
+            `UPDATE candidates SET assessment_invited_at = NOW() WHERE id = $1 AND tenant_id = :tenant_id;`,
+            [candidateId]
+          );
+
+          await queryTenant(
+            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) VALUES ($1, $2, $3, :tenant_id);`,
+            [candidateId, "assessment_invited", `Assessment invitation email sent to candidate. Token: ${assessmentToken}`]
+          );
+        } else {
+          console.warn(`[Evaluate] Assessment invitation for candidate ${candidateId} was not delivered (${inviteResult?.reason || "unknown reason"}). It will be retried by the autonomous cycle.`);
+        }
       }
     } catch (dbErr) {
       console.error("Failed to save candidate to DB:", dbErr);

@@ -289,12 +289,17 @@ export class EmailSyncService {
         console.log(`[Email Sync] Processing candidate application email: "${subject}"`);
         const targetJobId = await EmailSyncService.findBestMatchingJob(tenantId, jobTitleExtracted, subject, body);
 
-        // Strict Requirement: Only resumes with a correct, active job role from the email should be processed.
-        // If no active open job position matches the email subject or content, leave it unprocessed.
+        // Strict Requirement: an applicant is only auto-assigned to the specific
+        // active opening they actually applied for — never guessed. But an
+        // unresolved job reference must NOT mean the application is dropped with
+        // zero trace: previously this branch marked the email read and skipped it
+        // entirely, so a genuine applicant whose subject didn't clearly name an open
+        // role vanished with no resume_inbox row, no candidate record, nothing for HR
+        // to find. Queue it anyway (targetJobId left undefined) — the worker's own
+        // content-based matching / strict-mapping audit trail (resume_inbox marked
+        // "Unmatched Role") takes over from here, same as any other unmapped resume.
         if (!targetJobId) {
-          console.log(`[Email Sync] Skipping application email "${subject}": No active open job position matched the email.`);
-          await provider.markAsRead(email.id, email.folder);
-          continue;
+          console.log(`[Email Sync] No active open job position matched email "${subject}" by subject/ID. Queuing for content-based matching / HR review instead of dropping it.`);
         }
 
         let processedAtLeastOneResume = false;

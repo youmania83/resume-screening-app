@@ -24,7 +24,7 @@ const router = Router();
  * `yogeshkumarwadhwa@localhost.com` default made every HR notification attempt
  * delivery to an unroutable domain and log an SMTP failure.)
  */
-async function resolveHrEmail(tenantId: string | null | undefined): Promise<string | null> {
+export async function resolveHrEmail(tenantId: string | null | undefined): Promise<string | null> {
   if (tenantId) {
     try {
       const tenantCfgRes = await queryGlobal(

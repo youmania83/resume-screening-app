@@ -11,7 +11,7 @@ import { getTenantContext } from "./tenantContext.js";
 import { zohoConfig } from "../integrations/zoho/config/zoho.config.js";
 import { zohoMailService } from "../integrations/zoho/services/zohoMail.service.js";
 import { CircuitBreaker, retryWithBackoff } from "./circuitBreaker.js";
-import { buildAssessmentLink, getFallbackHrEmail, hrNotificationsEnabled } from "./appConfig.js";
+import { buildAssessmentLink, getFallbackHrEmail, hrNotificationsEnabled, getAcknowledgementCutoff } from "./appConfig.js";
 
 dotenv.config();
 
@@ -111,6 +111,25 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/**
+ * Global kill switch: when true, no candidate-facing (or HR-facing) email is ever
+ * actually delivered, regardless of Zoho/SMTP env vars or a tenant's saved
+ * Resend/SendGrid/SMTP `email_config` in the DB. Every send function checks this
+ * immediately before its real delivery call and, if set, logs what would have been
+ * sent and returns as if delivered — so `email_logs` / idempotency guards can be
+ * exercised for real in tests without any risk of mailing a real person.
+ *
+ * Unlike `src/test/disableEmail.ts` (which only clears SMTP env vars), this cannot be
+ * bypassed by a tenant's own configured email provider.
+ */
+function isDryRunEmails(): boolean {
+  return process.env.DRY_RUN_EMAILS === "true";
+}
+
+function logDryRunEmail(to: string, subject: string, template: string): void {
+  console.log(`🧪 [DRY_RUN_EMAILS] Would send "${template}" ("${subject}") to ${to}. No real email sent.`);
 }
 
 async function resolveTransporter(tenantId?: string): Promise<{ transporter: any; fromEmail: string }> {
@@ -277,8 +296,26 @@ const ONCE_PER_CANDIDATE_TEMPLATES = new Set([
   "assessment_results",
   "interview_schedule",
   "offer_letter",
-  "candidate_decision",
+  // Sent by the white-label-branded POST /api/email/send route (emailRouter.ts).
+  // Distinct template names from candidate_decision_*/interview_schedule so this
+  // route's own branded copy doesn't collide with the automated senders' guard, but
+  // still funnels through the same email_logs idempotency mechanism.
+  "email_send_invite",
+  "email_send_shortlist",
+  "email_send_rejection",
+  "email_send_followup",
 ]);
+
+/**
+ * Candidate decision emails ("selected", "rejected", etc, see
+ * `sendCandidateDecisionEmail`) are keyed per-outcome via a dynamic
+ * `candidate_decision_<decision>` template name rather than one flat entry above, so
+ * that each distinct outcome is exactly-once while a genuine later transition (e.g.
+ * hold -> rejected) can still reach the candidate.
+ */
+function isOncePerCandidateTemplate(templateName: string): boolean {
+  return ONCE_PER_CANDIDATE_TEMPLATES.has(templateName) || templateName.startsWith("candidate_decision_");
+}
 
 /** Repeatable templates and their minimum gap between sends, in hours. */
 const REPEATABLE_TEMPLATE_COOLDOWN_HOURS: Record<string, number> = {
@@ -325,7 +362,7 @@ export async function canSendEmailToCandidate(candidateEmail: string, templateNa
 
   try {
     // 1. Per-template idempotency.
-    if (ONCE_PER_CANDIDATE_TEMPLATES.has(templateName)) {
+    if (isOncePerCandidateTemplate(templateName)) {
       const everSentRes = await query(
         `SELECT COUNT(*)::int as count
            FROM email_logs
@@ -416,6 +453,7 @@ export async function sendCandidateDecisionEmail(params: {
   decision: string;
   remarks?: string;
   tenantId?: string;
+  candidateId?: string;
 }) {
   const safeName = escapeHtml(params.candidateName);
   const safeJob = escapeHtml(params.jobTitle);
@@ -521,26 +559,68 @@ export async function sendCandidateDecisionEmail(params: {
     </html>
   `;
 
-  if (zohoConfig.enabled) {
-    await zohoMailService.sendEmail(params.candidateEmail, subject, html);
-    return { success: true, mock: false };
+  // Keyed per-outcome (e.g. "candidate_decision_selected", not a single flat
+  // "candidate_decision" guard) so each distinct decision is exactly-once, while a
+  // genuine later transition (e.g. hold -> rejected) still reaches the candidate. A
+  // single shared guard across all outcomes would silently eat that second,
+  // genuinely different, notification.
+  const template = `candidate_decision_${decisionLower}`;
+  const guard = await canSendEmailToCandidate(params.candidateEmail, template, params.candidateId);
+  if (!guard.canSend) {
+    console.log(`⏭️ [Email] Skipping decision (${params.decision}) email to ${params.candidateEmail}: ${guard.reason}`);
+    return { success: false, mock: false, skipped: true, reason: guard.reason };
   }
 
-  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
-  if (!transporter) {
-    logEmailFallback(params.candidateEmail, subject, html);
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, template);
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, template, params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
     return { success: true, mock: true };
   }
 
-  await transporter.sendMail({
-    from: fromEmail,
-    to: params.candidateEmail,
-    subject,
-    html,
-  });
+  try {
+    if (zohoConfig.enabled) {
+      await zohoMailService.sendEmail(params.candidateEmail, subject, html);
+      await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, template, params.tenantId, "sent");
+      return { success: true, mock: false };
+    }
 
-  console.log(`📧 Decision email (${params.decision}) sent to ${params.candidateEmail}`);
-  return { success: true, mock: false };
+    const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
+    if (!transporter) {
+      logEmailFallback(params.candidateEmail, subject, html);
+      await recordEmailLog(
+        params.candidateId || null,
+        params.candidateEmail,
+        subject,
+        template,
+        params.tenantId,
+        "failed",
+        "No SMTP transport configured; email written to local fallback log only."
+      );
+      return { success: false, mock: true };
+    }
+
+    await transporter.sendMail({
+      from: fromEmail,
+      to: params.candidateEmail,
+      subject,
+      html,
+    });
+
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, template, params.tenantId, "sent");
+    console.log(`📧 Decision email (${params.decision}) sent to ${params.candidateEmail}`);
+    return { success: true, mock: false };
+  } catch (err: any) {
+    await recordEmailLog(
+      params.candidateId || null,
+      params.candidateEmail,
+      subject,
+      template,
+      params.tenantId,
+      "failed",
+      err?.message || String(err)
+    );
+    throw err;
+  }
 }
 
 /**
@@ -655,6 +735,12 @@ export async function sendAssessmentInviteEmail(params: {
     </body>
     </html>
   `;
+
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, "assessment_invitation");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_invitation", params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
+    return { success: true, mock: true };
+  }
 
   try {
     if (zohoConfig.enabled) {
@@ -917,6 +1003,13 @@ export async function sendInterviewScheduleEmail(params: {
     ? hrRecipient
     : undefined;
 
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, candidateSubject, "interview_schedule");
+    if (hrRecipientValid) logDryRunEmail(hrRecipientValid, hrSubject, "interview_schedule_hr_copy");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, candidateSubject, "interview_schedule", params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
+    return { success: true, mock: true };
+  }
+
   try {
     if (zohoConfig.enabled) {
       await zohoMailService.sendEmail(params.candidateEmail, candidateSubject, candidateHtml);
@@ -1034,6 +1127,11 @@ export async function sendSupportTicketNotification(params: {
 }) {
   const { tenantId, name, email, subject, message, priority, source } = params;
 
+  if (isDryRunEmails()) {
+    console.log(`🧪 [DRY_RUN_EMAILS] Would send support ticket notification ("${subject}") for ticket ${params.ticketId}. No real email sent.`);
+    return;
+  }
+
   try {
     let recipientEmails: string[] = [];
 
@@ -1116,8 +1214,14 @@ export async function sendRestrictedLinkEmail(params: {
   candidateEmail: string;
   candidateName: string;
 }): Promise<void> {
-  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   const subject = "Urgent: We couldn't access your resume link";
+
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, "restricted_link");
+    return;
+  }
+
+  const { transporter, fromEmail } = await resolveTransporter(params.tenantId);
   const html = `
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #1e293b;">
       <h2 style="color: #0f172a;">Hi ${escapeHtml(params.candidateName)},</h2>
@@ -1161,9 +1265,23 @@ export async function sendApplicationAcknowledgementEmail(params: {
   candidateEmail: string;
   tenantId?: string;
   candidateId?: string;
+  /** When the underlying application actually arrived. Required to enforce the
+   *  acknowledgement cutoff correctly against a re-queued/backfilled application —
+   *  using `new Date()` at send time would defeat the cutoff entirely for a resume
+   *  reprocessed today that originally arrived before the cutoff. */
+  appliedDate?: Date | string;
 }): Promise<void> {
   const safeCandidateName = escapeHtml(params.candidateName);
   const subject = "Application Received – Next Steps";
+
+  // Cutoff enforced here (not just at each call site) so every current and future
+  // caller inherits the protection automatically — the same reasoning behind the
+  // canSendEmailToCandidate self-guard already used throughout this file.
+  const appliedAt = params.appliedDate ? new Date(params.appliedDate) : new Date();
+  if (isNaN(appliedAt.getTime()) || appliedAt.getTime() < getAcknowledgementCutoff().getTime()) {
+    console.log(`⏭️ Skipping application acknowledgement to ${params.candidateEmail}: application predates the acknowledgement cutoff (${getAcknowledgementCutoff().toISOString()}).`);
+    return;
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -1222,6 +1340,12 @@ export async function sendApplicationAcknowledgementEmail(params: {
     return;
   }
 
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, "application_acknowledgement");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "application_acknowledgement", params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
+    return;
+  }
+
   let sentStatus = "sent";
   let errMessage: string | undefined = undefined;
 
@@ -1262,6 +1386,7 @@ export async function sendAssessmentReminderEmail(params: {
   token: string;
   remainingDays: number;
   tenantId?: string;
+  candidateId?: string;
 }): Promise<void> {
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
@@ -1342,15 +1467,21 @@ export async function sendAssessmentReminderEmail(params: {
     </html>
   `;
 
-  const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_reminder", (params as any).candidateId);
+  const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_reminder", params.candidateId);
   if (!guard.canSend) {
     console.log(`⏭️ [Email] Skipping assessment reminder to ${params.candidateEmail}: ${guard.reason}`);
     return;
   }
 
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, "assessment_reminder");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
+    return;
+  }
+
   if (zohoConfig.enabled) {
     await zohoMailService.sendEmail(params.candidateEmail, subject, html);
-    await recordEmailLog((params as any).candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
     return;
   }
 
@@ -1358,7 +1489,7 @@ export async function sendAssessmentReminderEmail(params: {
   if (!transporter) {
     logEmailFallback(params.candidateEmail, subject, html);
     await recordEmailLog(
-      (params as any).candidateId || null,
+      params.candidateId || null,
       params.candidateEmail,
       subject,
       "assessment_reminder",
@@ -1376,13 +1507,13 @@ export async function sendAssessmentReminderEmail(params: {
       subject,
       html
     });
-    await recordEmailLog((params as any).candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
+    await recordEmailLog(params.candidateId || null, params.candidateEmail, subject, "assessment_reminder", params.tenantId, "sent");
     console.log(`✉️ Assessment reminder email successfully sent to: ${params.candidateEmail}`);
   } catch (err: any) {
     console.error("Failed to dispatch assessment reminder email:", err);
     logEmailFallback(params.candidateEmail, subject, html);
     await recordEmailLog(
-      (params as any).candidateId || null,
+      params.candidateId || null,
       params.candidateEmail,
       subject,
       "assessment_reminder",
@@ -1530,6 +1661,12 @@ export async function sendAssessmentResultDetailsEmail(params: {
   const guard = await canSendEmailToCandidate(params.candidateEmail, "assessment_results", candidateId);
   if (!guard.canSend) {
     console.log(`⏭️ [Email] Skipping detailed results email to ${params.candidateEmail}: ${guard.reason}`);
+    return;
+  }
+
+  if (isDryRunEmails()) {
+    logDryRunEmail(params.candidateEmail, subject, "assessment_results");
+    await recordEmailLog(candidateId || null, params.candidateEmail, subject, "assessment_results", params.tenantId, "sent", "DRY_RUN_EMAILS active; no real email sent.");
     return;
   }
 
