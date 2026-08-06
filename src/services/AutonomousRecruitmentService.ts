@@ -37,16 +37,20 @@ export class AutonomousRecruitmentService {
     try {
       // 1. Sync Ingestion (Zoho Mail & Email Inbox)
       try {
-        const zohoEnabled = process.env.ZOHO_MAIL_ENABLED === "true";
+        const zohoEnabled = process.env.ZOHO_MAIL_ENABLED !== "false" && !!process.env.ZOHO_SMTP_USER;
         if (zohoEnabled) {
           const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
           const tenantsRes = await queryGlobal("SELECT id FROM tenants;");
-          for (const t of tenantsRes.rows) {
+          const tenantIds = tenantsRes.rows.map(t => t.id);
+          if (tenantIds.length === 0) {
+            tenantIds.push("default-tenant", "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5");
+          }
+          for (const tId of tenantIds) {
             try {
-              const count = await EmailSyncService.syncMailbox(t.id, "zoho");
+              const count = await EmailSyncService.syncMailbox(tId, "zoho");
               ingested += count;
             } catch (err: any) {
-              console.warn(`[Autonomous Cycle] Mail sync warning for tenant ${t.id}:`, err.message);
+              console.warn(`[Autonomous Cycle] Mail sync warning for tenant ${tId}:`, err.message);
             }
           }
         }

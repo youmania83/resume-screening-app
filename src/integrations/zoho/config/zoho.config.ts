@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const zohoConfig = {
-  enabled: process.env.ZOHO_MAIL_ENABLED === "true",
-  userEmail: process.env.ZOHO_MAIL_USER_EMAIL || "jobs@company.com",
+  enabled: process.env.ZOHO_MAIL_ENABLED !== "false" && (!!process.env.ZOHO_SMTP_USER || !!process.env.ZOHO_MAIL_CLIENT_ID),
+  userEmail: process.env.ZOHO_MAIL_USER_EMAIL || process.env.ZOHO_SMTP_USER || "jobs@company.com",
   clientId: process.env.ZOHO_MAIL_CLIENT_ID || "",
   clientSecret: process.env.ZOHO_MAIL_CLIENT_SECRET || "",
   refreshToken: process.env.ZOHO_MAIL_REFRESH_TOKEN || "",

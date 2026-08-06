@@ -354,54 +354,56 @@ cron.schedule("*/30 * * * *", () => {
   });
 });
 
-// Zoho Mail sync runs every 5 minutes if enabled (Lock TTL = 4 min)
-// Uses OAuth2 API when credentials are available, falls back to IMAP with app password
-cron.schedule("*/5 * * * *", () => {
-  runWithLock("cron:zoho-mail-sync", 240, async () => {
+// Zoho Mail sync runs automatically every 2 minutes (Lock TTL = 110s)
+cron.schedule("*/2 * * * *", () => {
+  runWithLock("cron:zoho-mail-sync", 110, async () => {
     try {
       const { zohoConfig } = await import("../integrations/zoho/config/zoho.config.js");
-      if (zohoConfig.enabled) {
-        // Check if OAuth2 API credentials are available
-        const hasOAuthCreds = !!zohoConfig.clientId && !!zohoConfig.clientSecret && !!zohoConfig.refreshToken;
-        
+      const hasSmtpCreds = !!zohoConfig.smtpUser && !!zohoConfig.smtpPassword;
+      const hasOAuthCreds = !!zohoConfig.clientId && !!zohoConfig.clientSecret && !!zohoConfig.refreshToken;
+      
+      if (hasOAuthCreds || hasSmtpCreds || zohoConfig.enabled) {
         if (hasOAuthCreds) {
           // Use Zoho Mail REST API with OAuth2
           const { zohoMailService } = await import("../integrations/zoho/services/zohoMail.service.js");
           console.log("⏰ [Cron] Starting automatic Zoho Mail sync (OAuth2 API)...");
           const result = await zohoMailService.syncInbox();
           console.log(`✅ [Cron] Zoho Mail sync complete. Synced: ${result.syncedCandidatesCount}, Errors: ${result.errors.length}`);
-        } else if (zohoConfig.smtpUser && zohoConfig.smtpPassword) {
+        } else if (hasSmtpCreds) {
           // Fallback: Use IMAP with SMTP/app password credentials
           const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
           const { queryGlobal } = await import("../lib/tenantDb.js");
           
-          console.log("⏰ [Cron] Starting automatic Zoho Mail sync (IMAP fallback — no OAuth2 credentials)...");
+          console.log("⏰ [Cron] Starting automatic Zoho Mail sync (IMAP for hr@techsolengineers.com)...");
           
-          // Find all tenants that use Zoho
+          // Find all tenants
           const tenantsRes = await queryGlobal(
-            "SELECT id, email_config FROM tenants WHERE email_config IS NOT NULL;"
+            "SELECT id FROM tenants;"
           );
           
+          let tenantIds = tenantsRes.rows.map(t => t.id);
+          if (tenantIds.length === 0) {
+            tenantIds = ["default-tenant", "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5"];
+          }
+          
           let totalSynced = 0;
-          for (const tenant of tenantsRes.rows) {
+          for (const tenantId of tenantIds) {
             try {
-              const count = await EmailSyncService.syncMailbox(tenant.id, "zoho");
+              const count = await EmailSyncService.syncMailbox(tenantId, "zoho");
               totalSynced += count;
               if (count > 0) {
-                console.log(`✉️ [Cron IMAP] Ingested ${count} item(s) for tenant ${tenant.id} via Zoho IMAP`);
+                console.log(`✉️ [Cron IMAP] Ingested ${count} item(s) for tenant ${tenantId} via Zoho IMAP`);
               }
             } catch (tenantErr: any) {
-              console.error(`🚨 [Cron IMAP] Tenant ${tenant.id} sync failed:`, tenantErr.message || tenantErr);
+              console.error(`🚨 [Cron IMAP] Tenant ${tenantId} sync failed:`, tenantErr.message || tenantErr);
             }
           }
           
           console.log(`✅ [Cron] Zoho Mail IMAP sync complete. Total ingested: ${totalSynced}`);
-        } else {
-          console.warn("⚠️ [Cron] Zoho Mail is enabled but no credentials (OAuth2 or SMTP) are configured. Skipping sync.");
         }
       }
     } catch (err: any) {
-      console.error("🚨 [Cron] Zoho Mail sync failed:", err.message || err);
+      console.error("🚨 [Cron] Automatic Zoho Mail sync failed:", err.message || err);
     }
   });
 });// Techsol Engineers Keka Careers active jobs sync runs every 30 minutes (Lock TTL = 15 minutes)
