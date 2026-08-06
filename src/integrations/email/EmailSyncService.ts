@@ -228,16 +228,9 @@ export class EmailSyncService {
           }
         }
 
-        // Fallback: If unclassified, we only assume it's a resume if there are attachments and at least one attachment has a resume-related keyword in its filename
-        if (!matchedRule && email.attachments && email.attachments.length > 0) {
-          const hasResumeInFiles = email.attachments.some(att => {
-            const name = (att.fileName || "").toLowerCase();
-            return name.includes("resume") || name.includes("cv") || name.includes("curriculum") || name.includes("biodata") || name.includes("profile") || name.includes("portfolio") || name.includes("candidate") || name.includes("application");
-          });
-          
-          if (hasResumeInFiles) {
-            matchedRule = { type: "resume" };
-          }
+        // Fallback: If unclassified, default to candidate application processing
+        if (!matchedRule) {
+          matchedRule = { type: "resume" };
         }
 
         // 2. Process according to classification

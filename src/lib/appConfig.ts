@@ -95,11 +95,12 @@ export function getIngestionCutoff(): Date {
     if (!isNaN(parsed.getTime())) {
       return parsed;
     }
-    console.warn(`⚠️  [Config] INGESTION_CUTOFF_DATE="${raw}" is not a valid date. Falling back to start of today.`);
+    console.warn(`⚠️  [Config] INGESTION_CUTOFF_DATE="${raw}" is not a valid date. Falling back to 24h grace cutoff.`);
   }
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  return todayStart;
+  const graceCutoff = new Date();
+  graceCutoff.setDate(graceCutoff.getDate() - 1);
+  graceCutoff.setHours(0, 0, 0, 0);
+  return graceCutoff;
 }
 
 /** ISO string form of the cutoff, for use as a SQL bind parameter. */

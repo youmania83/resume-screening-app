@@ -83,9 +83,9 @@ export class ZohoProvider implements IEmailProvider {
     });
 
     const emails: NormalizedEmail[] = [];
-    const folders = ["INBOX", "Inbox/HR Dump", "Inbox/Recruitment"];
+    const folders = ["INBOX", "Inbox/HR Dump", "Inbox/Recruitment", "Junk", "Spam", "Bulk"];
 
-    // Helper to recursively detect resume files in message bodyStructure
+    // Helper to recursively detect candidate document attachments in message bodyStructure
     const hasResumeAttachment = (part: any): boolean => {
       if (!part) return false;
       const fileName = part.parameters?.name || part.dispositionParameters?.filename || "";
@@ -149,53 +149,19 @@ export class ZohoProvider implements IEmailProvider {
                 const sender = msg.envelope?.from?.[0]?.address || "unknown@sender.com";
                 const date = msg.envelope?.date || new Date();
 
-                // 1. Subject keyword match check
-                const isSubjectMatch = /applying|application|resume|cv|job|hiring/i.test(subject);
-                
-                // 2. Attachment check (excluding blacklisted filenames)
+                // 1. Check if email has any non-blacklisted PDF/DOCX/DOC/TXT attachment
                 const isAttachmentMatch = hasResumeAttachment(msg.bodyStructure);
+                
+                // 2. Broad subject match for candidate applications, profiles, or job enquiries
+                const isSubjectMatch = /applying|application|resume|cv|job|hiring|profile|candidate|opening|vacancy|position|role|engineer|developer|designer|manager|opportunity|joining|referral|submission|enquiry|inquiry|attached|enclosed/i.test(subject);
 
-                // 3. For unclassified subjects, enforce that at least one attachment must contain a resume keyword in its filename
                 let shouldFetch = false;
-                if (isSubjectMatch && isAttachmentMatch) {
+                if (isAttachmentMatch) {
+                  // Any email with a valid non-junk attachment should be fetched for processing
                   shouldFetch = true;
-                } else if (isAttachmentMatch) {
-                  // Verify if any attachment filename explicitly contains resume/cv keywords
-                  const hasExplicitResumeFile = (part: any): boolean => {
-                    if (!part) return false;
-                    const fileName = (part.parameters?.name || part.dispositionParameters?.filename || "").toLowerCase();
-                    if (fileName && ["pdf", "docx", "doc", "txt"].some(ext => fileName.endsWith(ext))) {
-                      const lowerName = fileName.toLowerCase();
-                      const blacklist = [
-                        "payslip", "pay slip", "pay_slip", "salary",
-                        "challan", "ecr", "gst", "tax", "audit", "balance", "ledger", "statement",
-                        "ticket", "boarding", "flight", "booking", "travel", "paid", "voucher",
-                        "invoice", "receipt", "bill", "payment", "transaction", "bank", "account details",
-                        "scan", "mri", "xray", "medical", "prescription",
-                        "tender", "agreement", "contract", "proposal",
-                        "issue", "incident", "log", "report", "reports",
-                        "program", "training", "certificate", "course",
-                        "signature", "logo", "image0",
-                        "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
-                      ];
-                      if (blacklist.some(keyword => lowerName.includes(keyword)) || lowerName.includes(" to ")) {
-                        return false;
-                      }
-                      const hasCv = /(?:^|[^a-z])cv(?:$|[^a-z])/i.test(fileName);
-                      if (lowerName.includes("resume") || hasCv || lowerName.includes("curriculum") || lowerName.includes("biodata") || lowerName.includes("candidate") || lowerName.includes("application")) {
-                        return true;
-                      }
-                    }
-                    if (part.childNodes && Array.isArray(part.childNodes)) {
-                      for (const child of part.childNodes) {
-                        if (hasExplicitResumeFile(child)) return true;
-                      }
-                    }
-                    return false;
-                  };
-                  if (hasExplicitResumeFile(msg.bodyStructure)) {
-                    shouldFetch = true;
-                  }
+                } else if (isSubjectMatch) {
+                  // Any email matching recruitment subjects (e.g. drive links in body) should be fetched
+                  shouldFetch = true;
                 }
 
                 if (shouldFetch) {
