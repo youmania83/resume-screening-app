@@ -1,6 +1,6 @@
 // src/api/routes/candidateRouter.ts
 import { Router } from "express";
-import { queryTenant } from "../../lib/tenantDb.js";
+import { queryTenant, queryGlobal } from "../../lib/tenantDb.js";
 import { parseBooleanQuery, compileASTToSQL } from "../../lib/search/booleanParser.js";
 import { logTimelineEvent } from "../../lib/timeline.js";
 import { TenantUsageService } from "../../services/TenantUsageService.js";
