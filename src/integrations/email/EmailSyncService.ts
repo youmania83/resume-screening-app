@@ -190,20 +190,21 @@ export class EmailSyncService {
       const cutoff = getIngestionCutoff();
 
       for (const email of emails) {
-        if (!email.date) {
+        const emailDate = email.date || email.receivedAt;
+        if (!emailDate) {
           // No date header — we cannot prove it arrived after the cutoff, and
           // silently ingesting it would reintroduce historical backlog.
           console.log(`[Email Sync] Skipping email with no date header: "${email.subject}"`);
           continue;
         }
 
-        const emailTime = new Date(email.date).getTime();
+        const emailTime = new Date(emailDate).getTime();
         if (isNaN(emailTime)) {
-          console.log(`[Email Sync] Skipping email with an unparseable date "${email.date}": "${email.subject}"`);
+          console.log(`[Email Sync] Skipping email with an unparseable date "${emailDate}": "${email.subject}"`);
           continue;
         }
         if (emailTime < cutoff.getTime()) {
-          console.log(`[Email Sync] Skipping email received before the ${cutoff.toISOString()} cutoff: "${email.subject}" (${email.date})`);
+          console.log(`[Email Sync] Skipping email received before the ${cutoff.toISOString()} cutoff: "${email.subject}" (${emailDate})`);
           continue;
         }
 

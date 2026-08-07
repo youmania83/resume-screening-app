@@ -195,6 +195,7 @@ export class ZohoProvider implements IEmailProvider {
                       bodyText: parsed.text || "",
                       bodyHtml: parsed.html || "",
                       receivedAt: match.date,
+                      date: match.date,
                       attachments,
                       folder: folderPath
                     });
