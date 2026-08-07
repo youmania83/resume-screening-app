@@ -39,7 +39,7 @@ export default function InboxView() {
         status: statusFilter,
         search
       });
-      const res = await fetch(`${apiBase}/inbox?${q}`, { headers: getHeaders() });
+      const res = await fetch(`${apiBase}/inbox?${q}`, { credentials: "include", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setInboxItems(data.data);
@@ -54,7 +54,7 @@ export default function InboxView() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/inbox/stats`, { headers: getHeaders() });
+      const res = await fetch(`${apiBase}/inbox/stats`, { credentials: "include", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setStats(data);
@@ -66,7 +66,7 @@ export default function InboxView() {
 
   const fetchEmailHealth = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/inbox/email-health`, { headers: getHeaders() });
+      const res = await fetch(`${apiBase}/inbox/email-health`, { credentials: "include", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setEmailHealth(data.health);
@@ -93,6 +93,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/resumes/upload`, {
         method: "POST",
+        credentials: "include",
         headers: getHeaders(),
         body: formData
       });
@@ -115,6 +116,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/inbox/email-sync`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json", ...getHeaders() },
         body: JSON.stringify({ provider })
       });
@@ -136,7 +138,7 @@ export default function InboxView() {
 
   const handleRetry = async (id: string) => {
     try {
-      const res = await fetch(`${apiBase}/inbox/retry/${id}`, { method: "POST", headers: getHeaders() });
+      const res = await fetch(`${apiBase}/inbox/retry/${id}`, { method: "POST", credentials: "include", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success("Job re-queued successfully.");
@@ -151,7 +153,7 @@ export default function InboxView() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this inbox item?")) return;
     try {
-      const res = await fetch(`${apiBase}/inbox/delete/${id}`, { method: "POST", headers: getHeaders() });
+      const res = await fetch(`${apiBase}/inbox/delete/${id}`, { method: "POST", credentials: "include", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success("Inbox item deleted.");
@@ -169,6 +171,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/inbox/merge`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json", ...getHeaders() },
         body: JSON.stringify({
           primaryCandidateId: selectedDuplicate.primary_id,
@@ -194,11 +197,11 @@ export default function InboxView() {
 
   const openMergeReview = async (item: any) => {
     try {
-      const res = await fetch(`${apiBase}/candidates/${item.candidate_id}`, { headers: getHeaders() });
+      const res = await fetch(`${apiBase}/candidates/${item.candidate_id}`, { credentials: "include", headers: getHeaders() });
       const candData = await res.json();
       if (candData.success) {
         // Fetch candidate duplicate relation details
-        const dupCheck = await fetch(`${apiBase}/candidates?search=${candData.candidate.email}`, { headers: getHeaders() });
+        const dupCheck = await fetch(`${apiBase}/candidates?search=${candData.candidate.email}`, { credentials: "include", headers: getHeaders() });
         const dupData = await dupCheck.json();
         const primary = dupData.candidates?.find((c: any) => c.id !== item.candidate_id);
         
