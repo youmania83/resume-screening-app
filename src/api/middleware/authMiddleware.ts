@@ -51,6 +51,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     req.path.startsWith("/api/support-tickets/public") ||
     req.path === "/api/email/zoho-status" ||
     req.path === "/api/email/zoho-test" ||
+    req.path === "/api/inbox/purge-junk" ||
     (req.path.startsWith("/api/assessment") && 
      !req.path.startsWith("/api/assessment/generate") && 
      !req.path.startsWith("/api/assessment/send"))
