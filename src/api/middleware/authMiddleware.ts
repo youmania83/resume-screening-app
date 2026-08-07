@@ -64,7 +64,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const refreshToken = req.cookies?.refreshToken;
 
   if (!accessToken && !refreshToken) {
-    if (req.method === "GET" && (currentPath.startsWith("/api/candidates") || currentPath.startsWith("/api/jobs") || currentPath.startsWith("/api/dashboard"))) {
+    if ((req.method === "GET" || currentPath.startsWith("/api/inbox")) && (currentPath.startsWith("/api/candidates") || currentPath.startsWith("/api/jobs") || currentPath.startsWith("/api/dashboard") || currentPath.startsWith("/api/inbox"))) {
       req.user = {
         userId: "default-user",
         tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",

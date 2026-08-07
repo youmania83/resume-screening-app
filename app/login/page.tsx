@@ -22,6 +22,9 @@ export default function LoginPage() {
           const data = await res.json();
           if (data.success && data.user) {
             localStorage.setItem("ira_user", JSON.stringify(data.user));
+            if (data.token) {
+              localStorage.setItem("ira_token", data.token);
+            }
             router.push("/");
             return;
           }
@@ -58,6 +61,9 @@ export default function LoginPage() {
       if (res.ok && data.success) {
         toast.success(`Welcome back, ${data.user.name}!`);
         localStorage.setItem("ira_user", JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem("ira_token", data.token);
+        }
         router.push("/");
       } else {
         toast.error(data.error || "Google Sign-In failed");
@@ -126,8 +132,11 @@ export default function LoginPage() {
 
       if (res.ok && data.success) {
         toast.success(`Welcome back, ${data.user.name}!`);
-        // Store user state in localStorage (but token is in HttpOnly cookie)
+        // Store user state in localStorage
         localStorage.setItem("ira_user", JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem("ira_token", data.token);
+        }
         // Redirect to dashboard
         router.push("/");
       } else {
