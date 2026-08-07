@@ -87,7 +87,7 @@ router.get("/purge-junk", async (req: any, res: any, next: any) => {
       if (isNonResumeFile(fileName)) {
         isJunk = true;
       }
-      if (status === "Failed") {
+      if (status === "Failed" || status === "Unreadable") {
         isJunk = true;
       }
       if (candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {

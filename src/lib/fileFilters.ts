@@ -8,16 +8,34 @@ export const JUNK_DOCUMENT_KEYWORDS = [
   "issue", "incident", "log", "report", "reports",
   "program", "training", "certificate", "course", "study", "study documents",
   "signature", "logo", "image0",
-  "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25"
+  "aadhar", "pan", "passbook", "marksheet", "mark sheet", "mark_sheet", "degree", "diploma", "scorecard", "marklist", "passport", "photo", "visa", "gifting", "portfolio", "card", "q1", "q2", "q3", "q4", "2026-27", "2025-26", "2024-25",
+  "mbz", "form", "slip", "relieving", "offer_letter", "experience_letter", "declaration", "reimbursement", "claim"
+];
+
+export const JUNK_FILENAME_PATTERNS = [
+  /^\d{3,}[_\-\s]\d+/i,               // e.g. 0461_001.pdf, 0460_001.pdf
+  /^no\.\s*\d+/i,                      // e.g. NO.351 Mbz Lokesh T.pdf
+  /^(?:scan|doc|img|image|page|file|document|untitled|new_document)[_\-\s]?\d*/i,
+  /^(?:camscanner|adobe[_\-\s]?scan|fast[_\-\s]?scanner)[_\-\s]?/i,
+  /^(?:inv|rec|bill|ref|voucher)[_\-\s]?\d+/i
 ];
 
 export function isNonResumeFile(fileName: string): boolean {
-  const fileNameLower = fileName.toLowerCase();
+  if (!fileName) return true;
+  const fileNameLower = fileName.toLowerCase().trim();
   const hasCv = /(?:^|[^a-z])cv(?:$|[^a-z])/i.test(fileName);
   const hasResumeKeyword = fileNameLower.includes("resume") || hasCv || fileNameLower.includes("curriculum");
   
   if (hasResumeKeyword) {
-    return false;
+    const hasJunkKeyword = JUNK_DOCUMENT_KEYWORDS.some(keyword => fileNameLower.includes(keyword));
+    if (!hasJunkKeyword) {
+      return false;
+    }
+  }
+
+  // Check scanner/numeric patterns (e.g. 0461_001.pdf or NO.351 Mbz...)
+  if (JUNK_FILENAME_PATTERNS.some(pattern => pattern.test(fileNameLower))) {
+    return true;
   }
   
   const hasJunkKeyword = JUNK_DOCUMENT_KEYWORDS.some(keyword => fileNameLower.includes(keyword));
