@@ -48,9 +48,13 @@ export function useCandidates(isLoggedIn?: boolean) {
 
   const loadCandidates = useCallback(async () => {
     try {
-      const getHeaders = () => {
+      const getHeaders = (): Record<string, string> => {
         const token = typeof window !== "undefined" ? (localStorage.getItem("ira_token") || localStorage.getItem("token")) : null;
-        return token ? { Authorization: `Bearer ${token}` } : {};
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        return headers;
       };
 
       let statsData: any = null;
