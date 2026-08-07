@@ -118,6 +118,7 @@ router.post(
 
       res.status(201).json({
         success: true,
+        token: accessToken,
         user: { id: userId, tenantId, name: userName, email, role: "owner" }
       });
     } catch (err) {
@@ -267,6 +268,7 @@ router.post(
 
       res.json({
         success: true,
+        token: accessToken,
         user: { id: userId, tenantId, name: userName, email, role }
       });
     } catch (err) {
@@ -353,6 +355,7 @@ router.post(
 
       res.json({
         success: true,
+        token: accessToken,
         user: { id: userId, tenantId, name: user.name, email: sessionEmail, role }
       });
     } catch (err) {
@@ -427,6 +430,7 @@ router.post("/refresh", async (req, res, next) => {
 
     res.json({
       success: true,
+      token: newAccessToken,
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
       user: { id: user.id, tenantId: user.tenant_id, name: user.name, email: user.email, role: user.role }
