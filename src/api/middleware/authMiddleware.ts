@@ -60,7 +60,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  const accessToken = req.cookies?.accessToken;
+  const accessToken = req.cookies?.accessToken || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.split(" ")[1] : undefined);
   const refreshToken = req.cookies?.refreshToken;
 
   if (!accessToken && !refreshToken) {
