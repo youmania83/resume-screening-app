@@ -76,7 +76,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         
         req.user = {
           userId: decoded.userId,
-          tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
+          tenantId: decoded.tenantId || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
           role: decoded.role,
           email: decoded.email
         };
