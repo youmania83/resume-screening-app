@@ -86,12 +86,12 @@ export function OverviewView({ candidates, stats }: OverviewViewProps) {
   const completedCount = useMemo(() => steps.filter(s => s.done).length, [steps]);
 
   const metrics = useMemo(() => {
-    const total = Math.max(candidates.length, stats?.totalRecords || stats?.totalApplicants || 0);
-    const screened = stats?.screened ?? candidates.filter((c) => (c.score || 0) > 0).length;
-    const shortlisted = stats?.shortlisted ?? candidates.filter((c) => ["shortlisted", "interviewing"].includes(c.status || "")).length;
-    const rejected = stats?.rejected ?? candidates.filter((c) => ["rejected", "keka_rejected"].includes(c.status || "")).length;
-    const interviews = stats?.interviewsScheduled ?? candidates.filter((c) => c.status === "interviewing").length;
-    const selected = stats?.candidatesSelected ?? candidates.filter((c) => ["selected", "onboarded"].includes(c.status || "")).length;
+    const total = Math.max(candidates.length, stats?.totalRecords || 0, stats?.totalApplicants || 0);
+    const screened = (stats?.screened && stats.screened > 0) ? stats.screened : (candidates.filter((c) => (c.score || 0) > 0).length || (total > 0 ? total : 0));
+    const shortlisted = (stats?.shortlisted && stats.shortlisted > 0) ? stats.shortlisted : candidates.filter((c) => ["shortlisted", "interviewing", "qualified", "assessment"].includes((c.status || "").toLowerCase())).length;
+    const rejected = (stats?.rejected && stats.rejected > 0) ? stats.rejected : candidates.filter((c) => ["rejected", "keka_rejected"].includes((c.status || "").toLowerCase())).length;
+    const interviews = (stats?.interviewsScheduled && stats.interviewsScheduled > 0) ? stats.interviewsScheduled : candidates.filter((c) => ["interviewing", "interview_scheduled", "interview"].includes((c.status || "").toLowerCase())).length;
+    const selected = (stats?.candidatesSelected && stats.candidatesSelected > 0) ? stats.candidatesSelected : candidates.filter((c) => ["selected", "onboarded", "hired"].includes((c.status || "").toLowerCase())).length;
 
     return [
       { title: "Total Resumes Received", value: total, desc: "Cumulative uploaded resumes & records", color: "from-blue-500 via-blue-600 to-indigo-600", textAccent: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30", icon: FileText },

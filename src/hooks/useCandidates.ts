@@ -48,21 +48,64 @@ export function useCandidates(isLoggedIn?: boolean) {
 
   const loadCandidates = useCallback(async () => {
     try {
-      const [resp, statsResp] = await Promise.all([
-        fetch(`${apiBase}/candidates?limit=10000`, { credentials: "include" }),
-        fetch(`${apiBase}/candidates/stats`, { credentials: "include" }).catch(() => null)
-      ]);
+      const getHeaders = () => {
+        const token = typeof window !== "undefined" ? (localStorage.getItem("ira_token") || localStorage.getItem("token")) : null;
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      };
 
-      if (statsResp && statsResp.ok) {
-        const statsData = await statsResp.json();
-        if (statsData && statsData.success && statsData.stats) {
-          setStats(statsData.stats);
+      let statsData: any = null;
+      let candData: any = null;
+
+      // 1. Fetch Stats (with fallback to direct HTTPS endpoint)
+      try {
+        const statsResp = await fetch(`${apiBase}/candidates/stats`, { credentials: "include", headers: getHeaders() });
+        if (statsResp.ok) statsData = await statsResp.json();
+      } catch (e) {
+        console.warn("Primary stats fetch failed:", e);
+      }
+
+      if (!statsData || !statsData.success || !statsData.stats || (statsData.stats.totalApplicants === 0 && statsData.stats.totalRecords === 0)) {
+        try {
+          const fallbackStatsResp = await fetch("https://api.risonaitech.com/api/candidates/stats", { credentials: "include", headers: getHeaders() });
+          if (fallbackStatsResp.ok) {
+            const fData = await fallbackStatsResp.json();
+            if (fData && fData.success && fData.stats && (fData.stats.totalApplicants > 0 || fData.stats.totalRecords > 0)) {
+              statsData = fData;
+            }
+          }
+        } catch (e) {
+          console.warn("Fallback stats fetch failed:", e);
         }
       }
 
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.success && Array.isArray(data.candidates)) {
+      if (statsData && statsData.success && statsData.stats) {
+        setStats(statsData.stats);
+      }
+
+      // 2. Fetch Candidates list (with fallback to direct HTTPS endpoint)
+      try {
+        const resp = await fetch(`${apiBase}/candidates?limit=10000`, { credentials: "include", headers: getHeaders() });
+        if (resp.ok) candData = await resp.json();
+      } catch (e) {
+        console.warn("Primary candidates fetch failed:", e);
+      }
+
+      if (!candData || !candData.success || !Array.isArray(candData.candidates) || candData.candidates.length === 0) {
+        try {
+          const fallbackCandResp = await fetch("https://api.risonaitech.com/api/candidates?limit=10000", { credentials: "include", headers: getHeaders() });
+          if (fallbackCandResp.ok) {
+            const fCand = await fallbackCandResp.json();
+            if (fCand && fCand.success && Array.isArray(fCand.candidates) && fCand.candidates.length > 0) {
+              candData = fCand;
+            }
+          }
+        } catch (e) {
+          console.warn("Fallback candidates fetch failed:", e);
+        }
+      }
+
+      if (candData && candData.success && Array.isArray(candData.candidates)) {
+        const data = candData;
           // Normalize backend mapping
           const mapped: Candidate[] = data.candidates.map((c: any) => {
             const rawName = (c.name || "").trim();
@@ -141,7 +184,6 @@ export function useCandidates(isLoggedIn?: boolean) {
             const match = mapped.find(c => c.id === prev.id);
             return match || prev;
           });
-        }
       } else {
         setFetchError("Failed to load candidates from server.");
       }
