@@ -92,7 +92,7 @@ export class ZohoProvider implements IEmailProvider {
       const fileName = part.parameters?.name || part.dispositionParameters?.filename || "";
       if (fileName) {
         const ext = fileName.split(".").pop()?.toLowerCase();
-        if (ext && ["pdf", "docx", "doc", "txt"].includes(ext)) {
+        if (ext && ["pdf", "docx", "doc"].includes(ext)) {
           if (part.type?.startsWith("image/")) return false;
           
           const lowerName = fileName.toLowerCase();

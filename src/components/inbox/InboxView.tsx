@@ -23,6 +23,13 @@ export default function InboxView() {
   const [mergeReason, setMergeReason] = useState("Resolving parsed duplicate candidate");
   const [merging, setMerging] = useState(false);
 
+  const getHeaders = (): Record<string, string> => {
+    const token = typeof window !== "undefined" ? (localStorage.getItem("ira_token") || localStorage.getItem("token")) : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+  };
+
   const fetchInbox = useCallback(async () => {
     setLoading(true);
     try {
@@ -32,7 +39,7 @@ export default function InboxView() {
         status: statusFilter,
         search
       });
-      const res = await fetch(`${apiBase}/inbox?${q}`);
+      const res = await fetch(`${apiBase}/inbox?${q}`, { headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setInboxItems(data.data);
@@ -47,7 +54,7 @@ export default function InboxView() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/inbox/stats`);
+      const res = await fetch(`${apiBase}/inbox/stats`, { headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setStats(data);
@@ -59,7 +66,7 @@ export default function InboxView() {
 
   const fetchEmailHealth = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/inbox/email-health`);
+      const res = await fetch(`${apiBase}/inbox/email-health`, { headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         setEmailHealth(data.health);
@@ -86,6 +93,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/resumes/upload`, {
         method: "POST",
+        headers: getHeaders(),
         body: formData
       });
       const data = await res.json();
@@ -107,7 +115,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/inbox/email-sync`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getHeaders() },
         body: JSON.stringify({ provider })
       });
       const data = await res.json();
@@ -128,7 +136,7 @@ export default function InboxView() {
 
   const handleRetry = async (id: string) => {
     try {
-      const res = await fetch(`${apiBase}/inbox/retry/${id}`, { method: "POST" });
+      const res = await fetch(`${apiBase}/inbox/retry/${id}`, { method: "POST", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success("Job re-queued successfully.");
@@ -143,7 +151,7 @@ export default function InboxView() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this inbox item?")) return;
     try {
-      const res = await fetch(`${apiBase}/inbox/delete/${id}`, { method: "POST" });
+      const res = await fetch(`${apiBase}/inbox/delete/${id}`, { method: "POST", headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success("Inbox item deleted.");
@@ -161,7 +169,7 @@ export default function InboxView() {
     try {
       const res = await fetch(`${apiBase}/inbox/merge`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getHeaders() },
         body: JSON.stringify({
           primaryCandidateId: selectedDuplicate.primary_id,
           duplicateCandidateId: selectedDuplicate.duplicate_id,
@@ -186,11 +194,11 @@ export default function InboxView() {
 
   const openMergeReview = async (item: any) => {
     try {
-      const res = await fetch(`${apiBase}/candidates/${item.candidate_id}`);
+      const res = await fetch(`${apiBase}/candidates/${item.candidate_id}`, { headers: getHeaders() });
       const candData = await res.json();
       if (candData.success) {
         // Fetch candidate duplicate relation details
-        const dupCheck = await fetch(`${apiBase}/candidates?search=${candData.candidate.email}`);
+        const dupCheck = await fetch(`${apiBase}/candidates?search=${candData.candidate.email}`, { headers: getHeaders() });
         const dupData = await dupCheck.json();
         const primary = dupData.candidates?.find((c: any) => c.id !== item.candidate_id);
         
