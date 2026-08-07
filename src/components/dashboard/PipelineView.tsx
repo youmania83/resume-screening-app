@@ -12,19 +12,36 @@ interface PipelineViewProps {
 }
 
 export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }: PipelineViewProps) {
-  const filterByStatus = (statusList: string[]) => {
-    return candidates.filter(c => statusList.includes(c.status.toLowerCase()));
-  };
-
   const selectAndOpen = (c: Candidate) => {
     setSelectedCandidate(c);
   };
 
-  const appliedList = filterByStatus(["applied"]);
-  const reviewList = filterByStatus(["review", "under_review", "under review"]);
-  const shortlistedList = filterByStatus(["shortlisted", "qualified", "assessment"]);
-  const interviewingList = filterByStatus(["interviewing", "interview_scheduled", "interview"]);
-  const inactiveList = filterByStatus(["hold", "rejected", "keka_rejected", "talent_pool", "talent pool"]);
+  const appliedList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    return ["applied", "new", "unscreened", "received"].includes(s) || !s;
+  });
+  const reviewList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    return ["review", "under_review", "under review", "screening", "evaluating"].includes(s);
+  });
+  const shortlistedList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    return ["shortlisted", "qualified", "assessment", "assessment_passed", "passed"].includes(s);
+  });
+  const interviewingList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    return ["interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"].includes(s);
+  });
+  const inactiveList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    const isKnownOther = [
+      "applied", "new", "unscreened", "received",
+      "review", "under_review", "under review", "screening", "evaluating",
+      "shortlisted", "qualified", "assessment", "assessment_passed", "passed",
+      "interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"
+    ].includes(s);
+    return ["hold", "rejected", "keka_rejected", "talent_pool", "talent pool", "archived", "disqualified"].includes(s) || (!isKnownOther && Boolean(s));
+  });
 
   return (
     <motion.div
