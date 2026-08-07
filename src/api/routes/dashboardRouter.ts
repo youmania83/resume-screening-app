@@ -1,6 +1,5 @@
-// src/api/routes/dashboardRouter.ts
 import { Router } from "express";
-import { queryTenant } from "../../lib/tenantDb.js";
+import { queryTenant, queryGlobal } from "../../lib/tenantDb.js";
 import { Cache } from "../../lib/cache.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
 
@@ -35,13 +34,12 @@ router.get("/metrics", async (req, res, next) => {
     ] = await Promise.all([
       // Count OPEN openings only — a closed or ATS-removed requisition is not an
       // "active job" and must not inflate the dashboard tile.
-      queryTenant(
+      queryGlobal(
         `SELECT COUNT(*)::int as count FROM jobs
-          WHERE (tenant_id = :tenant_id OR tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' OR tenant_id IS NULL)
-            AND COALESCE(status, 'active') = 'active'
+          WHERE COALESCE(status, 'active') = 'active'
             AND sync_status IS DISTINCT FROM 'removed';`
       ),
-      queryTenant("SELECT COUNT(*)::int as count FROM candidates WHERE status NOT IN ('Hired', 'Rejected') AND (tenant_id = :tenant_id OR tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' OR tenant_id IS NULL);"),
+      queryGlobal("SELECT COUNT(*)::int as count FROM candidates WHERE status NOT IN ('Hired', 'Rejected');"),
       queryTenant("SELECT COUNT(*)::int as count FROM interviews WHERE status = 'scheduled' AND tenant_id = :tenant_id;"),
       queryTenant("SELECT COUNT(*)::int as count FROM offers WHERE status = 'sent' AND tenant_id = :tenant_id;"),
       queryTenant(`

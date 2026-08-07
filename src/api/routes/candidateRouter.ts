@@ -40,9 +40,9 @@ router.get("/recruiters/list", async (req, res, next) => {
 // GET /api/candidates/stats - Get complete, accurate database-wide candidate and record totals for all time
 router.get("/stats", async (req, res, next) => {
   try {
-    const { queryTenant, queryGlobal } = await import("../../lib/tenantDb.js");
+    const { queryGlobal } = await import("../../lib/tenantDb.js");
     const [candCounts, inboxCounts] = await Promise.all([
-      queryTenant(`
+      queryGlobal(`
         SELECT 
           COUNT(*)::int as total_applicants,
           COUNT(CASE WHEN candidates.score > 0 THEN 1 END)::int as screened_count,
@@ -51,9 +51,7 @@ router.get("/stats", async (req, res, next) => {
           COUNT(CASE WHEN LOWER(candidates.status) IN ('rejected', 'keka_rejected') THEN 1 END)::int as rejected_count,
           COUNT(CASE WHEN LOWER(candidates.status) IN ('interviewing', 'interview_scheduled', 'interview') OR candidates.keka_status ILIKE '%interview%' THEN 1 END)::int as interviewing_count,
           COUNT(CASE WHEN LOWER(candidates.status) IN ('selected', 'hired', 'onboarded') THEN 1 END)::int as selected_count
-        FROM candidates
-        LEFT JOIN jobs j ON candidates.job_id = j.id
-        WHERE (candidates.tenant_id = :tenant_id OR candidates.tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' OR candidates.tenant_id IS NULL OR j.tenant_id = :tenant_id);
+        FROM candidates;
       `),
       queryGlobal(`
         SELECT COUNT(*)::int as total_inbox_records
@@ -337,7 +335,7 @@ router.get("/", async (req, res, next) => {
       : "created_at";
     const sortOrder = (req.query.sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
-    let whereClause = "(candidates.tenant_id = :tenant_id OR candidates.tenant_id = '87b949cb-2c0d-44ca-a6f5-a025ec43e6a5' OR candidates.tenant_id IS NULL OR j.tenant_id = :tenant_id)";
+    let whereClause = "1=1";
     const queryParams: any[] = [];
     let paramIndex = 1;
 
@@ -380,7 +378,7 @@ router.get("/", async (req, res, next) => {
 
     // Fetch paginated candidate rows and total candidate count concurrently in parallel
     const [candidatesRes, countRes] = await Promise.all([
-      queryTenant(
+      queryGlobal(
         `SELECT candidates.*, j.title as job_title, j.location as job_location, j.job_code as job_code
          FROM candidates
          LEFT JOIN jobs j ON candidates.job_id = j.id
@@ -389,7 +387,7 @@ router.get("/", async (req, res, next) => {
          LIMIT ${limit} OFFSET ${offset};`,
         queryParams
       ),
-      queryTenant(
+      queryGlobal(
         `SELECT COUNT(*) as total
          FROM candidates
          LEFT JOIN jobs j ON candidates.job_id = j.id
