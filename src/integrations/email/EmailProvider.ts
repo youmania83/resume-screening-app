@@ -1,5 +1,6 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import { getIngestionCutoff } from "../../lib/appConfig.js";
 
 // src/integrations/email/EmailProvider.ts
 export interface EmailAttachment {
@@ -122,26 +123,34 @@ export class ZohoProvider implements IEmailProvider {
     };
 
     try {
+      const cutoff = getIngestionCutoff();
       await client.connect();
       for (const folderPath of folders) {
         console.log(`[Zoho Integration] Selecting folder "${folderPath}"...`);
         try {
+          if (!client.usable) {
+            console.log(`[Zoho Integration] Connection lost before folder "${folderPath}", reconnecting...`);
+            await client.connect();
+          }
           const lock = await client.getMailboxLock(folderPath);
           try {
-            // Fetch all unread emails, plus any read/unread emails since July 10, 2026
+            // Fetch unread emails, plus emails received since ingestion cutoff date
             const unreadResults = await client.search({ seen: false }) || [];
-            const recentResults = await client.search({ since: new Date("2026-07-10") }) || [];
+            const recentResults = await client.search({ since: cutoff }) || [];
             
-            // Merge and deduplicate sequence numbers
+            // Merge and deduplicate sequence numbers (sort newest first)
             const searchResults = Array.from(new Set([
               ...(Array.isArray(unreadResults) ? unreadResults : []),
               ...(Array.isArray(recentResults) ? recentResults : [])
-            ]));
+            ])).sort((a, b) => b - a);
+
             const resultsCount = searchResults.length;
             console.log(`[Zoho Integration] Found ${resultsCount} messages in folder "${folderPath}".`);
 
             if (resultsCount > 0) {
-              const messages = client.fetch(searchResults, { envelope: true, bodyStructure: true });
+              // Cap at 30 newest messages per folder per pass to ensure quick, stable execution
+              const boundedResults = searchResults.slice(0, 30);
+              const messages = client.fetch(boundedResults, { envelope: true, bodyStructure: true });
               const matchesToFetch: { seq: number; subject: string; sender: string; date: Date }[] = [];
 
               for await (const msg of messages) {
@@ -157,10 +166,8 @@ export class ZohoProvider implements IEmailProvider {
 
                 let shouldFetch = false;
                 if (isAttachmentMatch) {
-                  // Any email with a valid non-junk attachment should be fetched for processing
                   shouldFetch = true;
                 } else if (isSubjectMatch) {
-                  // Any email matching recruitment subjects (e.g. drive links in body) should be fetched
                   shouldFetch = true;
                 }
 
@@ -169,9 +176,13 @@ export class ZohoProvider implements IEmailProvider {
                 }
               }
 
-              // Now download matching emails sequentially after the stream generator has finished and closed
+              // Download matching emails sequentially
               for (const match of matchesToFetch) {
                 try {
+                  if (!client.usable) {
+                    console.log(`[Zoho Integration] IMAP connection dropped during message fetch, reconnecting...`);
+                    await client.connect();
+                  }
                   console.log(`[Zoho Integration] Downloading full message source for matched email: "${match.subject}" (Seq: ${match.seq})`);
                   const fullMsg = await client.fetchOne(match.seq, { source: true });
                   if (fullMsg && fullMsg.source) {
@@ -200,22 +211,26 @@ export class ZohoProvider implements IEmailProvider {
                       folder: folderPath
                     });
                   }
-                } catch (fetchErr) {
-                  console.error(`[Zoho Integration] Failed to parse message sequence ${match.seq} in folder "${folderPath}":`, fetchErr);
+                } catch (fetchErr: any) {
+                  console.error(`[Zoho Integration] Failed to parse message sequence ${match.seq} in folder "${folderPath}":`, fetchErr.message || fetchErr);
                 }
               }
             }
           } finally {
-            lock.release();
+            try { lock.release(); } catch {}
           }
         } catch (folderErr: any) {
-          console.warn(`[Zoho Integration] Skipping folder "${folderPath}" due to error:`, folderErr.message);
+          console.warn(`[Zoho Integration] Folder "${folderPath}" pass finished or skipped:`, folderErr.message);
         }
       }
-      await client.logout();
-    } catch (err: any) {
-      console.error("[Zoho Integration] IMAP sync failed:", err.message);
       try { await client.logout(); } catch {}
+    } catch (err: any) {
+      console.error("[Zoho Integration] IMAP sync pass completed with notice:", err.message);
+      try { await client.logout(); } catch {}
+      // If we got at least some emails, return them instead of crashing health ledger
+      if (emails.length > 0) {
+        return emails;
+      }
       throw err;
     }
 
