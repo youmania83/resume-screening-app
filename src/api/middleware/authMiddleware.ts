@@ -29,7 +29,8 @@ declare global {
 }
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  console.log("🔑 [Auth Middleware] Request Path:", req.path);
+  const currentPath = (req.originalUrl || req.path).split("?")[0];
+
   // Public routes that bypass auth entirely
   const publicPaths = [
     "/api/auth/login",
@@ -45,16 +46,16 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
   // Also bypass auth for public assessment routes and candidate portal (verified via token query)
   if (
-    publicPaths.some(p => req.path.startsWith(p)) ||
-    req.path.startsWith("/api/candidate-portal") ||
-    req.path.startsWith("/api/webhooks") ||
-    req.path.startsWith("/api/support-tickets/public") ||
-    req.path === "/api/email/zoho-status" ||
-    req.path === "/api/email/zoho-test" ||
-    req.path === "/api/inbox/purge-junk" ||
-    (req.path.startsWith("/api/assessment") && 
-     !req.path.startsWith("/api/assessment/generate") && 
-     !req.path.startsWith("/api/assessment/send"))
+    publicPaths.some(p => currentPath.startsWith(p)) ||
+    currentPath.startsWith("/api/candidate-portal") ||
+    currentPath.startsWith("/api/webhooks") ||
+    currentPath.startsWith("/api/support-tickets/public") ||
+    currentPath === "/api/email/zoho-status" ||
+    currentPath === "/api/email/zoho-test" ||
+    currentPath.includes("/api/inbox/purge-junk") ||
+    (currentPath.startsWith("/api/assessment") && 
+     !currentPath.startsWith("/api/assessment/generate") && 
+     !currentPath.startsWith("/api/assessment/send"))
   ) {
     return next();
   }
