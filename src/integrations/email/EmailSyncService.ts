@@ -359,10 +359,10 @@ export class EmailSyncService {
           await fs.promises.writeFile(tempPath, attach.content);
 
           await queryGlobal(
-            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_path, file_hash, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
              `,
-            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, tempPath, fileHash]
+            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, fileHash]
           );
 
           await IngestQueue.enqueue(tenantId, inboxId, tempPath, attach.mimeType, targetJobId);

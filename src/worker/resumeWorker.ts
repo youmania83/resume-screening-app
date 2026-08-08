@@ -140,7 +140,7 @@ export async function parseAndEvalResume(
     try {
       // 1. Fetch file hash from inbox record
       const inboxRes = await queryGlobal(
-        "SELECT created_at, file_hash, file_name, file_path, file_url FROM resume_inbox WHERE id = $1 LIMIT 1;",
+        "SELECT created_at, file_hash, file_name, file_url FROM resume_inbox WHERE id = $1 LIMIT 1;",
         [inboxId]
       );
       if (inboxRes.rowCount === 0) {
