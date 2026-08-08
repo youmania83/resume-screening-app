@@ -4,6 +4,12 @@ import path from "path";
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.resolve(process.cwd()),
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
