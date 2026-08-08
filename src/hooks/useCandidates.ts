@@ -437,10 +437,11 @@ export function useCandidates(isLoggedIn?: boolean) {
   const filteredCandidates = useMemo(() => {
     return candidates.filter(candidate => {
       const nameMatch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const emailMatch = (candidate.email || "").toLowerCase().includes(searchQuery.toLowerCase());
       const roleSearchMatch = candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
       const jobTitleMatch = (candidate.jobTitle || "").toLowerCase().includes(searchQuery.toLowerCase());
       const jobLocMatch = (candidate.jobLocation || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const searchMatch = nameMatch || roleSearchMatch || jobTitleMatch || jobLocMatch;
+      const searchMatch = nameMatch || emailMatch || roleSearchMatch || jobTitleMatch || jobLocMatch;
 
       let scoreMatch = true;
       if (scoreFilter === "high") scoreMatch = candidate.score >= 85;

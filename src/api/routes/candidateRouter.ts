@@ -364,6 +364,15 @@ router.get("/", async (req, res, next) => {
       queryParams.push(recruiterId);
     }
 
+    // General Search parameter
+    const search = req.query.search as string;
+    if (search && search.trim()) {
+      const s = `%${search.trim().toLowerCase()}%`;
+      whereClause += ` AND (LOWER(candidates.name) LIKE $${paramIndex} OR LOWER(candidates.email) LIKE $${paramIndex} OR LOWER(candidates.role) LIKE $${paramIndex} OR LOWER(COALESCE(j.title, '')) LIKE $${paramIndex})`;
+      queryParams.push(s);
+      paramIndex++;
+    }
+
     // Boolean Search compilation
     const booleanSearch = req.query.booleanSearch as string;
     if (booleanSearch) {
