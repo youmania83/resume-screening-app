@@ -180,7 +180,6 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all 2>/dev/null || true
-rm -rf node_modules .next 2>/dev/null || true
 NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
