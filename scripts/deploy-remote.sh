@@ -192,7 +192,7 @@ echo '==> 4/6 Running database migration...'
 npm run init-db
 
 echo '==> 5/6 Building production frontend...'
-pkill -f "next" 2>/dev/null || true
+(pkill -9 -f "next" 2>/dev/null || true)
 sleep 1
 rm -rf .next node_modules/.cache
 # --webpack is required here: Next 16 defaults to Turbopack, which fails on
