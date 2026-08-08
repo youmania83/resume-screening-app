@@ -183,6 +183,7 @@ pm2 stop all 2>/dev/null || true
 NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
+rm -rf .next
 ./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/tsx src/test/verifyPipelineFixes.ts
 
