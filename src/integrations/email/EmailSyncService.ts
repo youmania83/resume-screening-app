@@ -355,15 +355,15 @@ export class EmailSyncService {
           const storageMeta = await storage.uploadFile(tenantId, attach.fileName, attach.content);
           await this.logAudit(tenantId, inboxId, "Storage", "Success", provider.name, Date.now() - startTime);
 
-          await queryGlobal(
-            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-             `,
-            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, fileHash]
-          );
-
           const tempPath = path.resolve("uploads", `${inboxId}${ext}`);
           await fs.promises.writeFile(tempPath, attach.content);
+
+          await queryGlobal(
+            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_path, file_hash, status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+             `,
+            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, tempPath, fileHash]
+          );
 
           await IngestQueue.enqueue(tenantId, inboxId, tempPath, attach.mimeType, targetJobId);
           processedAtLeastOneResume = true;

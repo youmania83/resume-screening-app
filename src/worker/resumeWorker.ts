@@ -140,7 +140,7 @@ export async function parseAndEvalResume(
     try {
       // 1. Fetch file hash from inbox record
       const inboxRes = await queryGlobal(
-        "SELECT created_at, file_hash, file_name FROM resume_inbox WHERE id = $1 LIMIT 1;",
+        "SELECT created_at, file_hash, file_name, file_path, file_url FROM resume_inbox WHERE id = $1 LIMIT 1;",
         [inboxId]
       );
       if (inboxRes.rowCount === 0) {
@@ -148,13 +148,13 @@ export async function parseAndEvalResume(
       }
       const inboxRecord = inboxRes.rows[0];
       const fileHash = inboxRecord.file_hash || "";
+      const fileName = inboxRecord.file_name || "";
       const uploadDuration = Date.now() - new Date(inboxRecord.created_at).getTime();
 
       // Log SLA Upload timing
       await logProcessingStep(tenantId, inboxId, null, "Upload", "Success", "Storage", uploadDuration);
 
       // Heuristic non-resume file name check
-      const fileName = inboxRecord.file_name || "";
       if (isNonResumeFile(fileName)) {
         const errorMsg = `Rejected: Document "${fileName}" is identified as a non-resume file.`;
         console.log(`[Worker] ${errorMsg}`);
@@ -162,7 +162,7 @@ export async function parseAndEvalResume(
           "UPDATE resume_inbox SET status = 'Failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;",
           [errorMsg, inboxId]
         );
-        if (fs.existsSync(filePath)) {
+        if (filePath && fs.existsSync(filePath)) {
           try { fs.unlinkSync(filePath); } catch (e) { console.warn("Failed to delete temp file:", e); }
         }
         await logProcessingStep(tenantId, inboxId, null, "Parsing", "Failed", "System", 0, errorMsg);
@@ -171,9 +171,37 @@ export async function parseAndEvalResume(
 
       // 2. Read file and extract text
       const parseStart = Date.now();
-      const ext = path.extname(filePath).toLowerCase();
+      let resolvedFilePath = filePath || inboxRecord.file_path || "";
+      if (!resolvedFilePath || !fs.existsSync(resolvedFilePath)) {
+        const extName = fileName ? path.extname(fileName) : ".pdf";
+        const candidatePaths = [
+          path.resolve("uploads", `${inboxId}${extName}`),
+          path.resolve("uploads", `${inboxId}.pdf`),
+          path.resolve("uploads", fileName),
+          path.resolve("uploads", tenantId, fileName)
+        ];
+        for (const p of candidatePaths) {
+          if (p && fs.existsSync(p)) {
+            resolvedFilePath = p;
+            break;
+          }
+        }
+      }
+
+      if (!resolvedFilePath || !fs.existsSync(resolvedFilePath)) {
+        const errorMsg = `File for inbox item ${inboxId} ("${fileName}") not found on disk at ${resolvedFilePath || "any upload path"}.`;
+        console.error(`[Worker] ${errorMsg}`);
+        await queryGlobal(
+          "UPDATE resume_inbox SET status = 'Failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;",
+          [errorMsg, inboxId]
+        );
+        await logProcessingStep(tenantId, inboxId, null, "Parsing", "Failed", "System", 0, errorMsg);
+        return;
+      }
+
+      const ext = path.extname(resolvedFilePath).toLowerCase();
       let rawText = "";
-      const fileBuffer = fs.readFileSync(filePath);
+      const fileBuffer = fs.readFileSync(resolvedFilePath);
 
       let isCloudLink = false;
       let cloudLinkUrl = "";
