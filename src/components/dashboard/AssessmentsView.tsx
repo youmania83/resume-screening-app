@@ -72,11 +72,30 @@ export function AssessmentsView({
   };
 
   // Include candidates who qualify (Resume Score >= 70%), are in shortlisted/review/interviewing stages, or have assessment tokens
-  const eligibleCandidates = candidates.filter(c => 
+  const rawEligible = candidates.filter(c => 
     (c.score || 0) >= 70 || 
     !!c.assessmentToken || 
     ["shortlisted", "qualified", "review", "under_review", "under review", "interviewing", "interview_scheduled", "assessment"].includes((c.status || "").toLowerCase())
   );
+
+  // Deduplicate candidates by email address to ensure clean UI presentation
+  const emailMap = new Map<string, Candidate>();
+  for (const c of rawEligible) {
+    const key = (c.email || c.id).trim().toLowerCase();
+    if (!emailMap.has(key)) {
+      emailMap.set(key, c);
+    } else {
+      const existing = emailMap.get(key)!;
+      // Prefer record with assessmentToken, or higher score
+      if (!existing.assessmentToken && c.assessmentToken) {
+        emailMap.set(key, c);
+      } else if (!!existing.assessmentToken === !!c.assessmentToken && (c.score || 0) > (existing.score || 0)) {
+        emailMap.set(key, c);
+      }
+    }
+  }
+
+  const eligibleCandidates = Array.from(emailMap.values());
 
   const invitedCandidates = eligibleCandidates.filter(c => c.assessmentToken);
   const completedCandidates = eligibleCandidates.filter(c => c.assessmentStatus === "passed" || c.assessmentStatus === "failed");

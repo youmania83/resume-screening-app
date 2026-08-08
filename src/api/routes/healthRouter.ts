@@ -117,13 +117,23 @@ router.get("/readiness", async (req, res) => {
 router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, res) => {
   try {
     // 1. Queue statistics
-    const queueStats = await IngestQueue.getQueueStats();
+    let queueStats = { provider: "BullMQ", queued: 0, active: 0, completed: 0, failed: 0, isRedisConnected: false };
+    try {
+      queueStats = await IngestQueue.getQueueStats();
+    } catch (qErr) {
+      console.warn("[Diagnostics] Queue stats fetch warning:", qErr);
+    }
 
     // 2. DLQ and Failed jobs count from resume_inbox
-    const dlqRes = await queryGlobal(`
-      SELECT COUNT(*) as count FROM resume_inbox WHERE status = 'Failed';
-    `);
-    const dlqCount = parseInt(dlqRes.rows[0].count || "0", 10);
+    let dlqCount = 0;
+    try {
+      const dlqRes = await queryGlobal(`
+        SELECT COUNT(*) as count FROM resume_inbox WHERE status = 'Failed';
+      `);
+      dlqCount = parseInt(dlqRes.rows[0]?.count || "0", 10);
+    } catch (dlqErr) {
+      console.warn("[Diagnostics] DLQ count fetch warning:", dlqErr);
+    }
 
     // 3. Redis connectivity
     const redisStatus = queueStats.isRedisConnected ? "connected" : "disconnected";
@@ -151,22 +161,38 @@ router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, r
     }
 
     // 5. Storage stats (total files and usage)
-    const storageProvider = StorageManager.getProvider();
-    const files = await storageProvider.listAllFiles();
-    const storageUsage = files.reduce((acc, f) => acc + f.sizeBytes, 0);
-    const storageFilesCount = files.length;
+    let storageUsage = 0;
+    let storageFilesCount = 0;
+    try {
+      const storageProvider = StorageManager.getProvider();
+      const files = await storageProvider.listAllFiles();
+      storageUsage = files.reduce((acc, f) => acc + f.sizeBytes, 0);
+      storageFilesCount = files.length;
+    } catch (sErr) {
+      console.warn("[Diagnostics] Storage stats fetch warning:", sErr);
+    }
 
     // 6. Active tenants
-    const tenantsRes = await queryGlobal("SELECT COUNT(*) as count FROM tenants;");
-    const activeTenants = parseInt(tenantsRes.rows[0].count || "0", 10);
+    let activeTenants = 1;
+    try {
+      const tenantsRes = await queryGlobal("SELECT COUNT(*) as count FROM tenants;");
+      activeTenants = parseInt(tenantsRes.rows[0]?.count || "0", 10);
+    } catch (tErr) {
+      console.warn("[Diagnostics] Tenants count fetch warning:", tErr);
+    }
 
     // 7. Average Parse/Processing Time
-    const avgTimeRes = await queryGlobal(`
-      SELECT AVG(duration_ms) as avg_time 
-      FROM resume_processing_logs 
-      WHERE step = 'Parsing' AND status = 'Success';
-    `);
-    const avgParseTime = Math.round(parseFloat(avgTimeRes.rows[0].avg_time || "0"));
+    let avgParseTime = 120;
+    try {
+      const avgTimeRes = await queryGlobal(`
+        SELECT AVG(duration_ms) as avg_time 
+        FROM resume_processing_logs 
+        WHERE step = 'Parsing' AND status = 'Success';
+      `);
+      avgParseTime = Math.round(parseFloat(avgTimeRes.rows[0]?.avg_time || "0")) || 120;
+    } catch (aErr) {
+      console.warn("[Diagnostics] Avg parse time fetch warning:", aErr);
+    }
 
     res.json({
       success: true,
@@ -192,11 +218,11 @@ router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, r
           filesCount: storageFilesCount
         },
         tenants: {
-          activeCount: 1,
+          activeCount: activeTenants,
           mode: "Single Workspace Mode"
         },
         metrics: {
-          averageParseTimeMs: avgParseTime || 120 // fallback default
+          averageParseTimeMs: avgParseTime
         },
         timestamp: new Date().toISOString()
       }

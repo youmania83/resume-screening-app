@@ -42,15 +42,38 @@ export function PlatformHealthView() {
   const [loading, setLoading] = useState(true);
   const [pruning, setPruning] = useState(false);
 
+  const getHeaders = (): Record<string, string> => {
+    const token = typeof window !== "undefined" ? (localStorage.getItem("ira_token") || localStorage.getItem("token")) : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   const fetchDiagnostics = async () => {
     setLoading(true);
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
-      const resp = await fetch(`${apiBase}/health/diagnostics`);
-      if (resp.ok) {
+      const headers = getHeaders();
+
+      let resp = await fetch(`${apiBase}/health/diagnostics`, {
+        headers,
+        credentials: "include"
+      }).catch(() => null);
+
+      if (!resp || !resp.ok) {
+        resp = await fetch(`/api/health/diagnostics`, {
+          headers,
+          credentials: "include"
+        }).catch(() => null);
+      }
+
+      if (resp && resp.ok) {
         const json = await resp.json();
         if (json && json.success) {
           setData(json.data);
+          return;
         }
       }
     } catch (err) {
@@ -70,8 +93,23 @@ export function PlatformHealthView() {
     toast.loading("Initiating storage pruning job...", { id: "prune-toast" });
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
-      const resp = await fetch(`${apiBase}/health/prune-storage`, { method: "POST" });
-      if (resp.ok) {
+      const headers = getHeaders();
+
+      let resp = await fetch(`${apiBase}/health/prune-storage`, {
+        method: "POST",
+        headers,
+        credentials: "include"
+      }).catch(() => null);
+
+      if (!resp || !resp.ok) {
+        resp = await fetch(`/api/health/prune-storage`, {
+          method: "POST",
+          headers,
+          credentials: "include"
+        }).catch(() => null);
+      }
+
+      if (resp && resp.ok) {
         const json = await resp.json();
         if (json && json.success) {
           toast.success(`Pruning complete! Deleted ${json.deletedCount} orphaned files, freeing ${json.bytesFreed} bytes.`, { id: "prune-toast" });

@@ -297,6 +297,13 @@ export class EmailSyncService {
         }
 
         let processedAtLeastOneResume = false;
+        // Track whether every attachment was a hash-duplicate (already in DB).
+        // When ALL attachments are duplicates, we must still mark the email as
+        // read — otherwise the email stays "unread", gets fetched again every
+        // sync cycle, and the duplicate check keeps passing without ever
+        // consuming the email. This causes the infinite re-insertion loop.
+        let totalValidAttachments = 0;
+        let totalDuplicateAttachments = 0;
 
         // B1. Process attachments
         for (const attach of email.attachments) {
@@ -328,6 +335,9 @@ export class EmailSyncService {
             continue;
           }
 
+          // This attachment is a valid candidate for processing.
+          totalValidAttachments++;
+
           // Deduplication Check by MD5 File Hash
           const fileHash = crypto.createHash("md5").update(attach.content).digest("hex");
           const duplicateCheck = await queryGlobal(
@@ -337,6 +347,7 @@ export class EmailSyncService {
 
           if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
             console.log(`[Email Sync] Skipping duplicate attachment already in database: "${attach.fileName}" (Hash: ${fileHash})`);
+            totalDuplicateAttachments++;
             continue;
           }
 
@@ -346,7 +357,8 @@ export class EmailSyncService {
 
           await queryGlobal(
             `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+             VALUES ($1, $2, $3, $4, $5, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+             `,
             [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, fileHash]
           );
 
@@ -417,8 +429,22 @@ export class EmailSyncService {
           }
         }
 
-        // Mark email as read if any resume enqueued or JD created
-        if (processedAtLeastOneResume) {
+        // Mark email as read if any resume was enqueued, OR if ALL valid
+        // attachments were already-seen duplicates. In both cases the email
+        // has been fully handled and must not be re-fetched on the next sync.
+        // Only leave the email unread if there were literally zero valid
+        // resume attachments (e.g. body-only email that still needs link
+        // extraction logic to run) — but that path sets processedAtLeastOneResume
+        // via the cloud-link branch below anyway.
+        const allAttachmentsWereDuplicates =
+          totalValidAttachments > 0 && totalDuplicateAttachments === totalValidAttachments;
+
+        if (processedAtLeastOneResume || allAttachmentsWereDuplicates) {
+          console.log(
+            allAttachmentsWereDuplicates
+              ? `[Email Sync] All attachments already processed (duplicates). Marking email as read to stop re-fetching: "${email.subject}"`
+              : `[Email Sync] Marking email as read after successful ingestion: "${email.subject}"`
+          );
           await provider.markAsRead(email.id, email.folder);
         }
       }

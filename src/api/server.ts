@@ -372,34 +372,25 @@ cron.schedule("*/2 * * * *", () => {
         } else if (hasSmtpCreds) {
           // Fallback: Use IMAP with SMTP/app password credentials
           const { EmailSyncService } = await import("../integrations/email/EmailSyncService.js");
-          const { queryGlobal } = await import("../lib/tenantDb.js");
           
           console.log("⏰ [Cron] Starting automatic Zoho Mail sync (IMAP for hr@techsolengineers.com)...");
           
-          // Find all tenants
-          const tenantsRes = await queryGlobal(
-            "SELECT id FROM tenants;"
-          );
+          // Run IMAP sync for the production tenant ONLY.
+          // Running it for every tenant in the database would cause each email
+          // to be processed N times (once per tenant), creating massive
+          // duplicates in resume_inbox and candidates. The IMAP mailbox is
+          // shared across the whole organisation — there is only ONE inbox.
+          const productionTenantId = process.env.PRODUCTION_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
           
-          let tenantIds = tenantsRes.rows.map(t => t.id);
-          if (tenantIds.length === 0) {
-            tenantIds = ["default-tenant", "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5"];
-          }
-          
-          let totalSynced = 0;
-          for (const tenantId of tenantIds) {
-            try {
-              const count = await EmailSyncService.syncMailbox(tenantId, "zoho");
-              totalSynced += count;
-              if (count > 0) {
-                console.log(`✉️ [Cron IMAP] Ingested ${count} item(s) for tenant ${tenantId} via Zoho IMAP`);
-              }
-            } catch (tenantErr: any) {
-              console.error(`🚨 [Cron IMAP] Tenant ${tenantId} sync failed:`, tenantErr.message || tenantErr);
+          try {
+            const count = await EmailSyncService.syncMailbox(productionTenantId, "zoho");
+            if (count > 0) {
+              console.log(`✉️ [Cron IMAP] Ingested ${count} item(s) for production tenant via Zoho IMAP`);
             }
+            console.log(`✅ [Cron] Zoho Mail IMAP sync complete. Total ingested: ${count}`);
+          } catch (tenantErr: any) {
+            console.error(`🚨 [Cron IMAP] Production tenant sync failed:`, tenantErr.message || tenantErr);
           }
-          
-          console.log(`✅ [Cron] Zoho Mail IMAP sync complete. Total ingested: ${totalSynced}`);
         }
       }
     } catch (err: any) {
@@ -503,18 +494,14 @@ setTimeout(async () => {
       
       console.log("📥 [Startup] Triggering initial Zoho Mail inbox sync (IMAP)...");
       
-      const tenantsRes = await queryGlobal(
-        "SELECT id FROM tenants WHERE email_config IS NOT NULL LIMIT 10;"
-      );
-      
+      // Sync for production tenant ONLY (IMAP is a shared inbox — no per-tenant looping)
+      const productionTenantId = process.env.PRODUCTION_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
       let totalSynced = 0;
-      for (const tenant of tenantsRes.rows) {
-        try {
-          const count = await EmailSyncService.syncMailbox(tenant.id, "zoho");
-          totalSynced += count;
-        } catch (tenantErr: any) {
-          console.error(`🚨 [Startup IMAP] Tenant ${tenant.id} sync failed:`, tenantErr.message || tenantErr);
-        }
+      try {
+        const count = await EmailSyncService.syncMailbox(productionTenantId, "zoho");
+        totalSynced += count;
+      } catch (tenantErr: any) {
+        console.error(`🚨 [Startup IMAP] Production tenant sync failed:`, tenantErr.message || tenantErr);
       }
       
       console.log(`✅ [Startup] Initial Zoho Mail IMAP sync complete. Total ingested: ${totalSynced}`);

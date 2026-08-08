@@ -487,7 +487,6 @@ export async function parseAndEvalResume(
         }
 
         if (candidateScore >= 80) {
-          candidateId = crypto.randomUUID();
           const candidateName = `${parsedData.firstName} ${parsedData.lastName}`.trim() || "Unknown Candidate";
           const candidateRole = inferCandidateRole(parsedData);
           const remarks = ensureNonBlankRemarks(
@@ -500,29 +499,45 @@ export async function parseAndEvalResume(
             { role: candidateRole, score: candidateScore, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
           );
 
-          await queryGlobal(
-            `INSERT INTO candidates (
-              id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
-              skills, certifications, education, linkedin_url, github_url, recommendation,
-              first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
-              requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
-              experience_match
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'talent_pool', 'Manual Upload', CURRENT_DATE::text,
-              $33
-            );`,
-            [
-              candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-              candidateRole,
-              candidateScore, candidateScore, remarks.experienceYears ?? parsedData.experienceYears,
-              parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
-              remarks.recommendation, parsedData.firstName, parsedData.lastName,
-              parsedData.city, parsedData.state, parsedData.country,
-              parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
-              parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
-              remarks.experienceMatch
-            ]
-          );
+          if (primaryCandidateId) {
+            candidateId = primaryCandidateId;
+            console.log(`[Worker] Talent pool resume for inbox ${inboxId} belongs to existing candidate ${primaryCandidateId}. Updating profile.`);
+            await queryGlobal(
+              `UPDATE candidates SET
+                 phone = COALESCE(NULLIF($1, ''), phone),
+                 skills = CASE WHEN COALESCE(array_length($2::text[], 1), 0) > 0 THEN $2 ELSE skills END,
+                 score = GREATEST(COALESCE(score, 0), $3),
+                 match_percent = GREATEST(COALESCE(match_percent, 0), $3),
+                 last_synced_at = NOW()
+               WHERE id = $4;`,
+              [parsedData.phone || "", parsedData.skills || [], candidateScore, candidateId]
+            );
+          } else {
+            candidateId = crypto.randomUUID();
+            await queryGlobal(
+              `INSERT INTO candidates (
+                id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
+                skills, certifications, education, linkedin_url, github_url, recommendation,
+                first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
+                requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
+                experience_match
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'talent_pool', 'Manual Upload', CURRENT_DATE::text,
+                $33
+              );`,
+              [
+                candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
+                candidateRole,
+                candidateScore, candidateScore, remarks.experienceYears ?? parsedData.experienceYears,
+                parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
+                remarks.recommendation, parsedData.firstName, parsedData.lastName,
+                parsedData.city, parsedData.state, parsedData.country,
+                parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
+                parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
+                remarks.experienceMatch
+              ]
+            );
+          }
 
           await queryGlobal(
             `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
@@ -665,7 +680,7 @@ export async function parseAndEvalResume(
       }
 
       candidateId = crypto.randomUUID();
-      const candidateStatus = "applied";
+      let candidateStatus = "applied";
       const candidateRole = inferCandidateRole(parsedData);
 
       // recommendation/strengths are set once here, before the job-matching
@@ -682,54 +697,6 @@ export async function parseAndEvalResume(
         },
         { role: candidateRole, score: parsedData.skillsScore ?? 0, experienceYears: parsedData.experienceYears, skills: parsedData.skills }
       );
-
-      await queryGlobal(
-        `INSERT INTO candidates (
-          id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
-          skills, certifications, education, linkedin_url, github_url, recommendation,
-          first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
-          requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
-          experience_match
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, CURRENT_DATE::text,
-          $35
-        );`,
-        [
-          candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
-          candidateRole,
-          parsedData.skillsScore ?? 0, parsedData.skillsScore ?? 0, remarks.experienceYears ?? parsedData.experienceYears,
-          parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
-          remarks.recommendation, parsedData.firstName, parsedData.lastName,
-          parsedData.city, parsedData.state, parsedData.country,
-          parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
-          parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
-          candidateStatus, "Manual Upload",
-          remarks.experienceMatch
-        ]
-      );
-
-      // Create timeline entry
-      await queryGlobal(
-        `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
-         VALUES ($1, $2, $3, 'Candidate Created', 'Candidate Profile Created', 'Candidate profile automatically generated via resume processing worker.');`,
-        [crypto.randomUUID(), tenantId, candidateId]
-      );
-
-      // Create initial document link
-      await queryGlobal(
-        `INSERT INTO candidate_documents (id, tenant_id, candidate_id, title, file_url, document_type)
-         VALUES ($1, $2, $3, $4, (SELECT file_url FROM resume_inbox WHERE id = $5), 'Resume');`,
-        [crypto.randomUUID(), tenantId, candidateId, inboxRecord.file_name, inboxId]
-      );
-
-      // Increment monthly candidate counts
-      await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
-
-      // Application acknowledgement email sending is deferred until after scoring and assessment invitation status is determined.
-      //
-      // NOTE: repeat applications are merged into the existing candidate above and
-      // return early, so control only reaches here for genuinely new candidates.
-      // The old duplicate_candidates linking is therefore no longer needed.
 
       // 6. Job Matching
       const matchStart = Date.now();
@@ -770,10 +737,96 @@ export async function parseAndEvalResume(
       let matchedJobId: string | null = null;
       let matchedJobTitle = "";
       let matchedJobDesc = "";
+      
+      const jobMatches = [];
 
       for (const job of jobsToMatch) {
         const match = calculateHeuristicMatch(parsedData, job, weights);
+        jobMatches.push({ job, match });
         
+        // Track highest matching job, or target job specifically
+        if (targetJobIsOpen && (job.id === targetJobId || job.external_id === targetJobId)) {
+          highestMatchScore = match.score;
+          matchedJobId = job.id;
+          matchedJobTitle = job.title;
+          matchedJobDesc = job.description;
+        } else if (!targetJobIsOpen && match.score > highestMatchScore) {
+          highestMatchScore = match.score;
+          matchedJobId = job.id;
+          matchedJobTitle = job.title;
+          matchedJobDesc = job.description;
+        }
+      }
+
+      // Strict mapping: an applicant belongs strictly to an active open job position.
+      // Resumes that do not match a valid active open job opening are skipped and left unprocessed.
+      if (!matchedJobId && isStrictJobMapping()) {
+        console.log(`[Worker] Strict job mapping: candidate has no matching active open job role. Marking inbox item as Unmatched Role.`);
+        await queryGlobal(
+          `UPDATE resume_inbox SET status = 'Unmatched Role', error_message = 'Skipped: Resume does not match any active open job position.', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+          [inboxId]
+        );
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) {}
+        }
+        await logProcessingStep(tenantId, inboxId, null, "Matching", "Failed", providerName, Date.now() - startTime, "Skipped: No active open job matched.");
+        return;
+      }
+
+      let assessmentToken: string | null = null;
+      let assessmentTokenExpiry: Date | null = null;
+      let assessmentStatus = null;
+
+      if (matchedJobId) {
+        if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
+          candidateStatus = 'shortlisted';
+          assessmentToken = crypto.randomBytes(24).toString("hex");
+          assessmentTokenExpiry = new Date();
+          assessmentTokenExpiry.setDate(assessmentTokenExpiry.getDate() + 7);
+          assessmentStatus = 'pending';
+        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.REVIEW) {
+          candidateStatus = 'Review';
+        } else {
+          candidateStatus = 'rejected';
+        }
+      } else {
+        // No matched job (only reachable if strict job mapping is disabled)
+        candidateStatus = 'Review';
+      }
+
+      await queryGlobal(
+        `INSERT INTO candidates (
+          id, tenant_id, name, email, phone, role, score, match_percent, experience_years,
+          skills, certifications, education, linkedin_url, github_url, recommendation,
+          first_name, last_name, city, state, country, us_citizen, green_card, h1b, opt, cpt, ead, tn_visa,
+          requires_sponsorship, strengths, weaknesses, matched_skills, missing_skills, status, application_source, applied_date,
+          experience_match, job_id, assessment_token, assessment_token_expiry, assessment_status
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, CURRENT_DATE::text,
+          $35, $36, $37, $38, $39
+        );`,
+        [
+          candidateId, tenantId, candidateName, parsedData.email || "", parsedData.phone || "",
+          matchedJobTitle || candidateRole,
+          highestMatchScore || (parsedData.skillsScore ?? 0), 
+          highestMatchScore || (parsedData.skillsScore ?? 0), 
+          remarks.experienceYears ?? parsedData.experienceYears,
+          parsedData.skills, parsedData.certifications, parsedData.education, parsedData.linkedinUrl || "", parsedData.githubUrl || "",
+          remarks.recommendation, parsedData.firstName, parsedData.lastName,
+          parsedData.city, parsedData.state, parsedData.country,
+          parsedData.usCitizen, parsedData.greenCard, parsedData.h1b, parsedData.opt, parsedData.cpt, parsedData.ead, parsedData.tnVisa,
+          parsedData.requiresSponsorship, remarks.strengths, parsedData.concerns, parsedData.matchedSkills, parsedData.missingSkills,
+          candidateStatus, "Manual Upload",
+          remarks.experienceMatch,
+          matchedJobId,
+          assessmentToken,
+          assessmentTokenExpiry,
+          assessmentStatus
+        ]
+      );
+
+      // Insert job matches now that candidate is in DB
+      for (const { job, match } of jobMatches) {
         await queryGlobal(
           `INSERT INTO candidate_job_matches (
             tenant_id, candidate_id, job_id, match_score, matched_skills, missing_skills, strengths, concerns, recommendation_reason
@@ -796,75 +849,66 @@ export async function parseAndEvalResume(
            VALUES ($1, $2, $3, $4, 0, $5, 'Initial Matching Engine Recalculation');`,
           [crypto.randomUUID(), tenantId, candidateId, job.id, match.score]
         );
-
-        // Track highest matching job, or target job specifically
-        if (targetJobIsOpen && (job.id === targetJobId || job.external_id === targetJobId)) {
-          highestMatchScore = match.score;
-          matchedJobId = job.id;
-          matchedJobTitle = job.title;
-          matchedJobDesc = job.description;
-        } else if (!targetJobIsOpen && match.score > highestMatchScore) {
-          highestMatchScore = match.score;
-          matchedJobId = job.id;
-          matchedJobTitle = job.title;
-          matchedJobDesc = job.description;
-        }
       }
 
-      // Strict mapping: an applicant belongs strictly to an active open job position.
-      // Resumes that do not match a valid active open job opening are skipped and left unprocessed.
-      if (!targetJobIsOpen && isStrictJobMapping()) {
-        console.log(`[Worker] Strict job mapping: candidate ${candidateId} has no matching active open job role. Cleaning up profile and marking inbox item as Unmatched Role.`);
-        await queryGlobal("DELETE FROM candidate_timeline WHERE candidate_id = $1;", [candidateId]);
-        await queryGlobal("DELETE FROM candidate_documents WHERE candidate_id = $1;", [candidateId]);
-        await queryGlobal("DELETE FROM candidates WHERE id = $1;", [candidateId]);
+      // Create timeline entry
+      await queryGlobal(
+        `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+         VALUES ($1, $2, $3, 'Candidate Created', 'Candidate Profile Created', 'Candidate profile automatically generated via resume processing worker.');`,
+        [crypto.randomUUID(), tenantId, candidateId]
+      );
+
+      // Log activity and timeline for stage changes
+      if (candidateStatus === 'shortlisted') {
         await queryGlobal(
-          `UPDATE resume_inbox SET status = 'Unmatched Role', error_message = 'Skipped: Resume does not match any active open job position.', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
-          [inboxId]
+           `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+            VALUES ($1, 'email_sent', $2, $3);`,
+          [candidateId, `Candidate qualified for assessment (Score ${highestMatchScore}/100 >= 80). Assessment invitation automatically sent via email.`, tenantId]
         );
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch (e) {}
-        }
-        await logProcessingStep(tenantId, inboxId, null, "Matching", "Failed", providerName, Date.now() - startTime, "Skipped: No active open job matched.");
-        return;
+        await queryGlobal(
+          `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+           VALUES ($1, $2, $3, 'Stage Changed', 'Shortlisted', 'Candidate qualified for assessment stage with match score: ' || $4 || '/100.');`,
+          [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
+        );
+      } else if (candidateStatus === 'Review') {
+        const msg = matchedJobId ? `Candidate placed on Hold / HR Review (Score ${highestMatchScore}/100 is between 60 and 79).` : `Candidate placed on HR Review (No matching job found).`;
+        const tDesc = matchedJobId ? 'Candidate placed on Hold for manual review with match score: ' + highestMatchScore + '/100.' : 'Candidate automatically placed in HR Review because no matching job opening was found.';
+        
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+           VALUES ($1, 'stage_changed', $2, $3);`,
+          [candidateId, msg, tenantId]
+        );
+        await queryGlobal(
+          `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+           VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', $4);`,
+          [crypto.randomUUID(), tenantId, candidateId, tDesc]
+        );
+      } else if (candidateStatus === 'rejected') {
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
+           VALUES ($1, 'keka_rejected', $2, $3);`,
+          [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 60).`, tenantId]
+        );
+        await queryGlobal(
+          `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
+           VALUES ($1, $2, $3, 'Stage Changed', 'Rejected', 'Candidate auto-rejected with match score: ' || $4 || '/100.');`,
+          [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
+        );
       }
 
-      // Automated AI screening pipeline trigger
-      if (candidateStatus === "applied" && matchedJobId) {
-        if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
-          const assessmentToken = crypto.randomBytes(24).toString("hex");
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 7);
+      // Create initial document link
+      await queryGlobal(
+        `INSERT INTO candidate_documents (id, tenant_id, candidate_id, title, file_url, document_type)
+         VALUES ($1, $2, $3, $4, (SELECT file_url FROM resume_inbox WHERE id = $5), 'Resume');`,
+        [crypto.randomUUID(), tenantId, candidateId, inboxRecord.file_name, inboxId]
+      );
 
-          // Update candidate status to shortlisted and link the assessment token
-          await queryGlobal(
-            `UPDATE candidates 
-             SET status = 'shortlisted', 
-                 job_id = $1, 
-                 score = $2, 
-                 match_percent = $2,
-                 assessment_token = $3, 
-                 assessment_token_expiry = $4, 
-                 assessment_status = 'pending',
-                 role = COALESCE(NULLIF($6, ''), role)
-             WHERE id = $5;`,
-            [matchedJobId, highestMatchScore, assessmentToken, expiry, candidateId, matchedJobTitle]
-          );
+      // Increment monthly candidate counts
+      await TenantUsageService.incrementMetric(tenantId, "active_candidates", 1);
 
-          // Log activity and timeline
-          await queryGlobal(
-             `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-              VALUES ($1, 'email_sent', $2, $3);`,
-            [candidateId, `Candidate qualified for assessment (Score ${highestMatchScore}/100 >= 80). Assessment invitation automatically sent via email.`, tenantId]
-          );
-
-          await queryGlobal(
-            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
-             VALUES ($1, $2, $3, 'Stage Changed', 'Shortlisted', 'Candidate qualified for assessment stage with match score: ' || $4 || '/100.');`,
-            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
-          );
-
-          // Ensure job assessment and send invitation
+      // Automated AI screening pipeline trigger - Send assessment if shortlisted
+      if (candidateStatus === "shortlisted" && matchedJobId && assessmentToken) {
           try {
             await ensureJobAssessment(matchedJobId, matchedJobTitle, matchedJobDesc);
 
@@ -873,7 +917,7 @@ export async function parseAndEvalResume(
               candidateEmail: parsedData.email || "",
               jobTitle: matchedJobTitle,
               token: assessmentToken,
-              expiryDate: expiry,
+              expiryDate: assessmentTokenExpiry!,
               tenantId,
               candidateId: candidateId || undefined
             });
@@ -881,13 +925,10 @@ export async function parseAndEvalResume(
             if (inviteResult?.success) {
               hasSentAssessmentInvite = true;
 
-              // Stamp the invite time so the 30-minute autonomous cycle knows the
-              // invitation already went out and does not re-send it.
               await queryGlobal(
                 `UPDATE candidates SET assessment_invited_at = NOW() WHERE id = $1;`,
                 [candidateId]
               );
-
               await queryGlobal(
                 `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
                  VALUES ($1, 'assessment_invited', $2, $3);`,
@@ -899,80 +940,6 @@ export async function parseAndEvalResume(
           } catch (err: any) {
             console.error(`[Worker] Failed to generate/send assessment for candidate ${candidateId}:`, err);
           }
-        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.REVIEW) {
-          // Hold / HR Review stage
-          await queryGlobal(
-            `UPDATE candidates 
-             SET status = 'Review', 
-                 job_id = $1, 
-                 score = $2, 
-                 match_percent = $2,
-                 role = COALESCE(NULLIF($4, ''), role)
-             WHERE id = $3;`,
-            [matchedJobId, highestMatchScore, candidateId, matchedJobTitle]
-          );
-
-          await queryGlobal(
-            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-             VALUES ($1, 'stage_changed', $2, $3);`,
-            [candidateId, `Candidate placed on Hold / HR Review (Score ${highestMatchScore}/100 is between 60 and 79).`, tenantId]
-          );
-
-          await queryGlobal(
-            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
-             VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', 'Candidate placed on Hold for manual review with match score: ' || $4 || '/100.');`,
-            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
-          );
-        } else {
-          // Reject candidate
-          await queryGlobal(
-            `UPDATE candidates 
-             SET status = 'rejected', 
-                 job_id = $1, 
-                 score = $2, 
-                 match_percent = $2,
-                 role = COALESCE(NULLIF($4, ''), role)
-             WHERE id = $3;`,
-            [matchedJobId, highestMatchScore, candidateId, matchedJobTitle]
-          );
-
-          await queryGlobal(
-            `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-             VALUES ($1, 'keka_rejected', $2, $3);`,
-            [candidateId, `Candidate automatically rejected (Score ${highestMatchScore}/100 < 60).`, tenantId]
-          );
-
-          await queryGlobal(
-            `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
-             VALUES ($1, $2, $3, 'Stage Changed', 'Rejected', 'Candidate auto-rejected with match score: ' || $4 || '/100.');`,
-            [crypto.randomUUID(), tenantId, candidateId, highestMatchScore]
-          );
-        }
-      }
-
-      // If we don't have a matched job (due to low score or no active jobs), route candidate to HR Review / unassigned
-      if (candidateStatus === "applied" && !matchedJobId) {
-        await queryGlobal(
-          `UPDATE candidates 
-           SET status = 'Review', 
-               job_id = NULL, 
-               score = $1, 
-               match_percent = $1
-           WHERE id = $2;`,
-          [highestMatchScore, candidateId]
-        );
-
-        await queryGlobal(
-          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id) 
-           VALUES ($1, 'stage_changed', $2, $3);`,
-          [candidateId, `Candidate placed on HR Review (No matching job found with score >= 50%).`, tenantId]
-        );
-
-        await queryGlobal(
-          `INSERT INTO candidate_timeline (id, tenant_id, candidate_id, event_type, title, description)
-           VALUES ($1, $2, $3, 'Stage Changed', 'HR Review', 'Candidate automatically placed in HR Review because no matching job opening met the 50% score threshold.');`,
-          [crypto.randomUUID(), tenantId, candidateId]
-        );
       }
 
       // 6.5 Send immediate Application Acknowledgement Email only if not duplicate and not invited to assessment

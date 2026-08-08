@@ -26,11 +26,16 @@ export function isNonResumeFile(fileName: string): boolean {
   const hasCv = /(?:^|[^a-z])cv(?:$|[^a-z])/i.test(fileName);
   const hasResumeKeyword = fileNameLower.includes("resume") || hasCv || fileNameLower.includes("curriculum");
   
-  if (hasResumeKeyword) {
-    const hasJunkKeyword = JUNK_DOCUMENT_KEYWORDS.some(keyword => fileNameLower.includes(keyword));
-    if (!hasJunkKeyword) {
-      return false;
-    }
+  // Strict mode: if the file name doesn't even contain resume, cv, or curriculum,
+  // reject it immediately as a non-resume file.
+  if (!hasResumeKeyword) {
+    return true;
+  }
+
+  // If it DOES have resume/cv, ensure it doesn't also contain junk keywords.
+  const hasJunkKeyword = JUNK_DOCUMENT_KEYWORDS.some(keyword => fileNameLower.includes(keyword));
+  if (hasJunkKeyword) {
+    return true;
   }
 
   // Check scanner/numeric patterns (e.g. 0461_001.pdf or NO.351 Mbz...)
@@ -38,10 +43,9 @@ export function isNonResumeFile(fileName: string): boolean {
     return true;
   }
   
-  const hasJunkKeyword = JUNK_DOCUMENT_KEYWORDS.some(keyword => fileNameLower.includes(keyword));
   const hasDelimiterWord = fileNameLower.includes(" to ");
   
-  return hasJunkKeyword || hasDelimiterWord;
+  return hasDelimiterWord;
 }
 
 /**

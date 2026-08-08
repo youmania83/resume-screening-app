@@ -233,35 +233,47 @@ export class ZohoMailService {
             console.log(`[Zoho Mail Sync] No job title matched in subject "${msg.subject}". Leaving unmapped for content-based matching / HR review.`);
           }
 
-          const candidateId = `cand-zoho-${uuidv4()}`;
-          const applicationId = `app-zoho-${uuidv4()}`;
+          // Check if candidate already exists by email in DB or current batch
+          const emailLower = (msg.fromEmail || "").trim().toLowerCase();
+          let candidateId: string | null = null;
 
-          // Prepare candidate insert row.
-          // Score starts at 0 — NOT a fabricated 60 baseline. A hard-coded 60 sat
-          // exactly on the HR-review threshold, so unscreened candidates appeared
-          // pre-qualified before the AI had evaluated anything. The real score is
-          // written by the screening worker.
-          candidatesToInsert.push([
-            candidateId,
-            msg.fromName,
-            msg.fromEmail,
-            null, // Phone placeholder, extracted by AI parser
-            matchedRole,
-            0, // Score — assigned by AI screening, not guessed here
-            0, // Match percent — assigned by AI screening
-            0, // Experience years
-            "applied",
-            "Zoho Mail",
-            null,
-            "Applied",
-            msg.date.toISOString(),
-            jobId,
-            msg.id,
-            "Zoho Mail",
-            "pending",
-            new Date(),
-            syncTenantId
-          ]);
+          if (emailLower) {
+            const existingInDb = await query(
+              `SELECT id FROM candidates WHERE LOWER(email) = $1 AND tenant_id = $2 LIMIT 1;`,
+              [emailLower, syncTenantId]
+            );
+            if (existingInDb.rowCount && existingInDb.rowCount > 0) {
+              candidateId = existingInDb.rows[0].id;
+              console.log(`[Zoho Mail Sync] Reusing existing candidate profile ${candidateId} for ${msg.fromEmail}`);
+            }
+          }
+
+          if (!candidateId) {
+            candidateId = `cand-zoho-${uuidv4()}`;
+            candidatesToInsert.push([
+              candidateId,
+              msg.fromName,
+              msg.fromEmail,
+              null, // Phone placeholder, extracted by AI parser
+              matchedRole,
+              0, // Score — assigned by AI screening, not guessed here
+              0, // Match percent — assigned by AI screening
+              0, // Experience years
+              "applied",
+              "Zoho Mail",
+              null,
+              "Applied",
+              msg.date.toISOString(),
+              jobId,
+              msg.id,
+              "Zoho Mail",
+              "pending",
+              new Date(),
+              syncTenantId
+            ]);
+          }
+
+          const applicationId = `app-zoho-${uuidv4()}`;
 
           let resumeSaved = false;
           let savedFilename = "";
