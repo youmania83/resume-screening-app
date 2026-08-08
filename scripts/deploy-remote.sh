@@ -180,7 +180,7 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all || true
-npm ci || npm install
+NODE_ENV=development npm ci --include=dev || NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
