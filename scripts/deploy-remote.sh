@@ -182,7 +182,7 @@ echo '==> 2/6 Installing dependencies...'
 pm2 stop all 2>/dev/null || true
 rm -rf .next node_modules package-lock.json 2>/dev/null || true
 sleep 2
-NODE_ENV=development npm install --include=dev
+NODE_ENV=development npm install --include=dev --ignore-scripts
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
