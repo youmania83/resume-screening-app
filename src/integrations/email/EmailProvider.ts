@@ -148,8 +148,8 @@ export class ZohoProvider implements IEmailProvider {
             console.log(`[Zoho Integration] Found ${resultsCount} messages in folder "${folderPath}".`);
 
             if (resultsCount > 0) {
-              // Cap at 30 newest messages per folder per pass to ensure quick, stable execution
-              const boundedResults = searchResults.slice(0, 30);
+              // Up to 200 newest messages per folder per pass to reach all resume attachments
+              const boundedResults = searchResults.slice(0, 200);
               const messages = client.fetch(boundedResults, { envelope: true, bodyStructure: true });
               const matchesToFetch: { seq: number; subject: string; sender: string; date: Date }[] = [];
 
