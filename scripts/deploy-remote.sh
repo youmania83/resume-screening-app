@@ -180,7 +180,7 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all 2>/dev/null || true
-NODE_ENV=development npm install --include=dev --force
+NODE_ENV=development npm ci --include=dev || NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 npx tsc --noEmit
@@ -196,7 +196,7 @@ rm -rf .next node_modules/.cache
 # directory looking for next/package.json and gets confused by the parent
 # directory structure). package.json's own \"build\" script already pins
 # --webpack for this reason; the deploy script had drifted from it.
-./node_modules/.bin/next build --webpack || npx next build --webpack
+npm run build
 
 echo '==> 6/6 Restarting PM2 services...'
 pm2 restart ecosystem.config.cjs --env production --update-env || pm2 start ecosystem.config.cjs --env production
