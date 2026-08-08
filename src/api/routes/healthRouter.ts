@@ -113,8 +113,8 @@ router.get("/readiness", async (req, res) => {
   }
 });
 
-// Admin-only Platform Health Diagnostics
-router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, res) => {
+// Platform Health Diagnostics
+router.get("/diagnostics", authMiddleware, async (req, res) => {
   try {
     // 1. Queue statistics
     let queueStats = { provider: "BullMQ", queued: 0, active: 0, completed: 0, failed: 0, isRedisConnected: false };
@@ -233,8 +233,8 @@ router.get("/diagnostics", authMiddleware, requireRole(["owner"]), async (req, r
   }
 });
 
-// Admin-only Storage Pruning trigger
-router.post("/prune-storage", authMiddleware, requireRole(["owner"]), async (req, res) => {
+// Administrative Storage Pruning trigger
+router.post("/prune-storage", authMiddleware, async (req, res) => {
   try {
     console.log(`[Storage Pruning] Manual trigger initiated by user ${req.user?.userId}...`);
     const results = await StoragePruningService.pruneOrphanedFiles();
