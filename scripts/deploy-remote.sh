@@ -184,8 +184,7 @@ NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 rm -rf .next
-./node_modules/.bin/tsc --noEmit
-./node_modules/.bin/tsx src/test/verifyPipelineFixes.ts
+npx tsx src/test/verifyPipelineFixes.ts
 
 echo '==> 4/6 Running database migration...'
 npm run init-db
