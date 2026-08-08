@@ -180,11 +180,11 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all 2>/dev/null || true
-NODE_ENV=development npm ci --include=dev || NODE_ENV=development npm install --include=dev
+NODE_ENV=development npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
-npx tsc --noEmit
-npx tsx src/test/verifyPipelineFixes.ts
+./node_modules/.bin/tsc --noEmit
+./node_modules/.bin/tsx src/test/verifyPipelineFixes.ts
 
 echo '==> 4/6 Running database migration...'
 npm run init-db
