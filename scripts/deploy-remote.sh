@@ -194,7 +194,6 @@ echo '==> 4/6 Running database migration...'
 npm run init-db
 
 echo '==> 5/6 Building production frontend...'
-if pkill -f "next" 2>/dev/null; then sleep 1; fi
 rm -rf .next node_modules/.cache
 # --webpack is required here: Next 16 defaults to Turbopack, which fails on
 # this VPS with a workspace-root inference error (it climbs above the project
