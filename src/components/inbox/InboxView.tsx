@@ -365,15 +365,10 @@ export default function InboxView() {
                     <tr key={item.id} className="hover:bg-secondary/20 dark:hover:bg-slate-950/40 transition-colors text-foreground/85">
                       <td className="p-4 font-bold text-foreground max-w-xs truncate">{item.file_name}</td>
                       <td className="p-4">
-                        {item.candidate_name ? (
+                        {item.job_title && item.job_status === "active" && item.status !== "Unmatched Role" && item.status !== "Needs Review" ? (
                           <div>
-                            <div className="font-bold text-foreground/90">{item.candidate_name}</div>
-                            <div className="text-[10px] text-muted-foreground">{item.candidate_email}</div>
-                            {(!item.candidate_job_id || item.job_status !== "active" || item.status === "Unmatched Role" || item.status === "Needs Review") && (
-                              <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-                                Not matched with any active job
-                              </div>
-                            )}
+                            <div className="font-bold text-foreground/90">{item.job_title}</div>
+                            <div className="text-[10px] text-muted-foreground">{item.job_location || "Location not specified"}</div>
                           </div>
                         ) : (
                           <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 italic">

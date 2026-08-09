@@ -25,6 +25,7 @@ router.get("/", async (req: any, res: any, next: any) => {
              c.email as candidate_email,
              c.job_id as candidate_job_id,
              j.title as job_title,
+             j.location as job_location,
              COALESCE(j.status, 'inactive') as job_status
       FROM resume_inbox ri
       LEFT JOIN candidates c ON (
