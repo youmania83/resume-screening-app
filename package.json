@@ -30,6 +30,7 @@
     "aws-sdk": "^2.1693.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.78.1",
+    "caniuse-lite": "^1.0.30001700",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "compression": "^1.8.1",
