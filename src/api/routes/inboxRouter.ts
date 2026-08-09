@@ -29,7 +29,6 @@ router.get("/", async (req: any, res: any, next: any) => {
       FROM resume_inbox ri
       LEFT JOIN candidates c ON (
         ri.candidate_id = c.id 
-        OR (ri.candidate_id IS NULL AND ri.sender_email IS NOT NULL AND ri.sender_email <> '' AND LOWER(c.email) = LOWER(ri.sender_email))
         OR (ri.candidate_id IS NULL AND c.id IN (SELECT cd.candidate_id FROM candidate_documents cd WHERE cd.title = ri.file_name OR cd.file_url = ri.file_url))
       )
       LEFT JOIN jobs j ON c.job_id = j.id AND j.sync_status IS DISTINCT FROM 'removed'
