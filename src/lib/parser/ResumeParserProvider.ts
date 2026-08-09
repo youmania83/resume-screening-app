@@ -2,6 +2,7 @@
 import { DeepSeekLLMAdapter } from "../ai/adapters/DeepSeekLLMAdapter.js";
 import { OpenAILLMAdapter } from "../ai/adapters/OpenAILLMAdapter.js";
 import { GeminiLLMAdapter } from "../ai/adapters/GeminiLLMAdapter.js";
+import { sanitizePromptInjection } from "../guardrails.js";
 
 export interface ParsedResumeData {
   isResume: boolean;
@@ -60,6 +61,10 @@ export interface IResumeParserProvider {
 }
 
 function buildParserPrompt(rawText: string, jobDescription?: string): string {
+  // Resume text is fully attacker-controlled (a candidate uploads it), so strip
+  // known prompt-injection phrases before it ever reaches the LLM. Legitimate
+  // resumes never contain these phrases, so this is a no-op for real candidates.
+  const safeRawText = sanitizePromptInjection(rawText);
   return `You are an expert ATS parser. Parse the raw resume text and extract candidate details.
 ${jobDescription ? `Compare the resume details against this Job Description:\n${jobDescription}\n` : ""}
 
@@ -111,7 +116,7 @@ IMPORTANT: If a field is not found in the resume, return an empty string "" or e
 }
 
 Resume Text:
-${rawText}`;
+${safeRawText}`;
 }
 
 export function parseCleanJson(text: string): any {

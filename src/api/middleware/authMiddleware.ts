@@ -40,8 +40,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     "/api/auth/accept-invite",
     "/api/health",
     "/api/metrics",
-    "/api/candidates/stats",
-    "/api/candidates/rescreen-all",
   ];
 
   // Also bypass auth for public assessment routes and candidate portal (verified via token query)
@@ -52,8 +50,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     currentPath.startsWith("/api/support-tickets/public") ||
     currentPath === "/api/email/zoho-status" ||
     currentPath === "/api/email/zoho-test" ||
-    currentPath.includes("/api/inbox/purge-junk") ||
-    (currentPath.startsWith("/api/assessment") && 
+    (currentPath.startsWith("/api/assessment") &&
      !currentPath.startsWith("/api/assessment/generate") && 
      !currentPath.startsWith("/api/assessment/send"))
   ) {
@@ -64,17 +61,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const refreshToken = req.cookies?.refreshToken;
 
   if (!accessToken && !refreshToken) {
-    if ((req.method === "GET" || currentPath.startsWith("/api/inbox")) && (currentPath.startsWith("/api/candidates") || currentPath.startsWith("/api/jobs") || currentPath.startsWith("/api/dashboard") || currentPath.startsWith("/api/inbox") || currentPath.startsWith("/api/health"))) {
-      req.user = {
-        userId: "default-user",
-        tenantId: "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5",
-        role: "owner",
-        email: "admin@risonaitech.com"
-      };
-      return tenantStorage.run({ tenantId: req.user.tenantId, userId: req.user.userId, role: req.user.role }, () => {
-        next();
-      });
-    }
     res.status(401).json({ success: false, error: "Authentication required" });
     return;
   }

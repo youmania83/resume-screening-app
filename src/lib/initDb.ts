@@ -856,6 +856,21 @@ async function init() {
       );
     });
 
+    // A candidate may hold at most one attempt per assessment. Without this,
+    // two near-simultaneous GET /api/assessment/:token requests (e.g. a
+    // double-mount or a fast retry) can both pass the "no existing attempt"
+    // check before either INSERT lands, creating duplicate attempts/sessions
+    // for the same candidate+assessment and corrupting submit/scoring logic.
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_assessment_attempts_candidate_assessment
+        ON assessment_attempts(candidate_id, assessment_id);
+    `).catch(async (err: any) => {
+      console.warn(
+        "[initDb] Could not create uniq_assessment_attempts_candidate_assessment — duplicate attempts already exist. " +
+        "Resolve duplicates and re-run init-db. Details:", err.message
+      );
+    });
+
     // Alter experience_years to NUMERIC(4,1) to support fractional experience years (e.g. 0.5, 1.5)
     await client.query("ALTER TABLE candidates ALTER COLUMN experience_years TYPE NUMERIC(4,1);");
 

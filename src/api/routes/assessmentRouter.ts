@@ -6,6 +6,8 @@ import { kekaWorkflowService } from "../../integrations/keka/services/workflow.s
 import crypto from "crypto";
 import { tenantStorage, DEFAULT_TENANT_ID } from "../../lib/tenantContext.js";
 import { queryGlobal, queryTenant } from "../../lib/tenantDb.js";
+import { transaction } from "../../lib/db.js";
+import { rateLimiter } from "../middleware/security.js";
 import {
   PIPELINE_THRESHOLDS,
   nextBusinessDaySlot,
@@ -421,102 +423,119 @@ router.get("/:token", async (req: any, res: any) => {
     if (!attemptRes.rowCount || attemptRes.rowCount === 0) {
       // Use the session ID passed by the frontend to prevent race conditions during double-fetch
       const sessionDbId = sessionId || crypto.randomUUID();
-      // Capture client info for audit
-      const browserFingerprint = req.headers['user-agent'] || null;
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-      // Create a new session record (attempt_id will be linked after attempt creation)
-      await queryGlobal(
-        `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
-         VALUES ($1, $2, $3, NULL, $4, $5, $6);`,
-        [sessionDbId, candidate.id, assessmentId, 'active', browserFingerprint, ipAddress]
-      );
-      // Create a brand new attempt linked to this session
       const attemptId = crypto.randomUUID();
-      await queryGlobal(
+
+      // Atomic insert-or-skip: `uniq_assessment_attempts_candidate_assessment`
+      // guarantees at most one attempt per candidate+assessment. If a
+      // concurrent request (double-mount, fast retry) already created the
+      // attempt between our SELECT above and this INSERT, this is a no-op
+      // and we fall through to the "existing attempt" path below instead of
+      // creating a second attempt/session pair.
+      const insertedAttempt = await queryGlobal(
         `INSERT INTO assessment_attempts (id, candidate_id, assessment_id, status, session_id)
-         VALUES ($1, $2, $3, $4, $5);`,
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (candidate_id, assessment_id) DO NOTHING
+         RETURNING *;`,
         [attemptId, candidate.id, assessmentId, "started", sessionDbId]
       );
-      // Update the session with the attempt reference
-      await queryGlobal(
-        `UPDATE assessment_sessions SET attempt_id = $1 WHERE id = $2;`,
-        [attemptId, sessionDbId]
-      );
 
-      // Log activity
-      await queryGlobal(
-        `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
-         VALUES ($1, $2, $3);`,
-        [candidate.id, "assessment_started", "Candidate started the assessment test."]
-      );
+      if (insertedAttempt.rowCount && insertedAttempt.rowCount > 0) {
+        // We won the race — this is genuinely the first attempt.
+        attempt = insertedAttempt.rows[0];
 
-      return res.json({
-        success: true,
-        candidateName: candidate.name,
-        candidateEmail: candidate.email,
-        jobTitle: candidate.role,
-        remainingSeconds: TOTAL_TEST_TIME_SEC,
-        questions,
-        sessionId: sessionDbId,
-        currentAnswers: {},
-        currentQuestionIndex: 0,
-      });
-    } else {
-      attempt = attemptRes.rows[0];
-
-      // If attempt is already completed, deny access
-      if (attempt.status === "completed") {
-        return res.status(403).json({ error: "Assessment already completed and submitted." });
-      }
-
-      // Rejoining session checks: Auto-transfer session to latest browser window/device for failure-proof access!
-      if (attempt.session_id !== sessionId) {
-        console.log(`[Session Transfer] Candidate accessing from session ${sessionId}. Transferring old session ${attempt.session_id} to new session ${sessionId}`);
-        
-        await queryGlobal(
-          `UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`,
-          [sessionId, attempt.id]
-        );
-        
+        // Capture client info for audit
         const browserFingerprint = req.headers['user-agent'] || null;
         const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
+        // Create the session record linked to the attempt we just created
         await queryGlobal(
           `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
-           VALUES ($1, $2, $3, $4, 'active', $5, $6)
-           ON CONFLICT (id) DO NOTHING;`,
-          [sessionId, candidate.id, assessmentId, attempt.id, browserFingerprint, ipAddress]
+           VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+          [sessionDbId, candidate.id, assessmentId, attemptId, 'active', browserFingerprint, ipAddress]
         );
-      }
 
-      // Check remaining time
-      const elapsedMs = Date.now() - new Date(attempt.started_at).getTime();
-      const elapsedSec = Math.floor(elapsedMs / 1000);
-      const remainingSeconds = TOTAL_TEST_TIME_SEC - elapsedSec;
+        // Log activity
+        await queryGlobal(
+          `INSERT INTO candidate_activity_logs (candidate_id, event_type, message)
+           VALUES ($1, $2, $3);`,
+          [candidate.id, "assessment_started", "Candidate started the assessment test."]
+        );
 
-      if (remainingSeconds <= 0) {
-        // Force submit
-        return res.status(403).json({
-          error: "Time limit expired. The assessment has been automatically closed.",
-          expired: true
+        return res.json({
+          success: true,
+          candidateName: candidate.name,
+          candidateEmail: candidate.email,
+          jobTitle: candidate.role,
+          remainingSeconds: TOTAL_TEST_TIME_SEC,
+          questions,
+          sessionId: sessionDbId,
+          currentAnswers: {},
+          currentQuestionIndex: 0,
         });
       }
 
-      const currentAnswers = typeof attempt.current_answers === "string"
-        ? JSON.parse(attempt.current_answers)
-        : (attempt.current_answers || {});
-      const currentQuestionIndex = attempt.current_question_index || 0;
+      // Lost the race — re-fetch the attempt a concurrent request just
+      // created and fall through to the existing-attempt handling below.
+      const raceAttemptRes = await queryGlobal(
+        `SELECT * FROM assessment_attempts WHERE candidate_id = $1 AND assessment_id = $2 LIMIT 1;`,
+        [candidate.id, assessmentId]
+      );
+      attempt = raceAttemptRes.rows[0];
+    } else {
+      attempt = attemptRes.rows[0];
+    }
 
-      return res.json({
-        success: true,
-        candidateName: candidate.name,
-        candidateEmail: candidate.email,
-        jobTitle: candidate.role,
-        remainingSeconds,
-        questions,
-        currentAnswers,
-        currentQuestionIndex,
+    // If attempt is already completed, deny access
+    if (attempt.status === "completed") {
+      return res.status(403).json({ error: "Assessment already completed and submitted." });
+    }
+
+    // Rejoining session checks: Auto-transfer session to latest browser window/device for failure-proof access!
+    if (attempt.session_id !== sessionId) {
+      console.log(`[Session Transfer] Candidate accessing from session ${sessionId}. Transferring old session ${attempt.session_id} to new session ${sessionId}`);
+
+      await queryGlobal(
+        `UPDATE assessment_attempts SET session_id = $1 WHERE id = $2;`,
+        [sessionId, attempt.id]
+      );
+
+      const browserFingerprint = req.headers['user-agent'] || null;
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
+      await queryGlobal(
+        `INSERT INTO assessment_sessions (id, candidate_id, assessment_id, attempt_id, status, browser_fingerprint, ip_address)
+         VALUES ($1, $2, $3, $4, 'active', $5, $6)
+         ON CONFLICT (id) DO NOTHING;`,
+        [sessionId, candidate.id, assessmentId, attempt.id, browserFingerprint, ipAddress]
+      );
+    }
+
+    // Check remaining time
+    const elapsedMs = Date.now() - new Date(attempt.started_at).getTime();
+    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const remainingSeconds = TOTAL_TEST_TIME_SEC - elapsedSec;
+
+    if (remainingSeconds <= 0) {
+      // Force submit
+      return res.status(403).json({
+        error: "Time limit expired. The assessment has been automatically closed.",
+        expired: true
       });
     }
+
+    const currentAnswers = typeof attempt.current_answers === "string"
+      ? JSON.parse(attempt.current_answers)
+      : (attempt.current_answers || {});
+    const currentQuestionIndex = attempt.current_question_index || 0;
+
+    return res.json({
+      success: true,
+      candidateName: candidate.name,
+      candidateEmail: candidate.email,
+      jobTitle: candidate.role,
+      remainingSeconds,
+      questions,
+      currentAnswers,
+      currentQuestionIndex,
+    });
   } catch (err: any) {
     console.error("Failed to load assessment portal details:", err);
     res.status(500).json({ error: err.message || "Failed to load assessment details" });
@@ -745,14 +764,6 @@ router.post("/submit", async (req: any, res: any) => {
     const totalQuestions = questionsRes.rowCount || 15;
     const assessmentScore = Math.round((correctCount / totalQuestions) * 100);
 
-    // Save completed attempt
-    await queryGlobal(
-      `UPDATE assessment_attempts
-       SET status = $1, correct_answers = $2, incorrect_answers = $3, score = $4, time_taken = $5, completed_at = now()
-       WHERE id = $6;`,
-      ["completed", correctCount, incorrectCount, assessmentScore, timeTaken, attempt.id]
-    );
-
     // Calculate Final Integrated Score
     // Final Score = (Resume Score * 40%) + (Assessment Score * 60%)
     const resumeScore = candidate.score || 0;
@@ -797,13 +808,26 @@ router.post("/submit", async (req: any, res: any) => {
       assessmentStatus = "failed";
     }
 
-    // Update candidate
-    await queryGlobal(
-      `UPDATE candidates 
-       SET assessment_score = $1, assessment_status = $2, final_score = $3, status = $4, keka_status = $5, assessment_completed_at = now()
-       WHERE id = $6;`,
-      [assessmentScore, assessmentStatus, finalScore, nextStatus, kekaStatus, candidate.id]
-    );
+    // Persist the completed attempt and the candidate's resulting score/status
+    // atomically. These were previously two independent UPDATEs; if the process
+    // crashed or the DB dropped the connection between them, the attempt could be
+    // left marked "completed" while the candidate record never got its score —
+    // silently stalling the candidate with no way to resubmit.
+    await transaction(async (client) => {
+      await client.query(
+        `UPDATE assessment_attempts
+         SET status = $1, correct_answers = $2, incorrect_answers = $3, score = $4, time_taken = $5, completed_at = now()
+         WHERE id = $6;`,
+        ["completed", correctCount, incorrectCount, assessmentScore, timeTaken, attempt.id]
+      );
+
+      await client.query(
+        `UPDATE candidates
+         SET assessment_score = $1, assessment_status = $2, final_score = $3, status = $4, keka_status = $5, assessment_completed_at = now()
+         WHERE id = $6;`,
+        [assessmentScore, assessmentStatus, finalScore, nextStatus, kekaStatus, candidate.id]
+      );
+    });
 
     // ── CRITICAL PATH COMPLETE ── Send response immediately so the candidate sees results
     res.json({
@@ -1185,7 +1209,7 @@ router.get("/job-info/:jobId", async (req: any, res: any) => {
 });
 
 // POST /api/assessment/public-register - registers a candidate dynamically from a public link
-router.post("/public-register", async (req: any, res: any) => {
+router.post("/public-register", rateLimiter(15 * 60 * 1000, 10), async (req: any, res: any) => {
   try {
     const { jobId, name, email, phone } = req.body as {
       jobId: string;

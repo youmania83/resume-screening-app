@@ -24,6 +24,7 @@
 import { callDeepSeek } from "./deepseek.js";
 import { pool } from "./db.js";
 import { parseCleanJson } from "./parser/ResumeParserProvider.js";
+import { sanitizePromptInjection } from "./guardrails.js";
 
 type ScoreResult = {
   overall: number;
@@ -54,9 +55,12 @@ async function getResumeText(batchId: string): Promise<string> {
  * The prompt asks for JSON output to make parsing reliable.
  */
 function buildPrompt(jobDescription: string, resumeText: string): string {
+  // Resume text is candidate-controlled; strip known prompt-injection phrases
+  // before interpolating into the LLM prompt.
+  const safeResumeText = sanitizePromptInjection(resumeText);
   return `You are an expert recruiter. Evaluate the following candidate resume against the job description provided.
 
-Job Description:\n${jobDescription}\n\nCandidate Resume:\n${resumeText}\n\nScore the candidate on the following criteria (0-100): experience, skills, education, culture fit. Use the following weighting: experience 40%, skills 30%, education 20%, culture fit 10%.
+Job Description:\n${jobDescription}\n\nCandidate Resume:\n${safeResumeText}\n\nScore the candidate on the following criteria (0-100): experience, skills, education, culture fit. Use the following weighting: experience 40%, skills 30%, education 20%, culture fit 10%.
 Return ONLY a JSON object with the shape {\"overall\": number, \"criteria\": {\"experience\": number, \"skills\": number, \"education\": number, \"cultureFit\": number}}. Do not include any additional text.`;
 }
 
@@ -69,8 +73,13 @@ export async function computeScore(batchId: string, jobDescription: string): Pro
   const response = await callDeepSeek(prompt, { maxTokens: 800 });
   try {
     const parsed = parseCleanJson(response) as ScoreResult;
-    if (typeof parsed.overall !== "number") {
-      throw new Error("Missing overall score field");
+    if (!Number.isFinite(parsed.overall)) {
+      throw new Error("Missing or non-numeric overall score field");
+    }
+    for (const key of Object.keys(parsed.criteria || {})) {
+      if (!Number.isFinite(parsed.criteria[key])) {
+        throw new Error(`Non-numeric criteria score field: ${key}`);
+      }
     }
     return parsed;
   } catch (err: any) {

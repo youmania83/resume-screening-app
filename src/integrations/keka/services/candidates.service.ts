@@ -48,6 +48,10 @@ export class KekaCandidatesService {
     const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
     const candidates = await this.getCandidates();
     for (const c of candidates) {
+      // Isolate each candidate: a malformed record or a transient DB error
+      // must not abort the whole cron cycle and skip every candidate still
+      // queued behind it in this batch.
+      try {
       let mappedJobId: string | null = null;
       let roleTitle: string | null = null;
 
@@ -179,6 +183,10 @@ export class KekaCandidatesService {
         c.source_system || "Keka",
         "synced"
       ]);
+      } catch (err: any) {
+        console.error(`[Keka Sync] Failed to sync candidate "${c.name}" (${c.email || c.id}), skipping and continuing with the rest of the batch:`, err.message || err);
+        continue;
+      }
     }
   }
 

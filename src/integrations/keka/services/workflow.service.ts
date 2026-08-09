@@ -121,9 +121,19 @@ export class KekaWorkflowService {
       let foundLocalFile = "";
       if (fs.existsSync(uploadsDir)) {
         const files = fs.readdirSync(uploadsDir);
-        const match = files.find(f => f.includes(candidateId));
-        if (match) {
-          foundLocalFile = path.join(uploadsDir, match);
+        // Match the actual upload naming convention (`resume-<candidateId>.<ext>`,
+        // see zohoMail.service.ts / documents.service.ts) rather than a loose
+        // substring match, which could pick an unrelated file whose name happens
+        // to contain this candidate's UUID. If re-uploads left multiple files
+        // behind, prefer the most recently written one instead of directory order.
+        const matches = files.filter(f => f.startsWith(`resume-${candidateId}`));
+        if (matches.length > 0) {
+          const withMtime = matches.map(f => ({
+            name: f,
+            mtimeMs: fs.statSync(path.join(uploadsDir, f)).mtimeMs
+          }));
+          withMtime.sort((a, b) => b.mtimeMs - a.mtimeMs);
+          foundLocalFile = path.join(uploadsDir, withMtime[0].name);
         }
       }
 
