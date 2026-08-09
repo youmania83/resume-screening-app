@@ -369,9 +369,16 @@ export default function InboxView() {
                           <div>
                             <div className="font-bold text-foreground/90">{item.candidate_name}</div>
                             <div className="text-[10px] text-muted-foreground">{item.candidate_email}</div>
+                            {(!item.candidate_job_id || item.job_status !== "active" || item.status === "Unmatched Role" || item.status === "Needs Review") && (
+                              <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                                Not matched with any active job
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground/60 italic">Unassigned</span>
+                          <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 italic">
+                            Not matched with any active job
+                          </div>
                         )}
                       </td>
                       <td className="p-4">

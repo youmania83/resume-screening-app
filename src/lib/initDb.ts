@@ -976,6 +976,22 @@ async function init() {
       END $$;
     `);
 
+    // Repair orphaned resume_inbox items by linking them to their corresponding candidate records
+    await client.query(`
+      UPDATE resume_inbox ri
+      SET candidate_id = sub.candidate_id
+      FROM (
+        SELECT ri_inner.id as inbox_id, c.id as candidate_id
+        FROM resume_inbox ri_inner
+        JOIN candidates c ON (
+          (ri_inner.sender_email IS NOT NULL AND ri_inner.sender_email <> '' AND LOWER(ri_inner.sender_email) = LOWER(c.email))
+          OR c.id IN (SELECT cd.candidate_id FROM candidate_documents cd WHERE cd.title = ri_inner.file_name OR cd.file_url = ri_inner.file_url)
+        )
+        WHERE ri_inner.candidate_id IS NULL
+      ) sub
+      WHERE ri.id = sub.inbox_id AND ri.candidate_id IS NULL;
+    `);
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();
