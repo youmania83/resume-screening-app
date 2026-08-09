@@ -989,6 +989,37 @@ async function init() {
       WHERE ri.id = sub.inbox_id AND ri.candidate_id IS NULL;
     `);
 
+    // Merge duplicate candidate records across all ingestion sources (Keka API, Mailbox/Zoho, Uploads) by email
+    await client.query(`
+      DO $$
+      DECLARE
+          rec RECORD;
+          primary_id text;
+          dup_id text;
+      BEGIN
+          FOR rec IN 
+              SELECT LOWER(email) as email, array_agg(id::text ORDER BY (CASE WHEN assessment_token IS NOT NULL AND assessment_token != '' THEN 0 ELSE 1 END), (CASE WHEN job_id IS NOT NULL THEN 0 ELSE 1 END), score DESC, created_at DESC) as ids
+              FROM candidates
+              WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'
+              GROUP BY LOWER(email)
+              HAVING count(*) > 1
+          LOOP
+              primary_id := rec.ids[1];
+              FOR i IN 2..array_length(rec.ids, 1) LOOP
+                  dup_id := rec.ids[i];
+                  UPDATE candidate_documents SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_timeline SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_activity_logs SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_job_matches SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_match_history SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE resume_inbox SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  DELETE FROM duplicate_candidates WHERE candidate_id = dup_id OR duplicate_candidate_id = dup_id;
+                  DELETE FROM candidates WHERE id::text = dup_id;
+              END LOOP;
+          END LOOP;
+      END $$;
+    `);
+
     console.log("✅ Database tables and schema alterations ensured.");
   } finally {
     client.release();
