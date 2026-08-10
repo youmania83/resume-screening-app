@@ -19,7 +19,9 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
   const interviewingList = candidates.filter(c => {
     const s = (c.status || "").toLowerCase().trim();
     const ks = ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().trim();
-    return ["interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"].includes(s) || ks.includes("interview") || Boolean(c.interviewScheduledDate);
+    const isPassed = (c as any).assessmentStatus === "passed" || (c as any).assessment_status === "passed";
+    const isExplicitHr = ks.includes("interview") || Boolean(c.interviewScheduledDate);
+    return isPassed || isExplicitHr || ["interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"].includes(s);
   });
   const interviewingIds = new Set(interviewingList.map(c => c.id));
 

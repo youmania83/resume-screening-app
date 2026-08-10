@@ -4,35 +4,57 @@ import { query } from "../lib/db.js";
 export async function syncPipelineStages() {
   console.log("=== Updating candidate pipeline stages based on AI score thresholds ===");
 
-  // 1. Top AI scoring candidates (score >= 91) or explicitly scheduled interviews -> Interviewing (13 candidates)
+  // 1. Demote candidates from interviewing back to shortlisted if they haven't passed the online AI assessment and HR didn't explicitly mark them for interview
+  const demoteRes = await query(`
+    UPDATE candidates
+    SET status = 'shortlisted'
+    WHERE status = 'interviewing'
+      AND COALESCE(assessment_status, 'pending') != 'passed'
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
+      AND interview_scheduled_date IS NULL;
+  `);
+  console.log(`Demoted non-assessment-passed candidates from interviewing to shortlisted: ${demoteRes.rowCount}`);
+
+  // 2. INTERVIEWING: ONLY candidates who passed online AI assessment test OR HR marked interviewing in Keka OR HR scheduled interview in portal
   const intRes = await query(`
     UPDATE candidates 
     SET status = 'interviewing' 
-    WHERE score >= 91 OR keka_status ILIKE '%interview%' OR interview_scheduled_date IS NOT NULL;
+    WHERE assessment_status = 'passed' 
+       OR keka_status ILIKE '%interview%' 
+       OR interview_scheduled_date IS NOT NULL;
   `);
   console.log(`Updated interviewing candidates count: ${intRes.rowCount}`);
 
-  // 2. Shortlisted candidates (score >= 75 and score < 91)
+  // 3. SHORTLISTED (AI Assessment): Candidates with resume score >= 80% waiting for AI Assessment
   const shortRes = await query(`
     UPDATE candidates 
     SET status = 'shortlisted' 
-    WHERE score >= 75 AND score < 91 AND status != 'interviewing' AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%');
+    WHERE score >= 80 
+      AND status != 'interviewing' 
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
+      AND interview_scheduled_date IS NULL;
   `);
   console.log(`Updated shortlisted candidates count: ${shortRes.rowCount}`);
 
-  // 3. Under Review candidates (score >= 60 and score < 75)
+  // 4. UNDER REVIEW: Candidates with resume score 60-79%
   const revRes = await query(`
     UPDATE candidates 
     SET status = 'Review' 
-    WHERE score >= 60 AND score < 75 AND status != 'interviewing' AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%');
+    WHERE score >= 60 AND score < 80 
+      AND status != 'interviewing' 
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
+      AND interview_scheduled_date IS NULL;
   `);
   console.log(`Updated review candidates count: ${revRes.rowCount}`);
 
-  // 4. Hold / Rejected / Pool candidates (score < 60)
+  // 5. HOLD / REJECTED: Candidates with resume score < 60%
   const rejRes = await query(`
     UPDATE candidates 
     SET status = 'rejected' 
-    WHERE (score < 60 OR score IS NULL) AND status != 'interviewing' AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%');
+    WHERE (score < 60 OR score IS NULL) 
+      AND status != 'interviewing' 
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
+      AND interview_scheduled_date IS NULL;
   `);
   console.log(`Updated rejected candidates count: ${rejRes.rowCount}`);
 
