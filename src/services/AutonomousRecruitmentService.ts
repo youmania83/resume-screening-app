@@ -278,15 +278,13 @@ export class AutonomousRecruitmentService {
                   c.assessment_token, c.assessment_token_expiry,
                   j.title as job_title, j.description as job_desc
            FROM candidates c
-           JOIN jobs j ON c.job_id = j.id AND ${activeJobSql("j")}
-           WHERE LOWER(c.status) IN ('shortlisted', 'qualified')
-             AND c.created_at >= $1::timestamptz
+           LEFT JOIN jobs j ON c.job_id = j.id
+           WHERE (c.score >= 70 OR LOWER(c.status) IN ('shortlisted', 'qualified', 'interviewing', 'review'))
              AND COALESCE(c.assessment_status, 'pending') = 'pending'
              AND c.assessment_invited_at IS NULL
              AND c.email IS NOT NULL AND c.email LIKE '%@%'
-           ORDER BY c.created_at ASC
-           LIMIT 100;`,
-          [cutoffIso]
+           ORDER BY c.created_at DESC
+           LIMIT 200;`
         );
 
         for (const candidate of shortlistedRes.rows) {
