@@ -148,7 +148,10 @@ export class KekaCandidatesService {
           skills = CASE WHEN array_length(EXCLUDED.skills, 1) > 0 THEN EXCLUDED.skills ELSE candidates.skills END,
           matched_skills = CASE WHEN array_length(EXCLUDED.matched_skills, 1) > 0 THEN EXCLUDED.matched_skills ELSE candidates.matched_skills END,
           education = COALESCE(EXCLUDED.education, candidates.education),
-          status = candidates.status,
+          status = CASE
+            WHEN candidates.status = 'interviewing' OR candidates.keka_status ILIKE '%interview%' OR candidates.interview_scheduled_date IS NOT NULL THEN candidates.status
+            ELSE EXCLUDED.status
+          END,
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
           keka_status = EXCLUDED.keka_status,
@@ -175,7 +178,7 @@ export class KekaCandidatesService {
         candidateSkills,
         matchedSkills,
         c.education || null,
-        c.status === "rejected" ? "rejected" : "applied", 
+        c.status === "rejected" ? "rejected" : initialScore >= 91 ? "interviewing" : initialScore >= 75 ? "shortlisted" : initialScore >= 60 ? "Review" : "applied", 
         "Keka Integration", 
         c.assessmentScore ?? null,
         c.currentStage || "Applied", 
