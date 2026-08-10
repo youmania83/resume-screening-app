@@ -284,7 +284,7 @@ export class AutonomousRecruitmentService {
              AND c.assessment_invited_at IS NULL
              AND c.email IS NOT NULL AND c.email LIKE '%@%'
            ORDER BY c.created_at DESC
-           LIMIT 200;`
+           LIMIT 10;`
         );
 
         for (const candidate of shortlistedRes.rows) {
@@ -325,6 +325,10 @@ export class AutonomousRecruitmentService {
               tenantId: candidate.tenant_id,
               candidateId: candidate.id
             });
+
+            invited++;
+            // 3-second delay between dispatches to adhere to Zoho SMTP rate limits
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
             if (inviteResult?.success) {
               // Mark as invited so no later cycle can pick this candidate up again.
