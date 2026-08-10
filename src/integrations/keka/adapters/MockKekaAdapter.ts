@@ -199,6 +199,14 @@ export class MockKekaAdapter implements ATSAdapter {
     return this.db.candidates;
   }
 
+  async getCandidatesForJob(jobId: string, jobTitle?: string): Promise<KekaCandidate[]> {
+    const list = this.db.candidates.filter(c => c.jobId === jobId);
+    if (jobTitle) {
+      list.forEach(c => { (c as any).jobTitle = jobTitle; });
+    }
+    return list;
+  }
+
   async getCandidateById(id: string): Promise<KekaCandidate | null> {
     const candidate = this.db.candidates.find(c => c.id === id);
     return candidate || null;

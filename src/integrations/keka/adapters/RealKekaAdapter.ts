@@ -130,63 +130,98 @@ export class RealKekaAdapter implements ATSAdapter {
 
     for (const job of activeJobs) {
       try {
-        const candidates = await this.getCandidatesForJob(job.id);
+        const candidates = await this.getCandidatesForJob(job.id, job.title);
         allCandidates.push(...candidates);
       } catch (err) {
-        console.error(`Failed to fetch candidates for job ${job.id}:`, err);
+        console.error(`Failed to fetch candidates for job ${job.id} (${job.title}):`, err);
       }
     }
 
     return allCandidates;
   }
 
-  async getCandidatesForJob(jobId: string): Promise<KekaCandidate[]> {
+  async getCandidatesForJob(jobId: string, jobTitle?: string): Promise<KekaCandidate[]> {
     const token = await this.getAccessToken();
-    const url = `${kekaConfig.baseUrl}/v1/hire/jobs/${jobId}/candidates`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "Authorization": `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Keka API - getCandidatesForJob failed for ${jobId}: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const result = await response.json() as any;
-    const rawCandidates = (result.data || []) as any[];
-
-    // Strict filter: Ingest candidates applied on or after cutoff date
     const cutoff = getIngestionCutoff();
 
-    const filtered = rawCandidates.filter((cand: any) => {
-      const appliedSec = parseFloat(cand.jobApplicationDetails?.appliedOn || "0");
-      if (!appliedSec) return true;
-      const appliedMs = appliedSec * 1000;
+    const parseKekaTimestampMs = (val: any): number => {
+      if (!val) return 0;
+      if (typeof val === "number") return val > 1e11 ? val : val * 1000;
+      const str = String(val).trim();
+      if (!str) return 0;
+      if (/^\d+(\.\d+)?$/.test(str)) {
+        const num = parseFloat(str);
+        return num > 1e11 ? num : num * 1000;
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    const allRawCandidates: any[] = [];
+    let pageNumber = 1;
+    let totalPages = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const url = `${kekaConfig.baseUrl}/v1/hire/jobs/${jobId}/candidates?pageNumber=${pageNumber}&pageSize=100`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Keka API - getCandidatesForJob failed for ${jobId} (page ${pageNumber}): ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json() as any;
+      const rawCandidates = (result.data || []) as any[];
+      allRawCandidates.push(...rawCandidates);
+
+      totalPages = typeof result.totalPages === "number" && result.totalPages > 0 ? result.totalPages : 1;
+      if (rawCandidates.length > 0) {
+        console.log(`[Keka API] Fetched page ${pageNumber}/${totalPages} (${rawCandidates.length} candidates) for job "${jobTitle || jobId}"`);
+      }
+      if (result.nextPage && pageNumber < totalPages && rawCandidates.length > 0) {
+        pageNumber++;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    // Strict filter: Ingest candidates applied on or after cutoff date
+    const filtered = allRawCandidates.filter((cand: any) => {
+      const appliedMs = parseKekaTimestampMs(cand.jobApplicationDetails?.appliedOn);
+      if (!appliedMs) return true;
       return appliedMs >= cutoff.getTime();
     });
 
-    return filtered.map((cand: any) => ({
-      id: cand.id,
-      jobId: jobId,
-      name: `${cand.firstName || ""} ${cand.middleName || ""} ${cand.lastName || ""}`.replace(/\s+/g, " ").trim(),
-      email: cand.email,
-      phone: cand.phone || undefined,
-      resumeUrl: undefined, // Filled on-demand
-      skills: cand.skills || [],
-      experience: cand.experienceDetails?.length || undefined,
-      education: cand.educationDetails?.[0]?.degree || undefined,
-      currentStage: cand.jobApplicationDetails?.jobHiringStageId || undefined,
-      status: (cand.jobApplicationDetails?.status === 0 || cand.jobApplicationDetails?.status === 1 || cand.jobApplicationDetails?.status === 2 || cand.jobApplicationDetails?.status === undefined) && cand.jobApplicationDetails?.status !== 4 ? "active" : "inactive",
-      external_id: cand.id,
-      source_system: "Keka",
-      sync_status: "synced",
-      last_synced_at: new Date()
-    }));
+    return filtered.map((cand: any) => {
+      const appliedMs = parseKekaTimestampMs(cand.jobApplicationDetails?.appliedOn);
+      return {
+        id: cand.id,
+        jobId: jobId,
+        jobTitle: jobTitle,
+        name: `${cand.firstName || ""} ${cand.middleName || ""} ${cand.lastName || ""}`.replace(/\s+/g, " ").trim(),
+        email: cand.email,
+        phone: cand.phone || undefined,
+        resumeUrl: undefined, // Filled on-demand
+        skills: cand.skills || [],
+        experience: cand.experienceDetails?.length || undefined,
+        education: cand.educationDetails?.[0]?.degree || undefined,
+        currentStage: cand.jobApplicationDetails?.jobHiringStageId || undefined,
+        status: (cand.jobApplicationDetails?.status === 0 || cand.jobApplicationDetails?.status === 1 || cand.jobApplicationDetails?.status === 2 || cand.jobApplicationDetails?.status === undefined) && cand.jobApplicationDetails?.status !== 4 ? "active" : "inactive",
+        appliedDate: appliedMs > 0 ? new Date(appliedMs).toISOString() : undefined,
+        external_id: cand.id,
+        source_system: "Keka",
+        sync_status: "synced",
+        last_synced_at: new Date()
+      };
+    });
   }
 
   async getCandidateById(id: string): Promise<KekaCandidate | null> {

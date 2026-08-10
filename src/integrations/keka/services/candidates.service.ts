@@ -47,6 +47,8 @@ export class KekaCandidatesService {
   async syncCandidatesFromKeka(): Promise<void> {
     const targetTenantId = process.env.TARGET_TENANT_ID || "87b949cb-2c0d-44ca-a6f5-a025ec43e6a5";
     const candidates = await this.getCandidates();
+    let syncedCount = 0;
+    let skippedCount = 0;
     for (const c of candidates) {
       // Isolate each candidate: a malformed record or a transient DB error
       // must not abort the whole cron cycle and skip every candidate still
@@ -75,14 +77,12 @@ export class KekaCandidatesService {
       // to. Only auto-map when the title identifies exactly one active job.
       if (!mappedJobId && (c as any).jobTitle) {
         const titleCheck = await query(
-          `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND ${ACTIVE_JOB_SQL};`,
+          `SELECT id, title FROM jobs WHERE LOWER(title) = LOWER($1) AND ${ACTIVE_JOB_SQL} ORDER BY last_synced_at DESC NULLS LAST LIMIT 1;`,
           [(c as any).jobTitle]
         );
-        if (titleCheck.rowCount === 1) {
+        if (titleCheck.rowCount && titleCheck.rowCount > 0) {
           mappedJobId = titleCheck.rows[0].id;
           roleTitle = titleCheck.rows[0].title;
-        } else if (titleCheck.rowCount && titleCheck.rowCount > 1) {
-          console.warn(`[Keka Sync] Candidate "${c.name}" (${c.email}): Job ID "${c.jobId}" did not match a known posting and title "${(c as any).jobTitle}" matches ${titleCheck.rowCount} active postings (likely different locations). Refusing to guess — candidate will be skipped for HR to map manually.`);
         }
       }
 
@@ -90,11 +90,13 @@ export class KekaCandidatesService {
       const cleanNameStr = (c.name || "").trim();
       if (!cleanNameStr || /candidate name not found|name not found|not found|unknown candidate|unknown/i.test(cleanNameStr)) {
         console.log(`[Keka Sync] Skipping candidate with placeholder name: "${c.name}" (${c.email})`);
+        skippedCount++;
         continue;
       }
 
       if (!mappedJobId || !roleTitle) {
         console.log(`[Keka Sync] Skipping candidate "${c.name}" (${c.email}): Job "${c.jobId || (c as any).jobTitle || 'Unspecified'}" is not an active open position.`);
+        skippedCount++;
         continue;
       }
 
@@ -183,11 +185,14 @@ export class KekaCandidatesService {
         c.source_system || "Keka",
         "synced"
       ]);
+      syncedCount++;
       } catch (err: any) {
         console.error(`[Keka Sync] Failed to sync candidate "${c.name}" (${c.email || c.id}), skipping and continuing with the rest of the batch:`, err.message || err);
+        skippedCount++;
         continue;
       }
     }
+    console.log(`✅ [Keka Sync] Finished candidate sync. Total fetched: ${candidates.length}, Synced: ${syncedCount}, Skipped: ${skippedCount}`);
   }
 
   /**

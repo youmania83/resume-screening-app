@@ -12,6 +12,7 @@ export interface ATSAdapter {
   getJobById(id: string): Promise<KekaJob | null>;
   
   getCandidates(): Promise<KekaCandidate[]>;
+  getCandidatesForJob(jobId: string, jobTitle?: string): Promise<KekaCandidate[]>;
   getCandidateById(id: string): Promise<KekaCandidate | null>;
   updateCandidate(id: string, candidate: Partial<KekaCandidate>): Promise<KekaCandidate>;
   
