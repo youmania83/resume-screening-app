@@ -180,7 +180,7 @@ git reset --hard 'origin/${GIT_BRANCH}'
 
 echo '==> 2/6 Installing dependencies...'
 pm2 stop all 2>/dev/null || true
-npm install --include=dev --ignore-scripts
+npm install --include=dev
 
 echo '==> 3/6 Running type checks & regression suite...'
 rm -rf .next
