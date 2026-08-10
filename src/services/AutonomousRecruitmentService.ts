@@ -274,13 +274,11 @@ export class AutonomousRecruitmentService {
       //  - the assessment must not already be completed/passed.
       try {
         const shortlistedRes = await queryGlobal(
-          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role,
-                  c.assessment_token, c.assessment_token_expiry,
-                  j.title as job_title, j.description as job_desc
+          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc
            FROM candidates c
            LEFT JOIN jobs j ON c.job_id = j.id
-           WHERE (c.score >= 70 OR LOWER(c.status) IN ('shortlisted', 'qualified', 'interviewing', 'review'))
-             AND COALESCE(c.assessment_status, 'pending') = 'pending'
+           WHERE c.score >= 80
+             AND LOWER(c.status) IN ('shortlisted', 'qualified')
              AND c.assessment_invited_at IS NULL
              AND c.email IS NOT NULL AND c.email LIKE '%@%'
            ORDER BY c.created_at DESC

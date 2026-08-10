@@ -9,12 +9,13 @@ import { kekaAssessmentService } from "../integrations/keka/services/assessment.
 export async function autoInviteAllEligible(): Promise<{ totalEligible: number; newlyInvited: number; errors: number }> {
   console.log("🚀 [Auto-Invite] Starting automatic assessment invitation dispatch for all eligible candidates...");
 
-  // Select candidates with score >= 70 OR stage in (shortlisted, qualified, interviewing, Review) who haven't been invited yet
+  // Select candidates with resume score >= 80% (Shortlisted) who haven't been invited yet
   const res = await query(`
     SELECT c.id, c.name, c.email, c.job_id, c.role, c.score, c.assessment_token, j.title as job_title, j.description as job_description
     FROM candidates c
     LEFT JOIN jobs j ON c.job_id = j.id
-    WHERE (c.score >= 70 OR LOWER(c.status) IN ('shortlisted', 'qualified', 'interviewing', 'review'))
+    WHERE c.score >= 80
+      AND LOWER(c.status) IN ('shortlisted', 'qualified')
       AND c.email IS NOT NULL AND c.email LIKE '%@%'
       AND (c.assessment_invited_at IS NULL OR c.assessment_token IS NULL);
   `);

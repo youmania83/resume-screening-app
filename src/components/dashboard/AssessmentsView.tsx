@@ -71,11 +71,11 @@ export function AssessmentsView({
     }
   };
 
-  // Include candidates who qualify (Resume Score >= 70%), are in shortlisted/review/interviewing stages, or have assessment tokens
+  // Include candidates who qualify (Resume Score >= 80%), are in shortlisted/qualified/interviewing stages, or have assessment tokens
   const rawEligible = candidates.filter(c => 
-    (c.score || 0) >= 70 || 
+    (c.score || 0) >= 80 || 
     !!c.assessmentToken || 
-    ["shortlisted", "qualified", "review", "under_review", "under review", "interviewing", "interview_scheduled", "assessment"].includes((c.status || "").toLowerCase())
+    ["shortlisted", "qualified", "interviewing", "interview_scheduled", "assessment"].includes((c.status || "").toLowerCase())
   );
 
   // Deduplicate candidates by email address to ensure clean UI presentation
