@@ -278,8 +278,8 @@ export function CandidatesView({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={c.status === "shortlisted" ? "success" : c.status === "interviewing" ? "purple" : c.status === "hold" ? "warning" : c.status === "rejected" ? "destructive" : c.status === "selected" || c.status === "hired" || c.status === "onboarded" ? "success" : c.status === "talent_pool" ? "info" : "secondary"} className="text-[9px] uppercase tracking-wider py-0">
-                        {c.status === "talent_pool" ? "Talent Pool" : c.status}
+                      <Badge variant={c.status === "shortlisted" ? "success" : c.status === "interviewing" || ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") ? "purple" : c.status === "hold" ? "warning" : c.status === "rejected" ? "destructive" : c.status === "selected" || c.status === "hired" || c.status === "onboarded" ? "success" : c.status === "talent_pool" ? "info" : "secondary"} className="text-[9px] uppercase tracking-wider py-0">
+                        {((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") ? "Interview" : c.status === "talent_pool" ? "Talent Pool" : c.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="pr-6 text-right" onClick={(e) => e.stopPropagation()}>

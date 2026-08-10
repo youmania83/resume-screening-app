@@ -84,13 +84,13 @@ export function ScreeningView(props: ScreeningViewProps) {
         total: props.stats.totalApplicants,
         shortlisted: props.stats.shortlisted,
         assessmentPassed: props.stats.assessmentPassed !== undefined ? props.stats.assessmentPassed : props.candidates.filter(c => (c as any).assessment_status === "passed").length,
-        interviewing: props.stats.interviewsScheduled
+        interviewing: (props.stats.interviewsScheduled && props.stats.interviewsScheduled > 0) ? props.stats.interviewsScheduled : props.candidates.filter(c => (c.status || "").toLowerCase().includes("interview") || ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") || !!c.interviewScheduledDate).length
       };
     }
     const total = props.candidates.length;
     const shortlisted = props.candidates.filter(c => (c.score || 0) >= 80 || c.status === "shortlisted").length;
     const assessmentPassed = props.candidates.filter(c => (c as any).assessment_status === "passed").length;
-    const interviewing = props.candidates.filter(c => c.status === "interviewing" || c.status === "interview_scheduled").length;
+    const interviewing = props.candidates.filter(c => (c.status || "").toLowerCase().includes("interview") || ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") || !!c.interviewScheduledDate).length;
     return { total, shortlisted, assessmentPassed, interviewing };
   }, [props.candidates, props.stats]);
 

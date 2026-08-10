@@ -16,23 +16,33 @@ export function PipelineView({ candidates, setSelectedCandidate, setActiveTab }:
     setSelectedCandidate(c);
   };
 
+  const interviewingList = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    const ks = ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().trim();
+    return ["interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"].includes(s) || ks.includes("interview") || Boolean(c.interviewScheduledDate);
+  });
+  const interviewingIds = new Set(interviewingList.map(c => c.id));
+
   const appliedList = candidates.filter(c => {
+    if (interviewingIds.has(c.id)) return false;
     const s = (c.status || "").toLowerCase().trim();
     return ["applied", "new", "unscreened", "received"].includes(s) || !s;
   });
+
   const reviewList = candidates.filter(c => {
+    if (interviewingIds.has(c.id)) return false;
     const s = (c.status || "").toLowerCase().trim();
     return ["review", "under_review", "under review", "screening", "evaluating"].includes(s);
   });
+
   const shortlistedList = candidates.filter(c => {
+    if (interviewingIds.has(c.id)) return false;
     const s = (c.status || "").toLowerCase().trim();
     return ["shortlisted", "qualified", "assessment", "assessment_passed", "passed"].includes(s);
   });
-  const interviewingList = candidates.filter(c => {
-    const s = (c.status || "").toLowerCase().trim();
-    return ["interviewing", "interview_scheduled", "interview", "selected", "hired", "onboarded", "offered"].includes(s);
-  });
+
   const inactiveList = candidates.filter(c => {
+    if (interviewingIds.has(c.id)) return false;
     const s = (c.status || "").toLowerCase().trim();
     const isKnownOther = [
       "applied", "new", "unscreened", "received",
