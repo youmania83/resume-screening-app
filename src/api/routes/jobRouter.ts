@@ -19,28 +19,38 @@ router.get("/", async (req, res, next) => {
     const includeRemoved = req.query.include_removed === "true";
     const sql = includeRemoved
       ? `WITH candidate_counts AS (
-           SELECT job_id, COUNT(*) as count
-           FROM candidates
-           WHERE score > 0 OR recommendation IS NOT NULL
-           GROUP BY job_id
+           SELECT j_inner.id as job_id, COUNT(c.id) as count
+           FROM jobs j_inner
+           LEFT JOIN candidates c ON (
+             c.job_id = j_inner.id 
+             OR c.job_id = j_inner.external_id 
+             OR (j_inner.job_code IS NOT NULL AND (c.job_id = j_inner.job_code OR c.role ILIKE '%' || j_inner.job_code || '%'))
+             OR (c.role IS NOT NULL AND LOWER(TRIM(c.role)) = LOWER(TRIM(j_inner.title)))
+           )
+           GROUP BY j_inner.id
          )
          SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
-         LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
+         LEFT JOIN candidate_counts cc ON cc.job_id = j.id
          WHERE j.tenant_id = :tenant_id 
            AND j.title IS NOT NULL 
            AND j.title != 'Not Specified' 
            AND j.title != 'Not specified'
          ORDER BY j.created_at DESC;`
       : `WITH candidate_counts AS (
-           SELECT job_id, COUNT(*) as count
-           FROM candidates
-           WHERE score > 0 OR recommendation IS NOT NULL
-           GROUP BY job_id
+           SELECT j_inner.id as job_id, COUNT(c.id) as count
+           FROM jobs j_inner
+           LEFT JOIN candidates c ON (
+             c.job_id = j_inner.id 
+             OR c.job_id = j_inner.external_id 
+             OR (j_inner.job_code IS NOT NULL AND (c.job_id = j_inner.job_code OR c.role ILIKE '%' || j_inner.job_code || '%'))
+             OR (c.role IS NOT NULL AND LOWER(TRIM(c.role)) = LOWER(TRIM(j_inner.title)))
+           )
+           GROUP BY j_inner.id
          )
          SELECT j.*, COALESCE(cc.count, 0)::int as candidates_count
          FROM jobs j 
-         LEFT JOIN candidate_counts cc ON (cc.job_id = j.id OR cc.job_id = j.external_id)
+         LEFT JOIN candidate_counts cc ON cc.job_id = j.id
          WHERE j.tenant_id = :tenant_id
            AND (j.sync_status IS NULL OR j.sync_status != 'removed')
            AND COALESCE(j.status, 'active') = 'active'
