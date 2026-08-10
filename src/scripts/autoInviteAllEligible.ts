@@ -55,7 +55,10 @@ export async function autoInviteAllEligible(): Promise<{ totalEligible: number; 
       await kekaAssessmentService.sendAssessmentEmail(candidateId, name, email, targetRole, token);
       
       newlyInvited++;
-      console.log(`✅ [Auto-Invite] Successfully invited: ${name} (${email})`);
+      console.log(`✅ [Auto-Invite] Successfully processed invitation for: ${name} (${email})`);
+
+      // 1.5s delay per email to adhere to SMTP provider rate limits
+      await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (err: any) {
       errors++;
       console.error(`❌ [Auto-Invite] Failed to invite candidate ${name} (${email}):`, err.message || err);
