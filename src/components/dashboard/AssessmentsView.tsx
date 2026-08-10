@@ -338,8 +338,16 @@ export function AssessmentsView({
                                 variant="outline"
                                 className="text-[10px] px-2 py-1 font-bold rounded border-border text-foreground/90"
                                 onClick={() => {
-                                  const baseUrl = window.location.origin;
-                                  const inviteUrl = `${baseUrl}/assessment/${c.assessmentToken}`;
+                                  const envAppUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+                                  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+                                  let baseHost = envAppUrl || currentOrigin || "https://api.risonaitech.com";
+                                  if (/localhost|127\.0\.0\.1/.test(baseHost) && currentOrigin && !/localhost|127\.0\.0\.1/.test(currentOrigin)) {
+                                    baseHost = currentOrigin;
+                                  }
+                                  if (/localhost|127\.0\.0\.1/.test(baseHost)) {
+                                    baseHost = "https://api.risonaitech.com";
+                                  }
+                                  const inviteUrl = `${baseHost.replace(/\/+$/, "")}/assessment/${c.assessmentToken}`;
                                   copyToClipboard(inviteUrl);
                                 }}
                               >

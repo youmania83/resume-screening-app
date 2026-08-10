@@ -90,7 +90,7 @@ export function OverviewView({ candidates, stats }: OverviewViewProps) {
     const screened = (stats?.screened && stats.screened > 0) ? stats.screened : (candidates.filter((c) => (c.score || 0) > 0).length || (total > 0 ? total : 0));
     const shortlisted = (stats?.shortlisted && stats.shortlisted > 0) ? stats.shortlisted : candidates.filter((c) => ["shortlisted", "interviewing", "qualified", "assessment"].includes((c.status || "").toLowerCase())).length;
     const rejected = (stats?.rejected && stats.rejected > 0) ? stats.rejected : candidates.filter((c) => ["rejected", "keka_rejected"].includes((c.status || "").toLowerCase())).length;
-    const interviews = (stats?.interviewsScheduled && stats.interviewsScheduled > 0) ? stats.interviewsScheduled : candidates.filter((c) => ["interviewing", "interview_scheduled", "interview"].includes((c.status || "").toLowerCase())).length;
+    const interviews = (stats?.interviewsScheduled && stats.interviewsScheduled > 0) ? stats.interviewsScheduled : candidates.filter((c) => ["interviewing", "interview_scheduled", "interview"].includes((c.status || "").toLowerCase()) || (c.kekaStatus || "").toLowerCase().includes("interview") || !!c.interviewScheduledDate).length;
     const selected = (stats?.candidatesSelected && stats.candidatesSelected > 0) ? stats.candidatesSelected : candidates.filter((c) => ["selected", "onboarded", "hired"].includes((c.status || "").toLowerCase())).length;
 
     return [
