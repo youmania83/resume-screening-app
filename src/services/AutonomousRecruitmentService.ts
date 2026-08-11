@@ -11,6 +11,7 @@ import {
   PIPELINE_THRESHOLDS,
   isStrictJobMapping,
 } from "../lib/appConfig.js";
+import { syncPipelineStages } from "../scripts/syncPipelineStages.js";
 import crypto from "crypto";
 
 export class AutonomousRecruitmentService {
@@ -113,6 +114,9 @@ export class AutonomousRecruitmentService {
         if (promoteRes.rowCount && promoteRes.rowCount > 0) {
           console.log(`✨ [Autonomous Cycle] Auto-promoted ${promoteRes.rowCount} high-scoring (≥${PIPELINE_THRESHOLDS.SHORTLIST}%) candidates on open roles to 'shortlisted'.`);
         }
+
+        // Run full multi-stage sync (Shortlisted >=80%, Under Review 60-79%, Rejected <60%, Interviewing)
+        await syncPipelineStages();
       } catch (promoteErr: any) {
         console.error("🚨 [Autonomous Cycle] Candidate promotion error:", promoteErr.message);
       }

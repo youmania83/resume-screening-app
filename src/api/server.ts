@@ -28,6 +28,7 @@ import stageRouter from "./routes/stageRouter.js";
 import dashboardRouter from "./routes/dashboardRouter.js";
 import inboxRouter from "./routes/inboxRouter.js";
 import candidatePortalRouter from "./routes/candidatePortalRouter.js";
+import { syncPipelineStages } from "../scripts/syncPipelineStages.js";
 import emailRouter from "./routes/emailRouter.js";
 import calendarRouter from "./routes/calendarRouter.js";
 import webhookRouter from "./routes/webhookRouter.js";
@@ -511,13 +512,17 @@ setTimeout(async () => {
   }
 }, 10000);
 
-// Trigger initial Assessment Reminders check at startup (15s delay, with distributed lock TTL = 12h)
+// Trigger initial Assessment Reminders & Pipeline Stage Sync at startup
 setTimeout(async () => {
+  try {
+    await syncPipelineStages();
+  } catch (err: any) {
+    console.error("🚨 [Startup] Initial pipeline stage sync error:", err.message || err);
+  }
   runWithLock("cron:assessment-reminders-startup", 43200, async () => {
     await processAssessmentReminders("Startup");
   });
 }, 15000);
-
 
 // Boot inline BullMQ Resume Worker — processes queue items automatically
 try {
@@ -534,6 +539,7 @@ try {
       console.log(`🤖 [Pipeline Worker] Processing inbox ${inboxId} for tenant ${tenantId}...`);
       await parseAndEvalResume(tenantId, inboxId, filePath, mimeType, targetJobId);
       console.log(`✅ [Pipeline Worker] Finished processing inbox ${inboxId}`);
+      await syncPipelineStages().catch(() => {});
     },
     { connection }
   );

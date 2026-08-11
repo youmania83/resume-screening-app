@@ -514,6 +514,13 @@ router.post("/", async (req: any, res, next) => {
       }
     }
     const appliedDate = c.appliedDate || new Date().toISOString().split("T")[0];
+    const candScore = Number(c.score) || 0;
+    let computedStatus = c.status || "Applied";
+    if (!c.status || c.status.toLowerCase() === "applied") {
+      if (candScore >= 80) computedStatus = "shortlisted";
+      else if (candScore >= 60) computedStatus = "Review";
+      else computedStatus = "applied";
+    }
 
     await queryTenant(
       `INSERT INTO candidates (
@@ -525,11 +532,11 @@ router.post("/", async (req: any, res, next) => {
         expected_salary, current_salary, availability_date, recruiter_owner_id, ai_match_score, tenant_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $6, :tenant_id);`,
       [
-        c.id, c.name, c.email || "", c.phone || "", c.role, c.score || 0,
+        c.id, c.name, c.email || "", c.phone || "", c.role, candScore,
         c.experienceYears || 0, c.experienceMatch || "", c.recommendation || "",
         c.confidence || "", c.riskLevel || "Low", c.strengths || [], c.weaknesses || [],
         c.missingSkills || [], c.matchedSkills || [], c.skills || [], c.certifications || [],
-        c.projects || [], c.keywords || [], c.status || "Applied", c.applicationSource || "Manual",
+        c.projects || [], c.keywords || [], computedStatus, c.applicationSource || "Manual",
         c.kekaStatus || "active", appliedDate, c.source || "Manual", c.sourceDetails || null,
         c.linkedinUrl || null, c.githubUrl || null, c.visaStatus || null, c.workAuthorization || null,
         c.expectedSalary || null, c.currentSalary || null, c.availabilityDate || null, c.recruiterOwnerId || null
