@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup the resume-screening-app production database
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/resume-screening-app
+Environment=BACKUP_DIR=/root/db-backups
+Environment=RETENTION_DAYS=14
+ExecStart=/usr/bin/env bash /root/resume-screening-app/scripts/backup-database.sh

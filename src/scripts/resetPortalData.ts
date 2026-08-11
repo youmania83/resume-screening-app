@@ -211,6 +211,22 @@ async function main() {
       return;
     }
 
+    // Unconditional safety net: take a full pg_dump snapshot immediately
+    // before doing anything destructive, on top of the archive_* tables
+    // above. The archive step only covers PIPELINE_TABLES with the exact
+    // schema this script knows about; a full external dump is a second,
+    // independent recovery path that doesn't depend on this script's own
+    // logic being correct. Best-effort: a failed backup logs a warning but
+    // does not block the run, since the archive_* step already provides a
+    // recovery path -- but every effort is made to get this snapshot first.
+    try {
+      const { execSync } = await import("child_process");
+      console.log("\nTaking a pre-flight full database backup before making any changes...");
+      execSync(`bash "${path.join(process.cwd(), "scripts", "backup-database.sh")}"`, { stdio: "inherit" });
+    } catch (backupErr: any) {
+      console.warn(`⚠️  Pre-flight backup failed or is unavailable (${backupErr.message}). Proceeding on the archive_* tables alone -- verify you have a separate recovery path before continuing.`);
+    }
+
     console.log("\nStarting transaction...");
     await client.query("BEGIN;");
 

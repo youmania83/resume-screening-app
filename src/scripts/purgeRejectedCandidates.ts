@@ -154,6 +154,17 @@ async function main() {
       return;
     }
 
+    // Unconditional safety net: full pg_dump snapshot before any deletion.
+    // Best-effort -- a failed backup logs a warning but does not block an
+    // otherwise-approved purge.
+    try {
+      const { execSync } = await import("child_process");
+      console.log("\nTaking a pre-flight full database backup before deleting anything...");
+      execSync(`bash "${path.join(process.cwd(), "scripts", "backup-database.sh")}"`, { stdio: "inherit" });
+    } catch (backupErr: any) {
+      console.warn(`⚠️  Pre-flight backup failed or is unavailable (${backupErr.message}). Proceeding anyway -- verify you have a separate recovery path before continuing.`);
+    }
+
     const candidateIds = candidates.map(c => c.id);
 
     await client.query("BEGIN;");
