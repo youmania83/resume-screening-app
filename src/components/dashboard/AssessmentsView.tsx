@@ -71,12 +71,17 @@ export function AssessmentsView({
     }
   };
 
-  // Include candidates who qualify (Resume Score >= 80%), are in shortlisted/qualified/interviewing stages, or have assessment tokens
-  const rawEligible = candidates.filter(c => 
-    (c.score || 0) >= 80 || 
-    !!c.assessmentToken || 
-    ["shortlisted", "qualified", "interviewing", "interview_scheduled", "assessment"].includes((c.status || "").toLowerCase())
-  );
+  // Include active candidates who qualify (Resume Score >= 80%), or are in shortlisted/qualified/interviewing stages
+  const rawEligible = candidates.filter(c => {
+    const s = (c.status || "").toLowerCase().trim();
+    if (["rejected", "hold", "talent_pool", "archived", "disqualified", "keka_rejected"].includes(s)) {
+      return false;
+    }
+    return (
+      (c.score || 0) >= 80 || 
+      ["shortlisted", "qualified", "interviewing", "interview_scheduled", "assessment"].includes(s)
+    );
+  });
 
   // Deduplicate candidates by email address to ensure clean UI presentation
   const emailMap = new Map<string, Candidate>();
