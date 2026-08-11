@@ -71,15 +71,20 @@ export function AssessmentsView({
     }
   };
 
-  // Include active candidates who qualify (Resume Score >= 80%), or are in shortlisted/qualified/interviewing stages
+  // Include candidates who hold an assessment token, assessment status, or attempt history,
+  // OR candidates with Resume Score >= 80%, OR in active pipeline stages (shortlisted/Review/interviewing/assessment).
   const rawEligible = candidates.filter(c => {
+    const hasTokenOrAssessment = !!(c.assessmentToken || c.assessmentStatus || (c as any).assessment_invited_at || (c as any).assessment_completed_at);
+    if (hasTokenOrAssessment) {
+      return true;
+    }
     const s = (c.status || "").toLowerCase().trim();
     if (["rejected", "hold", "talent_pool", "archived", "disqualified", "keka_rejected"].includes(s)) {
       return false;
     }
     return (
       (c.score || 0) >= 80 || 
-      ["shortlisted", "qualified", "interviewing", "interview_scheduled", "assessment"].includes(s)
+      ["shortlisted", "qualified", "interviewing", "interview_scheduled", "assessment", "review"].includes(s)
     );
   });
 

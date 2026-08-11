@@ -103,7 +103,7 @@ export class AutonomousRecruitmentService {
               SET status = 'shortlisted'
             WHERE c.score >= $1
               AND c.created_at >= $2::timestamptz
-              AND LOWER(c.status) IN ('applied', 'review', 'talent_pool', 'under_review', 'under review', 'not specified')
+              AND (c.status IS NULL OR LOWER(c.status) IN ('applied', 'not specified'))
               AND EXISTS (
                     SELECT 1 FROM jobs j
                      WHERE j.id = c.job_id

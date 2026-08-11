@@ -831,21 +831,7 @@ async function init() {
       console.warn("[initDb] Could not backfill assessment_invited_at (non-fatal):", err.message);
     });
 
-    // Revoke assessment tokens and clear invited status for candidates with resume score < 80%
-    await client.query(`
-      UPDATE candidates 
-      SET assessment_token = NULL, 
-          assessment_token_expiry = NULL,
-          assessment_status = NULL,
-          assessment_invited_at = NULL 
-      WHERE (score < 80 OR score IS NULL) 
-        AND COALESCE(assessment_status, '') != 'passed'
-        AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
-        AND interview_scheduled_date IS NULL
-        AND (assessment_token IS NOT NULL OR assessment_invited_at IS NOT NULL);
-    `).catch((err: any) => {
-      console.warn("[initDb] Could not revoke tokens under 80 (non-fatal):", err.message);
-    });
+    // Revoke assessment tokens query removed to protect 7-day validity and candidate access.
 
     // PERMANENT DATABASE ENGINE GUARANTEE:
     // Create a PostgreSQL BEFORE INSERT OR UPDATE trigger on candidates.
@@ -858,16 +844,6 @@ async function init() {
     // `status` and the assessment token belong exclusively to explicit
     // application/HR logic (assessment submission, interview scheduling,
     // manual HR change) and this trigger never touches them again.
-    //
-    // The previous version re-derived `status` (and stripped assessment
-    // tokens) from `score` on EVERY insert/update, with no memory of
-    // whether a human or the pipeline had already made a decision. That is
-    // precisely what silently reset candidates already in
-    // Review/Shortlisted/Interviewing back to Applied/Rejected, and
-    // revoked assessment tokens the portal had legitimately issued,
-    // whenever ANY unrelated write touched their row (a Keka sync, the
-    // 30-minute autonomous cycle, a webhook, etc.) -- violating "status
-    // must not change except by HR/portal action."
     await client.query(`
       CREATE OR REPLACE FUNCTION fn_enforce_candidate_pipeline_integrity()
       RETURNS TRIGGER AS $$
@@ -883,16 +859,8 @@ async function init() {
             NEW.status := 'shortlisted';
           ELSIF NEW.score >= 60 THEN
             NEW.status := 'Review';
-            NEW.assessment_token := NULL;
-            NEW.assessment_token_expiry := NULL;
-            NEW.assessment_status := NULL;
-            NEW.assessment_invited_at := NULL;
           ELSE
             NEW.status := 'rejected';
-            NEW.assessment_token := NULL;
-            NEW.assessment_token_expiry := NULL;
-            NEW.assessment_status := NULL;
-            NEW.assessment_invited_at := NULL;
           END IF;
         END IF;
 
@@ -1101,11 +1069,39 @@ async function init() {
               primary_id := rec.ids[1];
               FOR i IN 2..array_length(rec.ids, 1) LOOP
                   dup_id := rec.ids[i];
+                  
+                  -- Transfer candidate details and tokens if primary is missing them
+                  UPDATE candidates p
+                  SET assessment_token = COALESCE(p.assessment_token, d.assessment_token),
+                      assessment_token_expiry = COALESCE(p.assessment_token_expiry, d.assessment_token_expiry),
+                      assessment_status = COALESCE(p.assessment_status, d.assessment_status),
+                      assessment_invited_at = COALESCE(p.assessment_invited_at, d.assessment_invited_at),
+                      assessment_completed_at = COALESCE(p.assessment_completed_at, d.assessment_completed_at),
+                      assessment_score = COALESCE(p.assessment_score, d.assessment_score),
+                      final_score = COALESCE(p.final_score, d.final_score),
+                      job_id = COALESCE(p.job_id, d.job_id),
+                      score = GREATEST(p.score, d.score)
+                  FROM candidates d
+                  WHERE p.id::text = primary_id AND d.id::text = dup_id;
+
+                  -- Re-link all child table relations to primary_id to preserve complete candidate history
+                  UPDATE assessment_attempts SET candidate_id = primary_id WHERE candidate_id = dup_id AND NOT EXISTS (SELECT 1 FROM assessment_attempts a2 WHERE a2.candidate_id = primary_id AND a2.assessment_id = assessment_attempts.assessment_id);
+                  UPDATE assessment_sessions SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE assessment_violations SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE interviews SET candidate_id = primary_id WHERE candidate_id = dup_id AND NOT EXISTS (SELECT 1 FROM interviews i2 WHERE i2.candidate_id = primary_id AND i2.scheduled_date = interviews.scheduled_date);
+                  UPDATE applications SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE client_submissions SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_notes SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_tags SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_assignments SET candidate_id = primary_id WHERE candidate_id = dup_id;
                   UPDATE candidate_documents SET candidate_id = primary_id WHERE candidate_id = dup_id;
                   UPDATE candidate_timeline SET candidate_id = primary_id WHERE candidate_id = dup_id;
                   UPDATE candidate_activity_logs SET candidate_id = primary_id WHERE candidate_id = dup_id;
-                  UPDATE candidate_job_matches SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE candidate_job_matches SET candidate_id = primary_id WHERE candidate_id = dup_id AND NOT EXISTS (SELECT 1 FROM candidate_job_matches m2 WHERE m2.candidate_id = primary_id AND m2.job_id = candidate_job_matches.job_id);
                   UPDATE candidate_match_history SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE email_logs SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE email_communication_history SET candidate_id = primary_id WHERE candidate_id = dup_id;
+                  UPDATE support_tickets SET candidate_id = primary_id WHERE candidate_id = dup_id;
                   UPDATE resume_inbox SET candidate_id = primary_id WHERE candidate_id = dup_id;
                   DELETE FROM duplicate_candidates WHERE candidate_id = dup_id OR duplicate_candidate_id = dup_id;
                   DELETE FROM candidates WHERE id::text = dup_id;

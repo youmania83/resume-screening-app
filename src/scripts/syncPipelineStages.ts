@@ -2,89 +2,41 @@
 import { query } from "../lib/db.js";
 
 export async function syncPipelineStages() {
-  console.log("=== Updating candidate pipeline stages based on AI score thresholds ===");
+  console.log("=== Checking candidate pipeline stage breakdown ===");
 
-  // 1. Demote candidates from interviewing back to shortlisted if they haven't passed the online AI assessment and HR didn't explicitly mark them for interview
-  const demoteRes = await query(`
-    UPDATE candidates
-    SET status = 'shortlisted'
-    WHERE status = 'interviewing'
-      AND COALESCE(assessment_status, 'pending') != 'passed'
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
-      AND interview_scheduled_date IS NULL;
-  `);
-  console.log(`Demoted non-assessment-passed candidates from interviewing to shortlisted: ${demoteRes.rowCount}`);
-
-  // 2. INTERVIEWING: ONLY candidates who passed online AI assessment test OR HR marked interviewing in Keka OR HR scheduled interview in portal
-  const intRes = await query(`
-    UPDATE candidates 
-    SET status = 'interviewing' 
-    WHERE assessment_status = 'passed' 
-       OR keka_status ILIKE '%interview%' 
-       OR interview_scheduled_date IS NOT NULL;
-  `);
-  console.log(`Updated interviewing candidates count: ${intRes.rowCount}`);
-
-  // 3. SHORTLISTED (AI Assessment): Candidates with resume score >= 80% waiting for AI Assessment
+  // 1. Initial stage routing ONLY for brand-new unscreened candidates (status NULL or 'applied') that now have a score
   const shortRes = await query(`
     UPDATE candidates 
     SET status = 'shortlisted' 
-    WHERE score >= 80 
-      AND status != 'interviewing' 
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
-      AND interview_scheduled_date IS NULL;
+    WHERE (status IS NULL OR status = 'applied')
+      AND score >= 80;
   `);
-  console.log(`Updated shortlisted candidates count: ${shortRes.rowCount}`);
+  if (shortRes.rowCount && shortRes.rowCount > 0) {
+    console.log(`Routed newly screened candidates to shortlisted (score >= 80): ${shortRes.rowCount}`);
+  }
 
-  // 4. UNDER REVIEW: Candidates with resume score 60-79%
   const revRes = await query(`
     UPDATE candidates 
     SET status = 'Review' 
-    WHERE score >= 60 AND score < 80 
-      AND status != 'interviewing' 
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
-      AND interview_scheduled_date IS NULL;
+    WHERE (status IS NULL OR status = 'applied')
+      AND score >= 60 AND score < 80;
   `);
-  console.log(`Updated review candidates count: ${revRes.rowCount}`);
+  if (revRes.rowCount && revRes.rowCount > 0) {
+    console.log(`Routed newly screened candidates to Review (score 60-79): ${revRes.rowCount}`);
+  }
 
-  // 5. REJECTED: Candidates with resume score > 0 and score < 60
   const rejRes = await query(`
     UPDATE candidates 
     SET status = 'rejected' 
-    WHERE score > 0 AND score < 60 
-      AND status != 'interviewing' 
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
-      AND interview_scheduled_date IS NULL;
+    WHERE (status IS NULL OR status = 'applied')
+      AND score > 0 AND score < 60;
   `);
-  console.log(`Updated rejected candidates count: ${rejRes.rowCount}`);
-
-  // 6. APPLIED: Unscreened candidates (score = 0 or NULL) waiting for AI screening
-  const appRes = await query(`
-    UPDATE candidates
-    SET status = 'applied'
-    WHERE (score = 0 OR score IS NULL)
-      AND (status IS NULL OR status IN ('rejected', 'Review'))
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
-      AND interview_scheduled_date IS NULL;
-  `);
-  console.log(`Updated applied/unscreened candidates count: ${appRes.rowCount}`);
-
-  // 7. Clear assessment tokens and invitation status on candidates with score < 80% (who haven't passed or been explicitly scheduled for interview)
-  await query(`
-    UPDATE candidates 
-    SET assessment_token = NULL, 
-        assessment_token_expiry = NULL,
-        assessment_status = NULL,
-        assessment_invited_at = NULL 
-    WHERE (score < 80 OR score IS NULL) 
-      AND COALESCE(assessment_status, '') != 'passed'
-      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
-      AND interview_scheduled_date IS NULL
-      AND (assessment_token IS NOT NULL OR assessment_invited_at IS NOT NULL);
-  `);
+  if (rejRes.rowCount && rejRes.rowCount > 0) {
+    console.log(`Routed newly screened candidates to rejected (score < 60): ${rejRes.rowCount}`);
+  }
 
   const breakdown = await query("SELECT status, count(*) FROM candidates GROUP BY status;");
-  console.log("New Stage Breakdown in DB:", breakdown.rows);
+  console.log("Current Stage Breakdown in DB:", breakdown.rows);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
