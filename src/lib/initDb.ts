@@ -857,15 +857,14 @@ async function init() {
       BEGIN
         -- 1. Automatic Stage Assignment based on score thresholds
         IF NEW.score IS NOT NULL 
+           AND NEW.score > 0
            AND COALESCE(NEW.assessment_status, '') != 'passed' 
            AND NEW.interview_scheduled_date IS NULL 
            AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%') THEN
           IF NEW.score >= 80 THEN
-            IF NEW.status IS NULL OR NEW.status IN ('applied', 'review', 'under_review', 'Review') THEN
-              NEW.status := 'shortlisted';
-            END IF;
+            NEW.status := 'shortlisted';
           ELSIF NEW.score >= 60 THEN
-            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted') THEN
+            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted', 'rejected') THEN
               NEW.status := 'Review';
             END IF;
           ELSE
@@ -876,8 +875,8 @@ async function init() {
         END IF;
 
         -- 2. Automatic Assessment Token Invalidation Engine Guarantee
-        -- Candidates under 80% OR in Review/rejected/applied status can NEVER hold active assessment tokens
-        IF (NEW.score IS NULL OR NEW.score < 80 OR NEW.status IN ('rejected', 'Review', 'review', 'under_review', 'applied', 'hold', 'disqualified', 'archived'))
+        -- Candidates under 80% OR in inactive status can NEVER hold active assessment tokens
+        IF (NEW.score IS NULL OR NEW.score < 80 OR NEW.status IN ('rejected', 'Review', 'review', 'under_review', 'hold', 'disqualified', 'archived'))
            AND COALESCE(NEW.assessment_status, '') != 'passed'
            AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%')
            AND NEW.interview_scheduled_date IS NULL THEN

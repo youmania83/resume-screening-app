@@ -47,18 +47,29 @@ export async function syncPipelineStages() {
   `);
   console.log(`Updated review candidates count: ${revRes.rowCount}`);
 
-  // 5. HOLD / REJECTED: Candidates with resume score < 60%
+  // 5. REJECTED: Candidates with resume score > 0 and score < 60
   const rejRes = await query(`
     UPDATE candidates 
     SET status = 'rejected' 
-    WHERE (score < 60 OR score IS NULL) 
+    WHERE score > 0 AND score < 60 
       AND status != 'interviewing' 
       AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%') 
       AND interview_scheduled_date IS NULL;
   `);
   console.log(`Updated rejected candidates count: ${rejRes.rowCount}`);
 
-  // 6. Clear assessment tokens and invitation status on candidates with score < 80% (who haven't passed or been explicitly scheduled for interview)
+  // 6. APPLIED: Unscreened candidates (score = 0 or NULL) waiting for AI screening
+  const appRes = await query(`
+    UPDATE candidates
+    SET status = 'applied'
+    WHERE (score = 0 OR score IS NULL)
+      AND (status IS NULL OR status IN ('rejected', 'Review'))
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
+      AND interview_scheduled_date IS NULL;
+  `);
+  console.log(`Updated applied/unscreened candidates count: ${appRes.rowCount}`);
+
+  // 7. Clear assessment tokens and invitation status on candidates with score < 80% (who haven't passed or been explicitly scheduled for interview)
   await query(`
     UPDATE candidates 
     SET assessment_token = NULL, 
