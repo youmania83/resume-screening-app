@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev:full": "concurrently \"npm run backend\" \"npm run dev\"",
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "npx next dev",
+    "build": "npx next build",
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx src/worker/resumeWorker.ts",
