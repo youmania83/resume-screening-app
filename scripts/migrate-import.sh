@@ -82,8 +82,34 @@ if [ "$CONFIRM_FLAG" != "true" ] || [ "$ENV_APPROVED" != "YES" ]; then
 fi
 
 # 1. Restore database
+#
+# pg_restore exits non-zero whenever ANY statement in the dump fails, even
+# ones it deliberately continued past. In practice that is near-guaranteed
+# noise from Supabase-managed internals a plain restore target can't have
+# (the "supabase_vault" extension, its "vault.secrets" table, a
+# "transaction_timeout" setting the server doesn't recognize) -- none of
+# which are this app's data. Rather than treat pg_restore's exit code as
+# the verdict, let it run to completion and hand the real verdict to the
+# row-count verification below, which is what actually determines whether
+# any real data failed to come across.
 echo "==> 1/3 Restoring database (this drops and recreates tables in the target)..."
-"$PG_RESTORE" --no-owner --no-privileges --clean --if-exists --dbname="$DATABASE_URL" "${BUNDLE}/database.dump"
+set +e
+RESTORE_OUTPUT=$("$PG_RESTORE" --no-owner --no-privileges --clean --if-exists --dbname="$DATABASE_URL" "${BUNDLE}/database.dump" 2>&1)
+RESTORE_EXIT=$?
+set -e
+echo "$RESTORE_OUTPUT"
+if [ "$RESTORE_EXIT" -ne 0 ]; then
+  UNEXPECTED=$(echo "$RESTORE_OUTPUT" | grep -E "^pg_restore: error:" | grep -viE "transaction_timeout|supabase_vault|vault\.secrets" || true)
+  if [ -n "$UNEXPECTED" ]; then
+    echo "🛑 pg_restore reported error(s) beyond the known-benign Supabase-internal ones:"
+    echo "$UNEXPECTED"
+    echo "Aborting -- these need investigation before trusting this restore."
+    exit 1
+  fi
+  echo "    ⚠️  pg_restore reported errors, but all of them are the known-benign"
+  echo "       Supabase-internal ones (vault extension, transaction_timeout) --"
+  echo "       none of this app's own data. Continuing to verification."
+fi
 echo "    Restore command finished."
 
 # 2. Restore uploaded files
