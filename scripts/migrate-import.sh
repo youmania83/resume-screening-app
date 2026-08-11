@@ -120,7 +120,7 @@ BEGIN
   END LOOP;
 END \$\$;
 SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM _migration_actual_counts;
-")
+" | grep -v '^DO$' | grep -v '^$' | tail -n 1)
 
 FAILED=0
 CHECKED=0

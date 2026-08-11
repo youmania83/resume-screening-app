@@ -81,6 +81,9 @@ echo "    $(du -h "${BUNDLE_DIR}/database.dump" | cut -f1) written."
 # meant 100+ sequential round trips to a remote pooler, which was slow
 # enough to time out and risked exhausting the pooler's connection limit.
 echo "==> 2/3 Recording per-table row counts..."
+# psql -c with multiple ;-separated statements echoes a completion tag
+# ("DO") for the DO block ahead of the actual SELECT output even with -t,
+# so take only the last non-empty line -- the JSON from the final SELECT.
 TABLE_JSON=$("$PSQL" "$DATABASE_URL" -Atc "
 DO \$\$
 DECLARE
@@ -92,7 +95,7 @@ BEGIN
   END LOOP;
 END \$\$;
 SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM _migration_counts;
-")
+" | grep -v '^DO$' | grep -v '^$' | tail -n 1)
 TABLE_COUNT_N=$(echo "$TABLE_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(Object.keys(JSON.parse(d)).length));")
 echo "    ${TABLE_COUNT_N} tables recorded."
 
