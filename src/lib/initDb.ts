@@ -831,6 +831,22 @@ async function init() {
       console.warn("[initDb] Could not backfill assessment_invited_at (non-fatal):", err.message);
     });
 
+    // Revoke assessment tokens and clear invited status for candidates with resume score < 80%
+    await client.query(`
+      UPDATE candidates 
+      SET assessment_token = NULL, 
+          assessment_token_expiry = NULL,
+          assessment_status = NULL,
+          assessment_invited_at = NULL 
+      WHERE (score < 80 OR score IS NULL) 
+        AND COALESCE(assessment_status, '') != 'passed'
+        AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
+        AND interview_scheduled_date IS NULL
+        AND (assessment_token IS NOT NULL OR assessment_invited_at IS NOT NULL);
+    `).catch((err: any) => {
+      console.warn("[initDb] Could not revoke tokens under 80 (non-fatal):", err.message);
+    });
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_jobs_tenant_active ON jobs(tenant_id, status, sync_status);
       CREATE INDEX IF NOT EXISTS idx_candidates_invite_pending

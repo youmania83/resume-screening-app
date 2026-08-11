@@ -58,12 +58,18 @@ export async function syncPipelineStages() {
   `);
   console.log(`Updated rejected candidates count: ${rejRes.rowCount}`);
 
-  // 6. Clear stale assessment tokens on rejected or inactive candidates
+  // 6. Clear assessment tokens and invitation status on candidates with score < 80% (who haven't passed or been explicitly scheduled for interview)
   await query(`
     UPDATE candidates 
-    SET assessment_token = NULL, assessment_invited_at = NULL 
-    WHERE LOWER(status) IN ('rejected', 'hold', 'talent_pool', 'archived', 'disqualified', 'keka_rejected') 
-      AND assessment_token IS NOT NULL;
+    SET assessment_token = NULL, 
+        assessment_token_expiry = NULL,
+        assessment_status = NULL,
+        assessment_invited_at = NULL 
+    WHERE (score < 80 OR score IS NULL) 
+      AND COALESCE(assessment_status, '') != 'passed'
+      AND (keka_status IS NULL OR keka_status NOT ILIKE '%interview%')
+      AND interview_scheduled_date IS NULL
+      AND (assessment_token IS NOT NULL OR assessment_invited_at IS NOT NULL);
   `);
 
   const breakdown = await query("SELECT status, count(*) FROM candidates GROUP BY status;");
