@@ -44,7 +44,7 @@ for v in 17 16 15; do
   fi
 done
 
-if [ -f "$APP_DIR/.env" ]; then
+if [ -z "${DATABASE_URL:-}" ] && [ -f "$APP_DIR/.env" ]; then
   set -a
   # shellcheck disable=SC1090
   source <(grep -E '^DATABASE_URL=' "$APP_DIR/.env")

@@ -48,7 +48,7 @@ done
 
 # Load DATABASE_URL the same way the app does (VPS .env is not in git and is
 # managed by hand on the server, per AGENTS.md).
-if [ -f "$APP_DIR/.env" ]; then
+if [ -z "${DATABASE_URL:-}" ] && [ -f "$APP_DIR/.env" ]; then
   set -a
   # shellcheck disable=SC1090
   source <(grep -E '^DATABASE_URL=' "$APP_DIR/.env")

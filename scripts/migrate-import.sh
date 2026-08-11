@@ -47,7 +47,7 @@ done
 [ ! -f "${BUNDLE}/database.dump" ] && { echo "❌ ${BUNDLE}/database.dump not found — is this a valid export bundle?"; exit 1; }
 [ ! -f "${BUNDLE}/manifest.json" ] && { echo "❌ ${BUNDLE}/manifest.json not found — cannot verify without it. Refusing to import blind."; exit 1; }
 
-if [ -f "$APP_DIR/.env" ]; then
+if [ -z "${DATABASE_URL:-}" ] && [ -f "$APP_DIR/.env" ]; then
   set -a
   # shellcheck disable=SC1090
   source <(grep -E '^DATABASE_URL=' "$APP_DIR/.env")
