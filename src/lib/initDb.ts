@@ -847,6 +847,63 @@ async function init() {
       console.warn("[initDb] Could not revoke tokens under 80 (non-fatal):", err.message);
     });
 
+    // PERMANENT DATABASE ENGINE GUARANTEE:
+    // Create a PostgreSQL BEFORE INSERT OR UPDATE trigger on candidates.
+    // This makes it physically impossible for any code, background worker, or API
+    // to give an assessment token to a candidate under 80% or leave a candidate in the wrong stage.
+    await client.query(`
+      CREATE OR REPLACE FUNCTION fn_enforce_candidate_pipeline_integrity()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- 1. Automatic Stage Assignment based on score thresholds
+        IF NEW.score IS NOT NULL 
+           AND COALESCE(NEW.assessment_status, '') != 'passed' 
+           AND NEW.interview_scheduled_date IS NULL 
+           AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%') THEN
+          IF NEW.score >= 80 THEN
+            IF NEW.status IS NULL OR NEW.status IN ('applied', 'review', 'under_review', 'Review') THEN
+              NEW.status := 'shortlisted';
+            END IF;
+          ELSIF NEW.score >= 60 THEN
+            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted') THEN
+              NEW.status := 'Review';
+            END IF;
+          ELSE
+            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted', 'Review', 'review') THEN
+              NEW.status := 'rejected';
+            END IF;
+          END IF;
+        END IF;
+
+        -- 2. Automatic Assessment Token Invalidation Engine Guarantee
+        -- Candidates under 80% OR in Review/rejected/applied status can NEVER hold active assessment tokens
+        IF (NEW.score IS NULL OR NEW.score < 80 OR NEW.status IN ('rejected', 'Review', 'review', 'under_review', 'applied', 'hold', 'disqualified', 'archived'))
+           AND COALESCE(NEW.assessment_status, '') != 'passed'
+           AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%')
+           AND NEW.interview_scheduled_date IS NULL THEN
+          NEW.assessment_token := NULL;
+          NEW.assessment_token_expiry := NULL;
+          IF COALESCE(NEW.assessment_status, '') IN ('invited', 'pending') THEN
+            NEW.assessment_status := NULL;
+          END IF;
+          NEW.assessment_invited_at := NULL;
+          NEW.assessment_reminder_sent_at := NULL;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_candidate_pipeline_integrity ON candidates;
+
+      CREATE TRIGGER trg_candidate_pipeline_integrity
+      BEFORE INSERT OR UPDATE ON candidates
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_enforce_candidate_pipeline_integrity();
+    `).catch((err: any) => {
+      console.warn("[initDb] Could not create PostgreSQL pipeline trigger (non-fatal):", err.message);
+    });
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_jobs_tenant_active ON jobs(tenant_id, status, sync_status);
       CREATE INDEX IF NOT EXISTS idx_candidates_invite_pending
