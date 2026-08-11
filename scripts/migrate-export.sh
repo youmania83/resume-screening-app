@@ -64,23 +64,20 @@ echo "Bundle    : $BUNDLE_DIR"
 echo "Source DB : $(echo "$DATABASE_URL" | sed -E 's#//[^@]*@#//<redacted>@#')"
 echo ""
 
-# 1. Database dump
-echo "==> 1/3 Dumping database..."
-"$PG_DUMP" "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="${BUNDLE_DIR}/database.dump"
-DUMP_SIZE=$(stat -c%s "${BUNDLE_DIR}/database.dump" 2>/dev/null || stat -f%z "${BUNDLE_DIR}/database.dump" 2>/dev/null || echo 0)
-if [ "$DUMP_SIZE" -lt 1024 ]; then
-  echo "❌ Database dump is suspiciously small (${DUMP_SIZE} bytes). Aborting export."
-  exit 1
-fi
-echo "    $(du -h "${BUNDLE_DIR}/database.dump" | cut -f1) written."
-
-# 2. Per-table row counts, straight from the source database (not from the
-# dump file) so the manifest is an independent source of truth to verify
-# the restore against. Done as ONE query in ONE connection (dynamic SQL
-# building a JSON object server-side) -- looping psql once per table here
-# meant 100+ sequential round trips to a remote pooler, which was slow
-# enough to time out and risked exhausting the pooler's connection limit.
-echo "==> 2/3 Recording per-table row counts..."
+# 1. Per-table row counts, taken BEFORE the dump, not after. This is the
+# baseline the import step's verification will require the target to meet
+# or exceed. On a live source database, a high-churn table (activity/audit
+# logs) keeps growing while pg_dump runs; counting first means that growth
+# only ever makes the dump contain >= this baseline, never <. Counting
+# after the dump (the original approach) can make an actively-written
+# table's live count run ahead of what actually made it into the dump
+# file, which then reads as "data lost" during verification when nothing
+# was actually lost -- confirmed by a real test run on this database.
+# Done as ONE query in ONE connection (dynamic SQL building a JSON object
+# server-side) -- looping psql once per table here meant 100+ sequential
+# round trips to a remote pooler, slow enough to time out and risking the
+# pooler's connection limit.
+echo "==> 1/3 Recording per-table row counts (baseline, taken before the dump)..."
 # psql -c with multiple ;-separated statements echoes a completion tag
 # ("DO") for the DO block ahead of the actual SELECT output even with -t,
 # so take only the last non-empty line -- the JSON from the final SELECT.
@@ -98,6 +95,16 @@ SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM
 " | grep -v '^DO$' | grep -v '^$' | tail -n 1)
 TABLE_COUNT_N=$(echo "$TABLE_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(Object.keys(JSON.parse(d)).length));")
 echo "    ${TABLE_COUNT_N} tables recorded."
+
+# 2. Database dump
+echo "==> 2/3 Dumping database..."
+"$PG_DUMP" "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="${BUNDLE_DIR}/database.dump"
+DUMP_SIZE=$(stat -c%s "${BUNDLE_DIR}/database.dump" 2>/dev/null || stat -f%z "${BUNDLE_DIR}/database.dump" 2>/dev/null || echo 0)
+if [ "$DUMP_SIZE" -lt 1024 ]; then
+  echo "❌ Database dump is suspiciously small (${DUMP_SIZE} bytes). Aborting export."
+  exit 1
+fi
+echo "    $(du -h "${BUNDLE_DIR}/database.dump" | cut -f1) written."
 
 # 3. Uploaded files (local storage only -- if STORAGE_PROVIDER is set to
 # something else in .env, e.g. s3, that provider's own bucket already

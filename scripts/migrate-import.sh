@@ -122,6 +122,12 @@ END \$\$;
 SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM _migration_actual_counts;
 " | grep -v '^DO$' | grep -v '^$' | tail -n 1)
 
+# The manifest's row counts were taken BEFORE the source dump ran (see
+# migrate-export.sh), so on an actively-written source, "actual > expected"
+# is normal and expected for high-churn tables (new rows arrived between
+# the count and the dump completing) -- that is not data loss. Only
+# "actual < expected" means something that existed at export time didn't
+# make it across, which is the failure this step exists to catch.
 FAILED=0
 CHECKED=0
 DIFF_REPORT=$(node -e "
@@ -132,11 +138,13 @@ for (const [table, expectedCount] of Object.entries(expected)) {
   checked++;
   const actualCount = actual[table];
   if (actualCount === undefined) {
-    console.log(\`FAIL \${table}: expected \${expectedCount} rows, table missing in target\`);
+    console.log(\`FAIL \${table}: expected at least \${expectedCount} rows, table missing in target\`);
     failed++;
-  } else if (Number(actualCount) !== Number(expectedCount)) {
-    console.log(\`FAIL \${table}: expected \${expectedCount} rows, found \${actualCount}\`);
+  } else if (Number(actualCount) < Number(expectedCount)) {
+    console.log(\`FAIL \${table}: expected at least \${expectedCount} rows, found \${actualCount}\`);
     failed++;
+  } else if (Number(actualCount) > Number(expectedCount)) {
+    console.log(\`NOTE \${table}: \${actualCount} rows vs a baseline of \${expectedCount} taken before the source dump -- extra rows arrived on the live source during export, not a problem.\`);
   }
 }
 console.log(\`SUMMARY \${checked} \${failed}\`);
@@ -145,21 +153,23 @@ console.log(\`SUMMARY \${checked} \${failed}\`);
 while IFS= read -r line; do
   if [[ "$line" == FAIL* ]]; then
     echo "    ❌ ${line#FAIL }"
+  elif [[ "$line" == NOTE* ]]; then
+    echo "    ℹ️  ${line#NOTE }"
   elif [[ "$line" == SUMMARY* ]]; then
     read -r _ CHECKED FAILED <<< "$line"
   fi
 done <<< "$DIFF_REPORT"
 
-if [ "$MANIFEST_FILE_COUNT" != "$RESTORED_FILE_COUNT" ]; then
-  echo "    ❌ uploaded files: expected ${MANIFEST_FILE_COUNT}, found ${RESTORED_FILE_COUNT}"
+if [ "$RESTORED_FILE_COUNT" -lt "$MANIFEST_FILE_COUNT" ]; then
+  echo "    ❌ uploaded files: expected at least ${MANIFEST_FILE_COUNT}, found ${RESTORED_FILE_COUNT}"
   FAILED=$((FAILED + 1))
 fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 if [ "$FAILED" -eq 0 ]; then
-  echo "✅ VERIFIED: all ${CHECKED} table(s) and the uploaded-file count match the"
-  echo "   source exactly. Nothing was lost in this migration."
+  echo "✅ VERIFIED: all ${CHECKED} table(s) and the uploaded-file count meet or"
+  echo "   exceed the pre-export baseline. Nothing was lost in this migration."
 else
   echo "🛑 VERIFICATION FAILED: ${FAILED} mismatch(es) out of ${CHECKED} table(s) checked."
   echo "   Do NOT treat this migration as complete or point production traffic at"
