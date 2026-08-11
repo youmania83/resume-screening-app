@@ -32,6 +32,20 @@ log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
 
 mkdir -p "$BACKUP_DIR"
 
+# pg_dump refuses to dump from a Postgres server newer than itself. The
+# production database (Supabase) runs PG 17; prefer a matching versioned
+# client if one is installed (see scripts/install-db-backup-timer.sh),
+# falling back to whatever "pg_dump" resolves to on PATH.
+PG_DUMP="pg_dump"
+PG_RESTORE="pg_restore"
+for v in 17 16 15; do
+  if [ -x "/usr/lib/postgresql/${v}/bin/pg_dump" ]; then
+    PG_DUMP="/usr/lib/postgresql/${v}/bin/pg_dump"
+    PG_RESTORE="/usr/lib/postgresql/${v}/bin/pg_restore"
+    break
+  fi
+done
+
 # Load DATABASE_URL the same way the app does (VPS .env is not in git and is
 # managed by hand on the server, per AGENTS.md).
 if [ -f "$APP_DIR/.env" ]; then
@@ -52,7 +66,7 @@ log "==> Starting backup -> ${DUMP_FILE}"
 
 # Custom format: compressed, supports selective/parallel restore, and
 # pg_restore --list can validate it without touching any database.
-if ! pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="$DUMP_FILE" 2>>"$LOG_FILE"; then
+if ! "$PG_DUMP" "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="$DUMP_FILE" 2>>"$LOG_FILE"; then
   log "❌ pg_dump failed. See $LOG_FILE for details."
   rm -f "$DUMP_FILE"
   exit 1
@@ -66,7 +80,7 @@ if [ "$DUMP_SIZE" -lt 1024 ]; then
 fi
 
 # Verify the dump is structurally readable (does not touch any live database).
-TABLE_COUNT=$(pg_restore --list "$DUMP_FILE" 2>>"$LOG_FILE" | grep -c "TABLE DATA" || true)
+TABLE_COUNT=$("$PG_RESTORE" --list "$DUMP_FILE" 2>>"$LOG_FILE" | grep -c "TABLE DATA" || true)
 if [ "$TABLE_COUNT" -lt 1 ]; then
   log "❌ Dump verification failed — pg_restore --list found no table data. Discarding."
   rm -f "$DUMP_FILE"
@@ -75,7 +89,7 @@ fi
 
 # Specifically confirm the candidates table actually made it into this dump
 # with rows in it — this is the exact failure mode that started all of this.
-CANDIDATES_IN_DUMP=$(pg_restore --list "$DUMP_FILE" 2>>"$LOG_FILE" | grep -c "TABLE DATA public candidates" || true)
+CANDIDATES_IN_DUMP=$("$PG_RESTORE" --list "$DUMP_FILE" 2>>"$LOG_FILE" | grep -c "TABLE DATA public candidates" || true)
 if [ "$CANDIDATES_IN_DUMP" -lt 1 ]; then
   log "⚠️  WARNING: no 'candidates' table data found in this dump. Keeping the file, but this needs investigation."
 fi

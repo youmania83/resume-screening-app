@@ -33,6 +33,17 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-/root/db-backups}"
 
+# Match the versioned client pg_dump uses (see backup-database.sh) — pg_dump
+# and pg_restore must be from the same major version for --list output and
+# custom-format compatibility to be reliable against a PG17 server.
+PG_RESTORE="pg_restore"
+for v in 17 16 15; do
+  if [ -x "/usr/lib/postgresql/${v}/bin/pg_restore" ]; then
+    PG_RESTORE="/usr/lib/postgresql/${v}/bin/pg_restore"
+    break
+  fi
+done
+
 if [ -f "$APP_DIR/.env" ]; then
   set -a
   # shellcheck disable=SC1090
@@ -54,7 +65,7 @@ case "$1" in
   --inspect)
     FILE="${2:?Usage: --inspect <file>}"
     echo "=== Tables in $FILE ==="
-    pg_restore --list "$FILE" | grep "TABLE DATA"
+    "$PG_RESTORE" --list "$FILE" | grep "TABLE DATA"
     ;;
 
   --restore-table)
@@ -87,7 +98,7 @@ case "$1" in
     done
 
     echo "Restoring table(s) [$TABLES] from $FROM into: $TO"
-    pg_restore --no-owner --no-privileges --data-only --disable-triggers "${ARGS[@]}" --dbname="$TO" "$FROM"
+    "$PG_RESTORE" --no-owner --no-privileges --data-only --disable-triggers "${ARGS[@]}" --dbname="$TO" "$FROM"
     echo "✅ Done. Inspect the recovered data at: $TO"
     echo "   Nothing in your live database was touched."
     ;;
@@ -116,7 +127,7 @@ case "$1" in
     fi
 
     echo "Restoring FULL dump from $FROM into: $TO"
-    pg_restore --no-owner --no-privileges --clean --if-exists --dbname="$TO" "$FROM"
+    "$PG_RESTORE" --no-owner --no-privileges --clean --if-exists --dbname="$TO" "$FROM"
     echo "✅ Full restore complete."
     ;;
 
