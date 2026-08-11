@@ -849,44 +849,51 @@ async function init() {
 
     // PERMANENT DATABASE ENGINE GUARANTEE:
     // Create a PostgreSQL BEFORE INSERT OR UPDATE trigger on candidates.
-    // This makes it physically impossible for any code, background worker, or API
-    // to give an assessment token to a candidate under 80% or leave a candidate in the wrong stage.
+    //
+    // IMPORTANT: this trigger fires the score-based stage assignment
+    // exactly ONCE per candidate -- the moment they transition out of
+    // "unscreened" (status NULL or 'applied'). It is gated on
+    // `OLD.status IS NULL OR OLD.status = 'applied'` (true on INSERT too,
+    // since OLD doesn't exist there). After that one-time assignment,
+    // `status` and the assessment token belong exclusively to explicit
+    // application/HR logic (assessment submission, interview scheduling,
+    // manual HR change) and this trigger never touches them again.
+    //
+    // The previous version re-derived `status` (and stripped assessment
+    // tokens) from `score` on EVERY insert/update, with no memory of
+    // whether a human or the pipeline had already made a decision. That is
+    // precisely what silently reset candidates already in
+    // Review/Shortlisted/Interviewing back to Applied/Rejected, and
+    // revoked assessment tokens the portal had legitimately issued,
+    // whenever ANY unrelated write touched their row (a Keka sync, the
+    // 30-minute autonomous cycle, a webhook, etc.) -- violating "status
+    // must not change except by HR/portal action."
     await client.query(`
       CREATE OR REPLACE FUNCTION fn_enforce_candidate_pipeline_integrity()
       RETURNS TRIGGER AS $$
       BEGIN
-        -- 1. Automatic Stage Assignment based on score thresholds
-        IF NEW.score IS NOT NULL 
+        IF NEW.score IS NOT NULL
            AND NEW.score > 0
-           AND COALESCE(NEW.assessment_status, '') != 'passed' 
-           AND NEW.interview_scheduled_date IS NULL 
+           AND (TG_OP = 'INSERT' OR OLD.status IS NULL OR OLD.status = 'applied')
+           AND (NEW.status IS NULL OR NEW.status = 'applied')
+           AND COALESCE(NEW.assessment_status, '') != 'passed'
+           AND NEW.interview_scheduled_date IS NULL
            AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%') THEN
           IF NEW.score >= 80 THEN
             NEW.status := 'shortlisted';
           ELSIF NEW.score >= 60 THEN
-            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted', 'rejected') THEN
-              NEW.status := 'Review';
-            END IF;
-          ELSE
-            IF NEW.status IS NULL OR NEW.status IN ('applied', 'shortlisted', 'Review', 'review') THEN
-              NEW.status := 'rejected';
-            END IF;
-          END IF;
-        END IF;
-
-        -- 2. Automatic Assessment Token Invalidation Engine Guarantee
-        -- Candidates under 80% OR in inactive status can NEVER hold active assessment tokens
-        IF (NEW.score IS NULL OR NEW.score < 80 OR NEW.status IN ('rejected', 'Review', 'review', 'under_review', 'hold', 'disqualified', 'archived'))
-           AND COALESCE(NEW.assessment_status, '') != 'passed'
-           AND (NEW.keka_status IS NULL OR NEW.keka_status NOT ILIKE '%interview%')
-           AND NEW.interview_scheduled_date IS NULL THEN
-          NEW.assessment_token := NULL;
-          NEW.assessment_token_expiry := NULL;
-          IF COALESCE(NEW.assessment_status, '') IN ('invited', 'pending') THEN
+            NEW.status := 'Review';
+            NEW.assessment_token := NULL;
+            NEW.assessment_token_expiry := NULL;
             NEW.assessment_status := NULL;
+            NEW.assessment_invited_at := NULL;
+          ELSE
+            NEW.status := 'rejected';
+            NEW.assessment_token := NULL;
+            NEW.assessment_token_expiry := NULL;
+            NEW.assessment_status := NULL;
+            NEW.assessment_invited_at := NULL;
           END IF;
-          NEW.assessment_invited_at := NULL;
-          NEW.assessment_reminder_sent_at := NULL;
         END IF;
 
         RETURN NEW;
@@ -976,7 +983,7 @@ async function init() {
     // Purge failed / junk inbox items and unknown candidates
     console.log("Purging failed/junk inbox items and unknown candidates...");
     const inboxRes = await client.query(`
-      SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, c.name as candidate_name
+      SELECT ri.id, ri.candidate_id, ri.file_name, ri.status, ri.created_at, c.name as candidate_name
       FROM resume_inbox ri
       LEFT JOIN candidates c ON c.id = ri.candidate_id;
     `);
@@ -988,6 +995,12 @@ async function init() {
       const fileName = row.file_name || "";
       const status = row.status;
       const candidateName = row.candidate_name;
+      // A row still lacking a resolved candidate name may simply be mid-processing
+      // (parsing/AI extraction not finished yet) rather than genuinely junk. Only
+      // treat the "unknown name" signal as junk once it's old enough to no longer
+      // plausibly be in flight; a bad filename or an explicit "Failed" status are
+      // definitive regardless of age.
+      const isOldEnough = row.created_at && (Date.now() - new Date(row.created_at).getTime() > 2 * 60 * 60 * 1000);
 
       let isJunk = false;
       if (isNonResumeFile(fileName)) {
@@ -996,7 +1009,7 @@ async function init() {
       if (status === "Failed") {
         isJunk = true;
       }
-      if (candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {
+      if (isOldEnough && candidateName && (candidateName === "Unknown Candidate" || candidateName.toLowerCase().includes("unknown"))) {
         isJunk = true;
       }
 
@@ -1008,13 +1021,22 @@ async function init() {
       }
     }
 
-    // Also search for candidates named 'Unknown Candidate' or whose name contains 'unknown' that might not be in resume_inbox
+    // Also search for candidates named 'Unknown Candidate' or whose name contains 'unknown' that might not be in resume_inbox.
+    //
+    // This purge runs unconditionally on every server boot (crash-restart,
+    // deploy, PM2 restart, etc). A brand-new candidate row can legitimately
+    // sit with no name for a brief window between being created and the AI
+    // parser filling it in from the resume -- a restart landing in that
+    // window would otherwise delete an in-flight, real application before
+    // it ever finished processing. Only records old enough that they can no
+    // longer be "still processing" are eligible for this cleanup.
     const orphanUnknownRes = await client.query(`
-      SELECT id FROM candidates 
-      WHERE name = 'Unknown Candidate' 
-         OR name ILIKE '%unknown%' 
-         OR name IS NULL 
-         OR name = '';
+      SELECT id FROM candidates
+      WHERE (name = 'Unknown Candidate'
+         OR name ILIKE '%unknown%'
+         OR name IS NULL
+         OR name = '')
+        AND created_at < NOW() - INTERVAL '2 hours';
     `);
     for (const row of orphanUnknownRes.rows) {
       if (!junkCandidateIds.includes(row.id)) {

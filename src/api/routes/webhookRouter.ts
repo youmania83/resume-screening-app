@@ -134,9 +134,9 @@ router.post("/webhooks/calcom", async (req: any, res: any, next: any) => {
 
         // Update candidate status back to applied/shortlisted depending on pipeline
         await queryTenant(
-          `UPDATE candidates 
-           SET status = 'shortlisted', interview_scheduled_date = NULL 
-           WHERE id = $2 AND tenant_id = :tenant_id;`,
+          `UPDATE candidates
+           SET status = 'shortlisted', interview_scheduled_date = NULL
+           WHERE id = $1 AND tenant_id = :tenant_id;`,
           [candidate.id]
         );
 

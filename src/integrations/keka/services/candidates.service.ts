@@ -148,15 +148,29 @@ export class KekaCandidatesService {
           skills = CASE WHEN array_length(EXCLUDED.skills, 1) > 0 THEN EXCLUDED.skills ELSE candidates.skills END,
           matched_skills = CASE WHEN array_length(EXCLUDED.matched_skills, 1) > 0 THEN EXCLUDED.matched_skills ELSE candidates.matched_skills END,
           education = COALESCE(EXCLUDED.education, candidates.education),
+          -- Only a candidate who has never been given a real decision yet
+          -- (status NULL or 'applied') may have this sync's derived status
+          -- applied. Once AI screening, HR, or any other pipeline step has
+          -- moved them to shortlisted/Review/selected/hired/onboarded/hold/
+          -- rejected/etc, this periodic Keka mirror must leave status
+          -- alone forever -- Keka's own view of the candidate (frequently
+          -- just "Sourced" with no AI score) is not authoritative over the
+          -- portal's own screening/assessment pipeline.
           status = CASE
-            WHEN candidates.status = 'interviewing' OR candidates.keka_status ILIKE '%interview%' OR candidates.interview_scheduled_date IS NOT NULL THEN candidates.status
-            ELSE EXCLUDED.status
+            WHEN candidates.status IS NULL OR candidates.status = 'applied' THEN EXCLUDED.status
+            ELSE candidates.status
           END,
           application_source = EXCLUDED.application_source,
           assessment_score = COALESCE(candidates.assessment_score, EXCLUDED.assessment_score),
           keka_status = EXCLUDED.keka_status,
           applied_date = COALESCE(candidates.applied_date, EXCLUDED.applied_date),
-          job_id = COALESCE(EXCLUDED.job_id, candidates.job_id),
+          -- Preserve whatever job the candidate is already attached to
+          -- locally; only backfill from Keka when nothing is set yet. A
+          -- periodic sync reassigning job_id away from the opening the
+          -- candidate was actually screened against is what silently sent
+          -- already-scored candidates through a second AI evaluation
+          -- against the wrong job description.
+          job_id = COALESCE(candidates.job_id, EXCLUDED.job_id),
           external_id = EXCLUDED.external_id,
           source_system = CASE
             WHEN EXISTS (SELECT 1 FROM resume_inbox WHERE candidate_id = candidates.id LIMIT 1)
@@ -237,8 +251,29 @@ export class KekaCandidatesService {
       }
 
       console.log(`[Auto Screening] Found batch of ${unscreened.rowCount} unscreened candidates. Processing...`);
-      
+
       for (const row of unscreened.rows) {
+        // Atomically claim this candidate before screening it. `runWithLock`
+        // (the cron-level Redis lock) is best-effort and silently disables
+        // if Redis is unavailable, so it is not a hard guarantee against two
+        // processes (a cron tick, a manual sync trigger, a local dev
+        // server pointed at the same database, etc.) both picking up the
+        // same "unscreened" batch. Two concurrent screenCandidate() calls
+        // on the same row would each run a fresh, non-deterministic AI
+        // evaluation and race to overwrite score/status -- exactly what
+        // corrupted several already-shortlisted candidates in production
+        // (duplicate 'ai_screened' log entries logged milliseconds apart,
+        // each with a different score, from the same 'unscreened' read).
+        // A conditional UPDATE...WHERE score still unset...RETURNING id
+        // guarantees only one caller can win the claim.
+        const claimRes = await query(
+          `UPDATE candidates SET score = -1 WHERE id = $1 AND (score = 0 OR score IS NULL) RETURNING id;`,
+          [row.id]
+        );
+        if (!claimRes.rowCount) {
+          console.log(`[Auto Screening] Candidate ${row.id} already claimed by another run. Skipping.`);
+          continue;
+        }
         try {
           const { kekaWorkflowService } = await import("./workflow.service.js");
           const src = row.source_system || "Email";
@@ -269,7 +304,7 @@ export class KekaCandidatesService {
                  END,
                  recommendation = COALESCE(NULLIF(recommendation, ''), 'Evaluated candidate profile: Qualified for position screening.'),
                  last_synced_at = NOW()
-             WHERE id = $1 AND (score = 0 OR score IS NULL)`,
+             WHERE id = $1 AND (score = 0 OR score IS NULL OR score = -1)`,
             [row.id]
           ).catch(() => null);
         }

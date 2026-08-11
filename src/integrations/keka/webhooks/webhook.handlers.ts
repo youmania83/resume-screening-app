@@ -113,7 +113,7 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
             phone = EXCLUDED.phone,
             role = EXCLUDED.role,
             keka_status = EXCLUDED.keka_status,
-            job_id = EXCLUDED.job_id,
+            job_id = COALESCE(candidates.job_id, EXCLUDED.job_id),
             last_synced_at = NOW()
         `, [
           targetId,
@@ -133,9 +133,22 @@ export async function processWebhookEvent(eventId: string, eventType: string, pa
           "Keka",
           "synced"
         ]);
-        
-        // Trigger automated screening if it is a new candidate and score is not computed yet
-        if (eventType === "candidate.created" && (c.aiScore === undefined || c.aiScore === null)) {
+
+        // Trigger automated screening only if this candidate has never been
+        // AI-screened locally. `c.aiScore` from the Keka payload is NOT a
+        // reliable signal here — Keka never populates an AI score (that is
+        // computed exclusively by this portal's own DeepSeek pipeline), so
+        // it reads as undefined/null on every single "candidate.created"
+        // webhook, including ones Keka resends for an existing candidate
+        // (e.g. a re-application). Gating on that field alone re-triggered
+        // a full re-screening of already-shortlisted/invited candidates —
+        // silently overwriting their real score and status with a fresh,
+        // often-lower result (and, if `job_id` had also drifted, scored
+        // against the wrong job description entirely). The local `score`
+        // column is the only trustworthy "already screened" signal.
+        const existingScoreRes = await query("SELECT score FROM candidates WHERE id = $1;", [targetId]);
+        const currentScore = existingScoreRes.rows[0]?.score;
+        if (eventType === "candidate.created" && (currentScore === null || currentScore === undefined || currentScore === 0)) {
           // Trigger async automated resume screening
           kekaWorkflowService.screenCandidate(targetId).catch(err => {
             console.error(`❌ Automated screening failed for candidate ${targetId}:`, err);
