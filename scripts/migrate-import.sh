@@ -104,22 +104,51 @@ fi
 # 3. Verification: every table's row count in the manifest must match what
 # is now actually in the target database. This is the step that actually
 # proves "no database lost" instead of just hoping pg_restore worked.
+# Actual counts are fetched in ONE query/connection (same reasoning as the
+# export step) rather than one psql call per table.
 echo "==> 3/3 Verifying restored data against the manifest..."
 MANIFEST_FILE_COUNT=$(node -e "console.log(require('${BUNDLE}/manifest.json').uploadedFileCount)" 2>/dev/null || echo "0")
-TABLE_NAMES=$(node -e "console.log(Object.keys(require('${BUNDLE}/manifest.json').tableRowCounts).join('\n'))")
+
+ACTUAL_JSON=$("$PSQL" "$DATABASE_URL" -Atc "
+DO \$\$
+DECLARE
+  r RECORD;
+BEGIN
+  CREATE TEMP TABLE _migration_actual_counts (table_name text, row_count bigint);
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename LOOP
+    EXECUTE format('INSERT INTO _migration_actual_counts SELECT %L, count(*) FROM %I', r.tablename, r.tablename);
+  END LOOP;
+END \$\$;
+SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM _migration_actual_counts;
+")
 
 FAILED=0
 CHECKED=0
-while IFS= read -r table; do
-  [ -z "$table" ] && continue
-  EXPECTED=$(node -e "console.log(require('${BUNDLE}/manifest.json').tableRowCounts['${table}'])")
-  ACTUAL=$("$PSQL" "$DATABASE_URL" -Atc "SELECT COUNT(*) FROM \"${table}\";" 2>/dev/null || echo "MISSING")
-  CHECKED=$((CHECKED + 1))
-  if [ "$EXPECTED" != "$ACTUAL" ]; then
-    echo "    ❌ ${table}: expected ${EXPECTED} rows, found ${ACTUAL}"
-    FAILED=$((FAILED + 1))
+DIFF_REPORT=$(node -e "
+const expected = require('${BUNDLE}/manifest.json').tableRowCounts;
+const actual = JSON.parse(process.argv[1] || '{}');
+let checked = 0, failed = 0;
+for (const [table, expectedCount] of Object.entries(expected)) {
+  checked++;
+  const actualCount = actual[table];
+  if (actualCount === undefined) {
+    console.log(\`FAIL \${table}: expected \${expectedCount} rows, table missing in target\`);
+    failed++;
+  } else if (Number(actualCount) !== Number(expectedCount)) {
+    console.log(\`FAIL \${table}: expected \${expectedCount} rows, found \${actualCount}\`);
+    failed++;
+  }
+}
+console.log(\`SUMMARY \${checked} \${failed}\`);
+" "$ACTUAL_JSON")
+
+while IFS= read -r line; do
+  if [[ "$line" == FAIL* ]]; then
+    echo "    ❌ ${line#FAIL }"
+  elif [[ "$line" == SUMMARY* ]]; then
+    read -r _ CHECKED FAILED <<< "$line"
   fi
-done <<< "$TABLE_NAMES"
+done <<< "$DIFF_REPORT"
 
 if [ "$MANIFEST_FILE_COUNT" != "$RESTORED_FILE_COUNT" ]; then
   echo "    ❌ uploaded files: expected ${MANIFEST_FILE_COUNT}, found ${RESTORED_FILE_COUNT}"

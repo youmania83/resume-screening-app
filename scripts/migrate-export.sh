@@ -76,20 +76,25 @@ echo "    $(du -h "${BUNDLE_DIR}/database.dump" | cut -f1) written."
 
 # 2. Per-table row counts, straight from the source database (not from the
 # dump file) so the manifest is an independent source of truth to verify
-# the restore against.
+# the restore against. Done as ONE query in ONE connection (dynamic SQL
+# building a JSON object server-side) -- looping psql once per table here
+# meant 100+ sequential round trips to a remote pooler, which was slow
+# enough to time out and risked exhausting the pooler's connection limit.
 echo "==> 2/3 Recording per-table row counts..."
-TABLE_LIST=$("$PSQL" "$DATABASE_URL" -Atc "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;")
-
-TABLE_JSON="{"
-FIRST=true
-while IFS= read -r table; do
-  [ -z "$table" ] && continue
-  COUNT=$("$PSQL" "$DATABASE_URL" -Atc "SELECT COUNT(*) FROM \"${table}\";" 2>/dev/null || echo "-1")
-  if [ "$FIRST" = true ]; then FIRST=false; else TABLE_JSON="${TABLE_JSON},"; fi
-  TABLE_JSON="${TABLE_JSON}\"${table}\":${COUNT}"
-done <<< "$TABLE_LIST"
-TABLE_JSON="${TABLE_JSON}}"
-echo "    $(echo "$TABLE_LIST" | wc -l | tr -d ' ') tables recorded."
+TABLE_JSON=$("$PSQL" "$DATABASE_URL" -Atc "
+DO \$\$
+DECLARE
+  r RECORD;
+BEGIN
+  CREATE TEMP TABLE _migration_counts (table_name text, row_count bigint);
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename LOOP
+    EXECUTE format('INSERT INTO _migration_counts SELECT %L, count(*) FROM %I', r.tablename, r.tablename);
+  END LOOP;
+END \$\$;
+SELECT COALESCE(jsonb_object_agg(table_name, row_count), '{}'::jsonb)::text FROM _migration_counts;
+")
+TABLE_COUNT_N=$(echo "$TABLE_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(Object.keys(JSON.parse(d)).length));")
+echo "    ${TABLE_COUNT_N} tables recorded."
 
 # 3. Uploaded files (local storage only -- if STORAGE_PROVIDER is set to
 # something else in .env, e.g. s3, that provider's own bucket already
