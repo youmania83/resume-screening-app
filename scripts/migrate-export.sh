@@ -31,19 +31,36 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BUNDLE_DIR="${OUTPUT_DIR}/migration-${TIMESTAMP}"
 
 PG_DUMP="pg_dump"
-for v in 17 16 15; do
-  if [ -x "/usr/lib/postgresql/${v}/bin/pg_dump" ]; then
-    PG_DUMP="/usr/lib/postgresql/${v}/bin/pg_dump"
+for p in "/opt/homebrew/opt/postgresql@17/bin/pg_dump" "/usr/local/opt/postgresql@17/bin/pg_dump"; do
+  if [ -x "$p" ]; then
+    PG_DUMP="$p"
     break
   fi
 done
+if [ "$PG_DUMP" = "pg_dump" ]; then
+  for v in 17 16 15; do
+    if [ -x "/usr/lib/postgresql/${v}/bin/pg_dump" ]; then
+      PG_DUMP="/usr/lib/postgresql/${v}/bin/pg_dump"
+      break
+    fi
+  done
+fi
+
 PSQL="psql"
-for v in 17 16 15; do
-  if [ -x "/usr/lib/postgresql/${v}/bin/psql" ]; then
-    PSQL="/usr/lib/postgresql/${v}/bin/psql"
+for p in "/opt/homebrew/opt/postgresql@17/bin/psql" "/usr/local/opt/postgresql@17/bin/psql"; do
+  if [ -x "$p" ]; then
+    PSQL="$p"
     break
   fi
 done
+if [ "$PSQL" = "psql" ]; then
+  for v in 17 16 15; do
+    if [ -x "/usr/lib/postgresql/${v}/bin/psql" ]; then
+      PSQL="/usr/lib/postgresql/${v}/bin/psql"
+      break
+    fi
+  done
+fi
 
 if [ -z "${DATABASE_URL:-}" ] && [ -f "$APP_DIR/.env" ]; then
   set -a

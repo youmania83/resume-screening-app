@@ -19,19 +19,36 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PG_RESTORE="pg_restore"
-for v in 17 16 15; do
-  if [ -x "/usr/lib/postgresql/${v}/bin/pg_restore" ]; then
-    PG_RESTORE="/usr/lib/postgresql/${v}/bin/pg_restore"
+for p in "/opt/homebrew/opt/postgresql@17/bin/pg_restore" "/usr/local/opt/postgresql@17/bin/pg_restore"; do
+  if [ -x "$p" ]; then
+    PG_RESTORE="$p"
     break
   fi
 done
+if [ "$PG_RESTORE" = "pg_restore" ]; then
+  for v in 17 16 15; do
+    if [ -x "/usr/lib/postgresql/${v}/bin/pg_restore" ]; then
+      PG_RESTORE="/usr/lib/postgresql/${v}/bin/pg_restore"
+      break
+    fi
+  done
+fi
+
 PSQL="psql"
-for v in 17 16 15; do
-  if [ -x "/usr/lib/postgresql/${v}/bin/psql" ]; then
-    PSQL="/usr/lib/postgresql/${v}/bin/psql"
+for p in "/opt/homebrew/opt/postgresql@17/bin/psql" "/usr/local/opt/postgresql@17/bin/psql"; do
+  if [ -x "$p" ]; then
+    PSQL="$p"
     break
   fi
 done
+if [ "$PSQL" = "psql" ]; then
+  for v in 17 16 15; do
+    if [ -x "/usr/lib/postgresql/${v}/bin/psql" ]; then
+      PSQL="/usr/lib/postgresql/${v}/bin/psql"
+      break
+    fi
+  done
+fi
 
 BUNDLE=""
 CONFIRM_FLAG="false"

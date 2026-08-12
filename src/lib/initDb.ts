@@ -1119,13 +1119,25 @@ async function init() {
           FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
               EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' ENABLE ROW LEVEL SECURITY;';
           END LOOP;
+
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;';
+              EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;';
+              EXECUTE 'REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon;';
+          END IF;
+
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated;';
+              EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated;';
+              EXECUTE 'REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM authenticated;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM authenticated;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM authenticated;';
+              EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM authenticated;';
+          END IF;
       END $$;
-      REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-      REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-      REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
-      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
-      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
-      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
     `);
 
     console.log("✅ Database tables, schema alterations, and Row-Level Security (RLS) ensured.");
