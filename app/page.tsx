@@ -23,6 +23,7 @@ import { PlatformHealthView } from "@/src/components/dashboard/PlatformHealthVie
 import { HRInterviewDashboard } from "@/src/components/dashboard/HRInterviewDashboard"
 import InboxView from "@/src/components/inbox/InboxView"
 import { CandidateDetailPanel } from "@/src/components/dashboard/CandidateDetailPanel"
+import { PortalToggleSwitch } from "@/src/components/ui/PortalToggleSwitch"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -397,19 +398,11 @@ export default function Dashboard() {
             </div>
 
             <div className="h-4 w-px bg-border" />
-            <button
-              onClick={handleTogglePortalPause}
+            <PortalToggleSwitch
+              isPaused={Boolean(portalStatus?.is_paused)}
+              onToggle={handleTogglePortalPause}
               disabled={isTogglingPause}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer border ${
-                portalStatus?.is_paused
-                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
-                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 hover:bg-emerald-500/20"
-              }`}
-              title={portalStatus?.is_paused ? "Click to resume portal and start catch-up sync" : "Click to pause all automated syncs and screening"}
-            >
-              <span className={`h-2 w-2 rounded-full mr-0.5 ${portalStatus?.is_paused ? "bg-amber-500 animate-ping" : "bg-emerald-500"}`} />
-              {portalStatus?.is_paused ? "⏸️ Portal Paused" : "🟢 Portal Active"}
-            </button>
+            />
 
             <div className="h-4 w-px bg-border" />
             <button onClick={() => setIsDark(!isDark)} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">

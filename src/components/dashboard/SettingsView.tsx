@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { PortalToggleSwitch } from "../ui/PortalToggleSwitch";
 import { toast } from "sonner";
 import { Key, Mail, Palette, FileText, Save, Info, AlertTriangle, Inbox, Plus, Trash2, CheckCircle2, LifeBuoy, Clock, Eye, AlertCircle } from "lucide-react";
 
@@ -584,18 +585,12 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                   Pause the portal to temporarily stop all background AI screening, ATS sync, email intake, and reminders without any data loss.
                 </CardDescription>
               </div>
-              <Button
-                onClick={handleTogglePause}
+              <PortalToggleSwitch
+                isPaused={Boolean(portalStatus?.is_paused)}
+                onToggle={handleTogglePause}
                 disabled={isTogglingPause}
-                variant={portalStatus?.is_paused ? "default" : "outline"}
-                className={`text-xs font-bold ${
-                  portalStatus?.is_paused
-                    ? "bg-amber-600 hover:bg-amber-700 text-white"
-                    : "border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
-                }`}
-              >
-                {portalStatus?.is_paused ? "▶️ Resume & Catch-up Sync" : "⏸️ Pause Portal"}
-              </Button>
+                size="lg"
+              />
             </CardHeader>
             <CardContent className="pt-4 space-y-2 text-xs">
               <div className="flex items-center justify-between text-muted-foreground text-[11px]">
