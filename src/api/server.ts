@@ -298,6 +298,22 @@ async function processAssessmentReminders(tag: string = "Cron") {
         continue;
       }
 
+      // Atomically claim this candidate BEFORE sending. The query above and this
+      // claim are two separate steps, so two overlapping runs of this job (e.g.
+      // a startup hook firing on back-to-back restarts, both starting before
+      // either finished) could otherwise both see "not yet reminded" and both
+      // send. The WHERE ... IS NULL guard means only one concurrent UPDATE can
+      // ever win this row, so only one run proceeds to actually send.
+      const claim = await queryGlobal(
+        `UPDATE candidates SET assessment_reminder_sent_at = NOW()
+         WHERE id = $1 AND assessment_reminder_sent_at IS NULL
+         RETURNING id;`,
+        [candidate.id]
+      );
+      if (!claim.rowCount) {
+        continue; // another concurrent run already claimed this candidate
+      }
+
       const expiryMs = new Date(candidate.assessment_token_expiry).getTime();
       const remainingDays = Math.max(1, Math.ceil((expiryMs - Date.now()) / 86400000));
 
@@ -314,12 +330,6 @@ async function processAssessmentReminders(tag: string = "Cron") {
           candidateId: candidate.id
         } as any);
 
-        // Stamp immediately so a later failure in this loop cannot cause a re-send.
-        await queryGlobal(
-          `UPDATE candidates SET assessment_reminder_sent_at = NOW() WHERE id = $1;`,
-          [candidate.id]
-        );
-
         await queryGlobal(
           `INSERT INTO candidate_activity_logs (candidate_id, event_type, message, tenant_id)
            VALUES ($1, 'assessment_reminder', $2, $3);`,
@@ -333,6 +343,12 @@ async function processAssessmentReminders(tag: string = "Cron") {
         remindersSent++;
       } catch (remErr: any) {
         console.error(`[${tag}] Failed to send reminder to ${candidate.email}:`, remErr.message || remErr);
+        // Release the claim so a genuine delivery failure is retried next cycle,
+        // instead of permanently marking a never-sent reminder as sent.
+        await queryGlobal(
+          `UPDATE candidates SET assessment_reminder_sent_at = NULL WHERE id = $1;`,
+          [candidate.id]
+        ).catch(() => {});
       }
     }
 
@@ -505,6 +521,10 @@ setTimeout(async () => {
 
 // Trigger initial Zoho Mail IMAP sync at startup (10s delay to let DB connections settle)
 setTimeout(async () => {
+  if (process.env.NODE_ENV === "test" || process.env.SKIP_STARTUP_SYNC === "true") {
+    console.log("ℹ️ [Startup] Skipping startup Zoho IMAP sync (SKIP_STARTUP_SYNC set).");
+    return;
+  }
   try {
     const zohoEnabled = process.env.ZOHO_MAIL_ENABLED === "true";
     const smtpUser = process.env.ZOHO_SMTP_USER;
@@ -535,6 +555,10 @@ setTimeout(async () => {
 
 // Trigger initial Assessment Reminders & Pipeline Stage Sync at startup
 setTimeout(async () => {
+  if (process.env.NODE_ENV === "test" || process.env.SKIP_STARTUP_SYNC === "true") {
+    console.log("ℹ️ [Startup] Skipping startup pipeline sync & assessment reminders (SKIP_STARTUP_SYNC set).");
+    return;
+  }
   try {
     await syncPipelineStages();
   } catch (err: any) {
