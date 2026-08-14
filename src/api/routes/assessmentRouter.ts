@@ -303,6 +303,14 @@ router.get("/:token", async (req: any, res: any) => {
 
     const candidate = candidateRes.rows[0];
 
+    // Check if tenant portal is currently paused by admin
+    const { PortalPauseService } = await import("../../services/PortalPauseService.js");
+    if (await PortalPauseService.isPortalPaused(candidate.tenant_id)) {
+      return res.status(423).json({
+        error: "The assessment portal is currently paused by the administrator. Please try again later or contact HR."
+      });
+    }
+
     // 2. Enforce the real 7-day validity window.
     //
     // The previous "failure-proof auto-heal" silently pushed the expiry 30 days

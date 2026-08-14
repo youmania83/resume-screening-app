@@ -245,4 +245,39 @@ router.get("/pipeline", async (req, res, next) => {
   }
 });
 
+// GET /api/dashboard/portal-pause-status
+router.get("/portal-pause-status", async (req, res, next) => {
+  try {
+    const { PortalPauseService } = await import("../../services/PortalPauseService.js");
+    const status = await PortalPauseService.getPortalStatus();
+    res.json({ success: true, ...status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/dashboard/portal-pause
+router.post("/portal-pause", async (req: any, res, next) => {
+  try {
+    const { PortalPauseService } = await import("../../services/PortalPauseService.js");
+    const userId = req.user?.id || "admin";
+    const result = await PortalPauseService.pausePortal(undefined, userId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/dashboard/portal-unpause
+router.post("/portal-unpause", async (req: any, res, next) => {
+  try {
+    const { PortalPauseService } = await import("../../services/PortalPauseService.js");
+    const userId = req.user?.id || "admin";
+    const result = await PortalPauseService.unpausePortal(undefined, userId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

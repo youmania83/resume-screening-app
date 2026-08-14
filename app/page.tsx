@@ -212,6 +212,65 @@ export default function Dashboard() {
     }
   }
 
+  const [portalStatus, setPortalStatus] = useState<any>({ is_paused: false, paused_at: null, unpaused_at: null })
+  const [isTogglingPause, setIsTogglingPause] = useState(false)
+
+  const loadPortalStatus = async () => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api"
+      const res = await fetch(`${apiBase}/dashboard/portal-pause-status`, { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setPortalStatus({ is_paused: data.is_paused, paused_at: data.paused_at, unpaused_at: data.unpaused_at })
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load portal pause status:", err)
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      loadPortalStatus()
+    }
+  }, [user])
+
+  const handleTogglePortalPause = async () => {
+    setIsTogglingPause(true)
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api"
+    const isCurrentlyPaused = portalStatus?.is_paused
+    const endpoint = isCurrentlyPaused ? "/dashboard/portal-unpause" : "/dashboard/portal-pause"
+    const toastId = toast.loading(isCurrentlyPaused ? "Resuming portal & launching catch-up sync..." : "Pausing portal...")
+
+    try {
+      const res = await fetch(`${apiBase}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          toast.success(data.message || (isCurrentlyPaused ? "Portal resumed!" : "Portal paused!"), { id: toastId })
+          await loadPortalStatus()
+          if (isCurrentlyPaused) {
+            loadCandidates()
+          }
+        } else {
+          toast.error("Failed to update portal state.", { id: toastId })
+        }
+      } else {
+        toast.error("Error updating portal pause state.", { id: toastId })
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error("Network error toggling portal pause status.", { id: toastId })
+    } finally {
+      setIsTogglingPause(false)
+    }
+  }
+
   if (!mounted || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
@@ -338,11 +397,44 @@ export default function Dashboard() {
             </div>
 
             <div className="h-4 w-px bg-border" />
+            <button
+              onClick={handleTogglePortalPause}
+              disabled={isTogglingPause}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer border ${
+                portalStatus?.is_paused
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 hover:bg-emerald-500/20"
+              }`}
+              title={portalStatus?.is_paused ? "Click to resume portal and start catch-up sync" : "Click to pause all automated syncs and screening"}
+            >
+              <span className={`h-2 w-2 rounded-full mr-0.5 ${portalStatus?.is_paused ? "bg-amber-500 animate-ping" : "bg-emerald-500"}`} />
+              {portalStatus?.is_paused ? "⏸️ Portal Paused" : "🟢 Portal Active"}
+            </button>
+
+            <div className="h-4 w-px bg-border" />
             <button onClick={() => setIsDark(!isDark)} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
               {isDark ? "☀️" : "🌙"}
             </button>
           </div>
         </header>
+
+        {portalStatus?.is_paused && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-6 py-2.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping flex-shrink-0" />
+              <span>
+                <strong>Portal Paused:</strong> All automatic AI screening, Keka/ATS sync, email intake, and candidate reminders are currently held (since {portalStatus.paused_at ? new Date(portalStatus.paused_at).toLocaleString() : "now"}). No previous data was lost.
+              </span>
+            </div>
+            <button
+              onClick={handleTogglePortalPause}
+              disabled={isTogglingPause}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer text-xs flex-shrink-0 ml-4"
+            >
+              ▶️ Resume & Catch-up Sync
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">
           {activeTab === "screening" && (

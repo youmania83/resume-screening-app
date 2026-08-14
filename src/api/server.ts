@@ -252,6 +252,12 @@ cron.schedule("0 9 * * *", () => {
 
 async function processAssessmentReminders(tag: string = "Cron") {
   try {
+    const { PortalPauseService } = await import("../services/PortalPauseService.js");
+    if (await PortalPauseService.isPortalPaused()) {
+      console.log(`⏸️ [${tag}] Assessment reminders skipped: Portal is currently PAUSED.`);
+      return;
+    }
+
     console.log(`⏰ [${tag}] Starting assessment reminders check...`);
     const { queryGlobal } = await import("../lib/tenantDb.js");
     const { sendAssessmentReminderEmail } = await import("../lib/email.js");
@@ -345,6 +351,11 @@ async function processAssessmentReminders(tag: string = "Cron") {
 cron.schedule("*/30 * * * *", () => {
   runWithLock("cron:autonomous-30min-recruitment-sync", 1700, async () => {
     try {
+      const { PortalPauseService } = await import("../services/PortalPauseService.js");
+      if (await PortalPauseService.isPortalPaused()) {
+        console.log("⏸️ [Cron] Autonomous recruitment sync skipped: Portal is currently PAUSED.");
+        return;
+      }
       const { AutonomousRecruitmentService } = await import("../services/AutonomousRecruitmentService.js");
       console.log("⏰ [Cron] Starting 30-Minute Autonomous Recruitment Sync...");
       const result = await AutonomousRecruitmentService.run30MinCycle();
@@ -359,6 +370,11 @@ cron.schedule("*/30 * * * *", () => {
 cron.schedule("*/2 * * * *", () => {
   runWithLock("cron:zoho-mail-sync", 110, async () => {
     try {
+      const { PortalPauseService } = await import("../services/PortalPauseService.js");
+      if (await PortalPauseService.isPortalPaused()) {
+        console.log("⏸️ [Cron] Zoho Mail sync skipped: Portal is currently PAUSED.");
+        return;
+      }
       const { zohoConfig } = await import("../integrations/zoho/config/zoho.config.js");
       const hasSmtpCreds = !!zohoConfig.smtpUser && !!zohoConfig.smtpPassword;
       const hasOAuthCreds = !!zohoConfig.clientId && !!zohoConfig.clientSecret && !!zohoConfig.refreshToken;
@@ -402,6 +418,11 @@ cron.schedule("*/2 * * * *", () => {
 cron.schedule("*/30 * * * *", () => {
   runWithLock("cron:keka-careers-active-sync", 900, async () => {
     try {
+      const { PortalPauseService } = await import("../services/PortalPauseService.js");
+      if (await PortalPauseService.isPortalPaused()) {
+        console.log("⏸️ [Cron] Keka Careers active jobs sync skipped: Portal is currently PAUSED.");
+        return;
+      }
       const { KekaCareersSyncService } = await import("../services/KekaCareersSyncService.js");
       const { isKekaEnabled } = await import("../integrations/keka/config/keka.config.js");
       

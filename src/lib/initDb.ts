@@ -10,8 +10,19 @@ async function init() {
       CREATE TABLE IF NOT EXISTS tenants (
         id VARCHAR PRIMARY KEY,
         name VARCHAR NOT NULL,
+        is_paused BOOLEAN DEFAULT FALSE,
+        paused_at TIMESTAMPTZ DEFAULT NULL,
+        unpaused_at TIMESTAMPTZ DEFAULT NULL,
+        last_sync_paused_at TIMESTAMPTZ DEFAULT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT FALSE;
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ DEFAULT NULL;
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS unpaused_at TIMESTAMPTZ DEFAULT NULL;
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS last_sync_paused_at TIMESTAMPTZ DEFAULT NULL;
     `);
 
     await client.query(`

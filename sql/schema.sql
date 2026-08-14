@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Tenants table for SaaS portal state
+CREATE TABLE IF NOT EXISTS tenants (
+  id VARCHAR PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  is_paused BOOLEAN DEFAULT FALSE,
+  paused_at TIMESTAMPTZ DEFAULT NULL,
+  unpaused_at TIMESTAMPTZ DEFAULT NULL,
+  last_sync_paused_at TIMESTAMPTZ DEFAULT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Enable Row Level Security (RLS) on public schema tables
 ALTER TABLE IF EXISTS resume_texts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS candidate_scores ENABLE ROW LEVEL SECURITY;

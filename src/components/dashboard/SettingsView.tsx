@@ -238,8 +238,58 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
     }
   };
 
+  // Portal Pause Control State
+  const [portalStatus, setPortalStatus] = useState<any>({ is_paused: false, paused_at: null, unpaused_at: null });
+  const [isTogglingPause, setIsTogglingPause] = useState(false);
+
+  const loadPortalPauseState = async () => {
+    try {
+      const res = await fetch(`${apiBase}/dashboard/portal-pause-status`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setPortalStatus({ is_paused: data.is_paused, paused_at: data.paused_at, unpaused_at: data.unpaused_at });
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load portal pause status:", err);
+    }
+  };
+
+  const handleTogglePause = async () => {
+    setIsTogglingPause(true);
+    const isCurrentlyPaused = portalStatus?.is_paused;
+    const endpoint = isCurrentlyPaused ? "/dashboard/portal-unpause" : "/dashboard/portal-pause";
+    const toastId = toast.loading(isCurrentlyPaused ? "Resuming portal & launching catch-up sync..." : "Pausing portal...");
+
+    try {
+      const res = await fetch(`${apiBase}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          toast.success(data.message || (isCurrentlyPaused ? "Portal resumed!" : "Portal paused!"), { id: toastId });
+          await loadPortalPauseState();
+        } else {
+          toast.error("Failed to update portal state.", { id: toastId });
+        }
+      } else {
+        toast.error("Error updating portal state.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error toggling portal pause status.", { id: toastId });
+    } finally {
+      setIsTogglingPause(false);
+    }
+  };
+
   useEffect(() => {
     loadSettingsData();
+    loadPortalPauseState();
   }, []);
 
   useEffect(() => {
@@ -520,6 +570,55 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
       {/* General Integration Tab */}
       {activeTab === "general" && (
         <div className="space-y-6 max-w-2xl">
+          {/* Portal Pause & Operating State Card */}
+          <Card className={`shadow-sm border-2 transition-all ${portalStatus?.is_paused ? "border-amber-500/50 bg-amber-500/5" : "border-border bg-card"}`}>
+            <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground flex items-center gap-2">
+                  <span>Portal Operating State</span>
+                  <Badge variant={portalStatus?.is_paused ? "secondary" : "success"} className="text-[10px] font-bold">
+                    {portalStatus?.is_paused ? "⏸️ PAUSED" : "🟢 ACTIVE"}
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-[10px] mt-0.5">
+                  Pause the portal to temporarily stop all background AI screening, ATS sync, email intake, and reminders without any data loss.
+                </CardDescription>
+              </div>
+              <Button
+                onClick={handleTogglePause}
+                disabled={isTogglingPause}
+                variant={portalStatus?.is_paused ? "default" : "outline"}
+                className={`text-xs font-bold ${
+                  portalStatus?.is_paused
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
+                    : "border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                }`}
+              >
+                {portalStatus?.is_paused ? "▶️ Resume & Catch-up Sync" : "⏸️ Pause Portal"}
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                <span>Status:</span>
+                <strong className={portalStatus?.is_paused ? "text-amber-600 font-bold" : "text-emerald-600 font-bold"}>
+                  {portalStatus?.is_paused ? "Paused (All automated background jobs on hold)" : "Active (All automated processes running)"}
+                </strong>
+              </div>
+              {portalStatus?.paused_at && (
+                <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                  <span>Last Paused At:</span>
+                  <span className="font-mono text-foreground font-semibold">{new Date(portalStatus.paused_at).toLocaleString()}</span>
+                </div>
+              )}
+              {portalStatus?.unpaused_at && (
+                <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                  <span>Last Resumed At:</span>
+                  <span className="font-mono text-foreground font-semibold">{new Date(portalStatus.unpaused_at).toLocaleString()}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-sm border-border bg-card">
             <CardHeader className="pb-3 border-b border-border">
               <CardTitle className="text-xs uppercase tracking-wider font-bold text-foreground">DeepSeek API Settings</CardTitle>
