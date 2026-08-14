@@ -23,6 +23,7 @@ export default function CandidateAssessmentPage() {
     questions,
     testStarted,
     testSubmitted,
+    startingTest,
     remainingSeconds,
     currentIdx,
     setCurrentIdx,
@@ -81,6 +82,7 @@ export default function CandidateAssessmentPage() {
         isMobile={isMobile}
         token={token}
         requestFullscreen={requestFullscreen}
+        startingTest={startingTest}
         isResuming={isResuming}
         webcamStream={proctoring.webcamStream}
         videoRef={proctoring.videoRef}

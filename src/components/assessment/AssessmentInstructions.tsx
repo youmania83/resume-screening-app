@@ -8,6 +8,7 @@ interface AssessmentInstructionsProps {
   isMobile: boolean;
   token: string;
   requestFullscreen: () => Promise<void>;
+  startingTest?: boolean;
   isResuming?: boolean;
   webcamStream?: MediaStream | null;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -19,6 +20,7 @@ export default function AssessmentInstructions({
   isMobile,
   token,
   requestFullscreen,
+  startingTest = false,
   isResuming = false,
   webcamStream = null,
   videoRef,
@@ -111,9 +113,12 @@ export default function AssessmentInstructions({
         <div className="pt-4 border-t border-border flex flex-col gap-3">
           <button
             onClick={requestFullscreen}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
+            disabled={startingTest}
+            className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
           >
-            {isMobile ? (
+            {startingTest ? (
+              "Preparing your test..."
+            ) : isMobile ? (
               isResuming ? "Resume Assessment" : "Start Assessment"
             ) : (
               <>

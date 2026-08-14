@@ -339,7 +339,7 @@ router.get("/:token", async (req: any, res: any) => {
     // 4. Find or generate the assessment for the candidate's ACTUAL job.
     let assessmentId = "";
     const assessmentRes = await queryGlobal(
-      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
       [candidate.job_id]
     );
     if (assessmentRes.rowCount && assessmentRes.rowCount > 0) {
@@ -542,6 +542,106 @@ router.get("/:token", async (req: any, res: any) => {
   }
 });
 
+/**
+ * GET /api/assessment/:token/info
+ * Read-only lookup for the pre-test instructions screen.
+ *
+ * Unlike GET /:token, this never creates an assessment_attempts row and never
+ * starts the 15-minute timer. GET /:token used to be called the instant the
+ * page loaded (before the candidate even read the instructions or granted
+ * camera/fullscreen permission), so the clock was already running while they
+ * were still on the welcome screen — anyone who stepped away and came back
+ * later than 15 minutes after merely opening the link was permanently locked
+ * out with "Time limit expired" having never seen a single question. The
+ * timer now only starts when the candidate explicitly clicks Start/Resume,
+ * which calls GET /:token; this endpoint only tells the frontend whether the
+ * link itself is valid and what label the button should show.
+ */
+router.get("/:token/info", async (req: any, res: any) => {
+  try {
+    const cleanToken = (req.params.token || "").trim();
+
+    const candidateRes = await queryGlobal(
+      `SELECT c.*, j.title as job_title, COALESCE(j.status, 'active') as job_status, j.sync_status as job_sync_status
+       FROM candidates c
+       LEFT JOIN jobs j ON c.job_id = j.id
+       WHERE c.assessment_token = $1
+       LIMIT 1;`,
+      [cleanToken]
+    );
+
+    if (!candidateRes.rowCount || candidateRes.rowCount === 0) {
+      return res.status(404).json({
+        error: "This assessment link is not valid. It may have been mistyped or superseded by a newer invitation. Please use the most recent link emailed to you, or contact HR."
+      });
+    }
+
+    const candidate = candidateRes.rows[0];
+
+    // Same validity checks as GET /:token (token/expiry/job), so an invalid
+    // or expired link still fails fast on page load rather than only after
+    // the candidate clicks through. Only the attempt-creating, clock-starting
+    // part is deferred.
+    const expiry = candidate.assessment_token_expiry ? new Date(candidate.assessment_token_expiry) : null;
+    if (!expiry || isNaN(expiry.getTime())) {
+      return res.status(403).json({
+        error: "This assessment link has no valid expiry on record. Please contact HR for a fresh invitation."
+      });
+    }
+    if (expiry.getTime() <= Date.now()) {
+      return res.status(403).json({
+        error: `This assessment link expired on ${expiry.toLocaleDateString()}. Please contact HR if you would like a new invitation.`
+      });
+    }
+
+    if (!candidate.job_id) {
+      return res.status(409).json({
+        error: "Your application is still being reviewed and is not yet linked to a specific role. Please contact HR."
+      });
+    }
+    if (candidate.job_status !== "active" || candidate.job_sync_status === "removed") {
+      return res.status(409).json({
+        error: "The position you applied for is no longer open. Please contact HR regarding your application."
+      });
+    }
+
+    // Best-effort, read-only: tell the frontend whether an attempt already
+    // exists so the button can say "Resume" instead of "Start". Never
+    // generates questions or writes anything.
+    let isResuming = false;
+    let completed = false;
+    try {
+      const assessmentRes = await queryGlobal(
+        `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
+        [candidate.job_id]
+      );
+      if (assessmentRes.rowCount && assessmentRes.rowCount > 0) {
+        const attemptRes = await queryGlobal(
+          `SELECT status FROM assessment_attempts WHERE candidate_id = $1 AND assessment_id = $2 LIMIT 1;`,
+          [candidate.id, assessmentRes.rows[0].id]
+        );
+        if (attemptRes.rowCount && attemptRes.rowCount > 0) {
+          completed = attemptRes.rows[0].status === "completed";
+          isResuming = !completed;
+        }
+      }
+    } catch (lookupErr) {
+      console.error("Non-fatal: failed to resolve attempt state for assessment info:", lookupErr);
+    }
+
+    res.json({
+      success: true,
+      candidateName: candidate.name,
+      jobTitle: candidate.role,
+      isResuming,
+      completed,
+    });
+  } catch (err: any) {
+    console.error("Failed to load assessment info:", err);
+    res.status(500).json({ error: err.message || "Failed to load assessment information." });
+  }
+});
+
 // POST /api/assessment/:token/save-progress - saves in-progress answers and question index
 router.post("/:token/save-progress", async (req: any, res: any) => {
   try {
@@ -569,7 +669,7 @@ router.post("/:token/save-progress", async (req: any, res: any) => {
 
     // Find assessment
     const assessmentRes = await queryGlobal(
-      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
       [candidate.job_id]
     );
 
@@ -626,7 +726,7 @@ router.post("/:token/force-resume", async (req: any, res: any) => {
     const candidateRes = await queryGlobal(`SELECT id, job_id FROM candidates WHERE assessment_token = $1 LIMIT 1;`, [token]);
     if (!candidateRes.rowCount) { return res.status(404).json({ error: "Invalid token" }); }
     const candidate = candidateRes.rows[0];
-    const assessmentRes = await queryGlobal(`SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`, [candidate.job_id]);
+    const assessmentRes = await queryGlobal(`SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`, [candidate.job_id]);
     if (!assessmentRes.rowCount) { return res.status(404).json({ error: "Assessment not found" }); }
     const assessmentId = assessmentRes.rows[0].id;
     const browserFingerprint = req.headers['user-agent'] || null;
@@ -705,7 +805,7 @@ router.post("/submit", async (req: any, res: any) => {
 
     // Find assessment
     const assessmentRes = await queryGlobal(
-      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
       [candidate.job_id]
     );
 
@@ -1051,7 +1151,7 @@ router.post("/violation", async (req: any, res: any) => {
 
     // Find assessment
     const assessmentRes = await queryGlobal(
-      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
       [candidate.job_id]
     );
 
@@ -1230,7 +1330,7 @@ router.post("/public-register", rateLimiter(15 * 60 * 1000, 10), async (req: any
     const job = jobRes.rows[0];
 
     // 2. Fetch assessment to make sure it exists (auto-generate if missing)
-    const assessmentRes = await queryGlobal(`SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`, [jobId]);
+    const assessmentRes = await queryGlobal(`SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`, [jobId]);
     if (!assessmentRes.rowCount || assessmentRes.rowCount === 0) {
       await ensureJobAssessment(jobId, job.title, job.description || `Autogenerated job description for ${job.title}`);
     }
@@ -1323,7 +1423,7 @@ router.post("/regenerate", async (req: any, res: any) => {
     // Also reset any existing candidate attempts for this job's assessment
     // so candidates can re-take with fresh questions
     const existingAssessment = await queryGlobal(
-      `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
+      `SELECT id FROM assessments WHERE job_id = $1 ORDER BY created_at ASC LIMIT 1;`,
       [jobId]
     );
     if (existingAssessment.rowCount && existingAssessment.rowCount > 0) {

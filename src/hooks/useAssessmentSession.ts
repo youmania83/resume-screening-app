@@ -50,6 +50,8 @@ export function useAssessmentSession(token: string) {
   const [latestViolationMsg, setLatestViolationMsg] = useState<string | null>(null);
   const [result, setResult] = useState<ResultData | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [attemptInProgress, setAttemptInProgress] = useState(false);
+  const [startingTest, setStartingTest] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const proctorGraceActive = useRef(true);
@@ -119,47 +121,25 @@ export function useAssessmentSession(token: string) {
     setSessionId(sId);
   }, []);
 
+  // Read-only lookup for the welcome/instructions screen. This deliberately
+  // does NOT call fetchAssessment — that endpoint creates the attempt row and
+  // starts the server-side 15-minute clock. Doing that on mere page load (before
+  // the candidate has even read the instructions or granted camera/fullscreen
+  // permission) meant the clock could run out while they were still reading,
+  // permanently locking them out with no way to recover. The timer now only
+  // starts when they click Start/Resume — see requestFullscreen below.
   useEffect(() => {
-    if (!token || !sessionId) return;
-    const loadAssessment = async () => {
+    if (!token) return;
+    const loadInfo = async () => {
       try {
-        const res = await api.fetchAssessment(token, sessionId);
+        const res = await api.fetchAssessmentInfo(token);
         if (res.isCompleted) {
           setResult(res.result);
           setTestSubmitted(true);
-        } else if (res.data) {
-          setCandidateName(res.data.candidateName);
-          setJobTitle(res.data.jobTitle);
-          setQuestions(res.data.questions);
-          setRemainingSeconds(res.data.remainingSeconds);
-          if (res.data.sessionId) {
-            setSessionId(res.data.sessionId);
-            sessionStorage.setItem("assessment_session_id", res.data.sessionId);
-          }
-
-          // Restore progress from server with local storage fallback
-          const serverAnswers = res.data.currentAnswers || {};
-          const serverIdx = res.data.currentQuestionIndex || 0;
-
-          const localAnswersStr = localStorage.getItem(`answers_${token}`);
-          if (localAnswersStr && Object.keys(serverAnswers).length === 0) {
-            try {
-              setAnswers(JSON.parse(localAnswersStr));
-            } catch {}
-          } else {
-            setAnswers(serverAnswers);
-          }
-
-          const localIdxStr = localStorage.getItem(`currentIdx_${token}`);
-          if (localIdxStr && serverIdx === 0) {
-            const localIdx = parseInt(localIdxStr, 10);
-            if (!isNaN(localIdx) && localIdx >= 0 && localIdx < res.data.questions.length) {
-              setCurrentIdx(localIdx);
-            }
-          } else {
-            const finalIdx = typeof serverIdx === "number" && serverIdx < res.data.questions.length ? serverIdx : 0;
-            setCurrentIdx(finalIdx);
-          }
+        } else {
+          setCandidateName(res.candidateName);
+          setJobTitle(res.jobTitle);
+          setAttemptInProgress(!!res.isResuming);
         }
         setLoading(false);
       } catch (err: any) {
@@ -167,8 +147,8 @@ export function useAssessmentSession(token: string) {
         setLoading(false);
       }
     };
-    loadAssessment();
-  }, [token, sessionId]);
+    loadInfo();
+  }, [token]);
 
   // Request camera permission early on welcome screen mount so user is ready when they click start
   useEffect(() => {
@@ -248,6 +228,62 @@ export function useAssessmentSession(token: string) {
   }, [testStarted, testSubmitted, remainingSeconds]);
 
   const requestFullscreen = async () => {
+    if (startingTest || !token || !sessionId) return;
+
+    // This is the moment the 15-minute clock actually starts server-side
+    // (see GET /api/assessment/:token). Deferred here from page-mount so a
+    // candidate reading instructions or granting camera permission doesn't
+    // silently burn their test time before answering a single question.
+    setStartingTest(true);
+    try {
+      const res = await api.fetchAssessment(token, sessionId);
+      if (res.isCompleted) {
+        setResult(res.result);
+        setTestSubmitted(true);
+        setStartingTest(false);
+        return;
+      }
+      if (res.data) {
+        setCandidateName(res.data.candidateName);
+        setJobTitle(res.data.jobTitle);
+        setQuestions(res.data.questions);
+        setRemainingSeconds(res.data.remainingSeconds);
+        if (res.data.sessionId) {
+          setSessionId(res.data.sessionId);
+          sessionStorage.setItem("assessment_session_id", res.data.sessionId);
+        }
+
+        // Restore progress from server with local storage fallback
+        const serverAnswers = res.data.currentAnswers || {};
+        const serverIdx = res.data.currentQuestionIndex || 0;
+
+        const localAnswersStr = localStorage.getItem(`answers_${token}`);
+        if (localAnswersStr && Object.keys(serverAnswers).length === 0) {
+          try {
+            setAnswers(JSON.parse(localAnswersStr));
+          } catch {}
+        } else {
+          setAnswers(serverAnswers);
+        }
+
+        const localIdxStr = localStorage.getItem(`currentIdx_${token}`);
+        if (localIdxStr && serverIdx === 0) {
+          const localIdx = parseInt(localIdxStr, 10);
+          if (!isNaN(localIdx) && localIdx >= 0 && localIdx < res.data.questions.length) {
+            setCurrentIdx(localIdx);
+          }
+        } else {
+          const finalIdx = typeof serverIdx === "number" && serverIdx < res.data.questions.length ? serverIdx : 0;
+          setCurrentIdx(finalIdx);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred while starting the test.");
+      setStartingTest(false);
+      return;
+    }
+    setStartingTest(false);
+
     if (!isMobile) {
       try {
         const docEl = document.documentElement as any;
@@ -255,7 +291,7 @@ export function useAssessmentSession(token: string) {
                           docEl.webkitRequestFullscreen ||
                           docEl.mozRequestFullScreen ||
                           docEl.msRequestFullscreen;
-        
+
         if (requestFS) {
           await requestFS.call(docEl);
         }
@@ -336,7 +372,10 @@ export function useAssessmentSession(token: string) {
     setFullscreenError(false);
   };
 
-  const isResuming = Object.keys(answers).length > 0 || currentIdx > 0;
+  // Sourced from the pre-click /info lookup (attemptInProgress) once it's
+  // resolved; falls back to locally restored progress once the timed fetch
+  // has actually run, so the button label stays correct in both cases.
+  const isResuming = attemptInProgress || Object.keys(answers).length > 0 || currentIdx > 0;
 
   return {
     sessionId,
@@ -349,6 +388,7 @@ export function useAssessmentSession(token: string) {
     testStarted,
     testSubmitted,
     submitting,
+    startingTest,
     remainingSeconds,
     currentIdx,
     setCurrentIdx: handleSetCurrentIdx,

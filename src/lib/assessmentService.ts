@@ -879,16 +879,16 @@ export async function ensureJobAssessment(jobId: string, jobTitle: string, jobDe
  * Regenerates assessment questions for a job by deleting old ones and creating fresh ones.
  */
 export async function regenerateJobAssessment(jobId: string, jobTitle: string, jobDescription: string): Promise<string> {
-  const existingAssessment = await query(
-    `SELECT id FROM assessments WHERE job_id = $1 LIMIT 1;`,
-    [jobId]
-  );
-
-  if (existingAssessment.rowCount && existingAssessment.rowCount > 0) {
-    const oldAssessmentId = existingAssessment.rows[0].id;
-    await query(`DELETE FROM assessment_questions WHERE assessment_id = $1;`, [oldAssessmentId]);
-    await query(`DELETE FROM assessments WHERE id = $1;`, [oldAssessmentId]);
-    console.log(`🗑️ Deleted old assessment ${oldAssessmentId} for job ${jobId}`);
+  // Delete every assessment row for this job, not just one. A job should
+  // only ever have a single assessment, but a past race in ensureJobAssessment
+  // (two concurrent callers both finding "no assessment yet" before either
+  // finished inserting) could leave duplicates behind. Deleting via LIMIT 1
+  // left the other duplicate orphaned, and later requests could resolve to
+  // either one non-deterministically. assessment_questions, assessment_attempts
+  // (and their sessions/violations) all cascade on assessment deletion.
+  const deleted = await query(`DELETE FROM assessments WHERE job_id = $1 RETURNING id;`, [jobId]);
+  if (deleted.rowCount && deleted.rowCount > 0) {
+    console.log(`🗑️ Deleted ${deleted.rowCount} old assessment(s) for job ${jobId}`);
   }
 
   return ensureJobAssessment(jobId, jobTitle, jobDescription);

@@ -1,18 +1,41 @@
 const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.risonaitech.com/api";
 
+async function fetchAssessmentResults(token: string) {
+  const resultResp = await fetch(`${apiBase}/assessment/results/get?token=${token}`);
+  if (!resultResp.ok) return null;
+  return resultResp.json();
+}
+
 export async function fetchAssessment(token: string, sessionId: string) {
   const resp = await fetch(`${apiBase}/assessment/${token}?sessionId=${sessionId}`);
   if (!resp.ok) {
     const errData = await resp.json();
     if (resp.status === 403 && (errData.error?.includes("completed") || errData.error?.includes("submitted"))) {
-      const resultResp = await fetch(`${apiBase}/assessment/results/get?token=${token}`);
-      if (resultResp.ok) {
-        return { isCompleted: true, result: await resultResp.json() };
-      }
+      const result = await fetchAssessmentResults(token);
+      if (result) return { isCompleted: true, result };
     }
     throw new Error(errData.error || "Failed to load assessment information.");
   }
   return { isCompleted: false, data: await resp.json() };
+}
+
+/**
+ * Read-only pre-test lookup for the instructions/welcome screen. Never
+ * creates an assessment_attempts row and never starts the 15-minute timer —
+ * that only happens once the candidate clicks Start/Resume (fetchAssessment).
+ */
+export async function fetchAssessmentInfo(token: string) {
+  const resp = await fetch(`${apiBase}/assessment/${token}/info`);
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => null);
+    throw new Error(errData?.error || "Failed to load assessment information.");
+  }
+  const info = await resp.json();
+  if (info.completed) {
+    const result = await fetchAssessmentResults(token);
+    if (result) return { isCompleted: true, result };
+  }
+  return { isCompleted: false, ...info };
 }
 
 export async function postViolation(token: string, type: string, details: string) {
