@@ -416,7 +416,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 font-medium">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping flex-shrink-0" />
               <span>
-                <strong>Portal Paused:</strong> All automatic AI screening, Keka/ATS sync, email intake, and candidate reminders are currently held (since {portalStatus.paused_at ? new Date(portalStatus.paused_at).toLocaleString() : "now"}). No previous data was lost.
+                <strong>Portal Paused:</strong> Automatic recruiter background syncs, ATS ingestion, and email reminders are currently held (since {portalStatus.paused_at ? new Date(portalStatus.paused_at).toLocaleString() : "now"}). <strong>Candidate assessment tests remain 100% active and unblocked with zero data loss.</strong>
               </span>
             </div>
             <button

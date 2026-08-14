@@ -582,7 +582,7 @@ export function SettingsView({ webhookUrl, setWebhookUrl }: SettingsViewProps) {
                   </Badge>
                 </CardTitle>
                 <CardDescription className="text-[10px] mt-0.5">
-                  Pause the portal to temporarily stop all background AI screening, ATS sync, email intake, and reminders without any data loss.
+                  Pause background recruiter tasks (AI screening cycles, ATS sync, email intake, and reminders) without data loss. Candidate test taking remains 100% active and unblocked.
                 </CardDescription>
               </div>
               <PortalToggleSwitch
