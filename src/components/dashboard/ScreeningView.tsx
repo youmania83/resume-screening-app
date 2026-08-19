@@ -83,13 +83,13 @@ export function ScreeningView(props: ScreeningViewProps) {
       return {
         total: props.stats.totalApplicants,
         shortlisted: props.stats.shortlisted,
-        assessmentPassed: props.stats.assessmentPassed !== undefined ? props.stats.assessmentPassed : props.candidates.filter(c => (c as any).assessment_status === "passed").length,
+        assessmentPassed: props.stats.assessmentPassed !== undefined ? props.stats.assessmentPassed : props.candidates.filter(c => ((c as any).assessmentStatus || (c as any).assessment_status) === "passed" || (c.status || "").toLowerCase().includes("pass") || (c.assessmentScore !== undefined && c.assessmentScore !== null && Number(c.assessmentScore) >= 70)).length,
         interviewing: (props.stats.interviewsScheduled && props.stats.interviewsScheduled > 0) ? props.stats.interviewsScheduled : props.candidates.filter(c => (c.status || "").toLowerCase().includes("interview") || ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") || !!c.interviewScheduledDate).length
       };
     }
     const total = props.candidates.length;
     const shortlisted = props.candidates.filter(c => (c.score || 0) >= 80 || c.status === "shortlisted").length;
-    const assessmentPassed = props.candidates.filter(c => (c as any).assessment_status === "passed").length;
+    const assessmentPassed = props.candidates.filter(c => ((c as any).assessmentStatus || (c as any).assessment_status) === "passed" || (c.status || "").toLowerCase().includes("pass") || (c.assessmentScore !== undefined && c.assessmentScore !== null && Number(c.assessmentScore) >= 70)).length;
     const interviewing = props.candidates.filter(c => (c.status || "").toLowerCase().includes("interview") || ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase().includes("interview") || !!c.interviewScheduledDate).length;
     return { total, shortlisted, assessmentPassed, interviewing };
   }, [props.candidates, props.stats]);
@@ -106,8 +106,30 @@ export function ScreeningView(props: ScreeningViewProps) {
 
       if (statusFilter === "shortlisted") return (c.score || 0) >= 80 || c.status === "shortlisted";
       if (statusFilter === "review") return (c.score || 0) >= 60 && (c.score || 0) < 80;
-      if (statusFilter === "assessment_passed") return (c as any).assessment_status === "passed" || c.status === "qualified";
-      if (statusFilter === "interviewing") return c.status === "interviewing" || c.status === "interview_scheduled";
+      if (statusFilter === "assessment_passed") {
+        const assStatus = (c.assessmentStatus || (c as any).assessment_status || "").toLowerCase();
+        const s = (c.status || "").toLowerCase();
+        const keka = ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase();
+        return (
+          assStatus === "passed" ||
+          assStatus === "completed" ||
+          s.includes("pass") ||
+          s === "qualified" ||
+          s === "assessment_passed" ||
+          keka.includes("pass") ||
+          (c.assessmentScore !== undefined && c.assessmentScore !== null && Number(c.assessmentScore) >= 70)
+        );
+      }
+      if (statusFilter === "interviewing") {
+        const s = (c.status || "").toLowerCase();
+        const keka = ((c as any).kekaStatus || (c as any).keka_status || "").toLowerCase();
+        return (
+          s.includes("interview") ||
+          s === "scheduled" ||
+          keka.includes("interview") ||
+          !!c.interviewScheduledDate
+        );
+      }
       if (statusFilter === "rejected") return c.status === "rejected" || (c.score || 0) < 60;
 
       return true;
