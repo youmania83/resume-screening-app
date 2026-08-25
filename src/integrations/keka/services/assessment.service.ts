@@ -8,10 +8,27 @@ import crypto from "crypto";
 export class KekaAssessmentService {
   async generateAssessment(candidateId: string, jobId: string, jobTitle: string, jobDescription: string): Promise<string> {
     console.log(`Generating assessment for candidate ${candidateId} (Job: ${jobTitle})`);
-    
+
     // Ensure assessment template exists for this job in database
     await ensureJobAssessment(jobId, jobTitle, jobDescription);
-    
+
+    // Reuse a still-valid token/expiry instead of unconditionally minting a new
+    // 7-day window. The one live caller already guards against calling this on
+    // an already-invited candidate, but this check makes that safe on its own
+    // terms too — a repeat call (e.g. from a backlog/admin script) must not
+    // silently push a candidate's real deadline further out each time.
+    const existing = await query(
+      `SELECT assessment_token, assessment_token_expiry FROM candidates WHERE id = $1 LIMIT 1;`,
+      [candidateId]
+    );
+    const existingToken = existing.rows[0]?.assessment_token;
+    const existingExpiry = existing.rows[0]?.assessment_token_expiry
+      ? new Date(existing.rows[0].assessment_token_expiry)
+      : null;
+    if (existingToken && existingExpiry && existingExpiry.getTime() > Date.now()) {
+      return existingToken;
+    }
+
     // Generate secure assessment token
     const token = crypto.randomBytes(24).toString("hex");
     const expiryDate = new Date();

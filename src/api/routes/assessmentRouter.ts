@@ -193,17 +193,28 @@ router.post("/send", async (req: any, res: any) => {
     // Ensure the assessment exists for the real job.
     await ensureJobAssessment(job.id, job.title, job.description || job.title);
 
-    // Reuse a still-valid token, otherwise mint a fresh one with a 7-day window.
+    // Reuse a still-valid token AND its existing expiry — only mint a fresh
+    // token (and a fresh N-day window) when there isn't a currently-valid one.
+    //
+    // This previously recomputed `NOW() + ASSESSMENT_VALIDITY_DAYS` unconditionally,
+    // even when reusing an existing valid token. So any repeat call to this route
+    // for an already-invited candidate (a second Send click, a retry, an internal
+    // re-sync) silently pushed the real deadline further out every time, while
+    // `assessment_invited_at` and the "N days" wording in the invite/reminder
+    // emails never moved — producing reminders like "13 days remaining" on a link
+    // candidates were told was valid for 7.
     let token = candidate.assessment_token;
     const isTokenValid =
       token && candidate.assessment_token_expiry && new Date(candidate.assessment_token_expiry) > new Date();
 
-    if (!isTokenValid) {
+    let expiry: Date;
+    if (isTokenValid) {
+      expiry = new Date(candidate.assessment_token_expiry);
+    } else {
       token = crypto.randomBytes(24).toString("hex");
+      expiry = new Date();
+      expiry.setDate(expiry.getDate() + ASSESSMENT_VALIDITY_DAYS);
     }
-
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + ASSESSMENT_VALIDITY_DAYS);
 
     await queryTenant(
       `UPDATE candidates
