@@ -1026,10 +1026,10 @@ router.post("/submit", async (req: any, res: any) => {
           // tenant-scoped HR dashboard queries.
           const insertRes = await queryGlobal(
             `INSERT INTO interviews (id, candidate_id, job_id, scheduled_date, status, tenant_id)
-             SELECT $1, $2, $3, $4, 'scheduled', $5
+             SELECT $1, $2::varchar, $3, $4, 'scheduled', $5
               WHERE NOT EXISTS (
                     SELECT 1 FROM interviews
-                     WHERE candidate_id = $2 AND status IN ('scheduled', 'completed')
+                     WHERE candidate_id = $2::varchar AND status IN ('scheduled', 'completed')
                   )
              ON CONFLICT DO NOTHING
              RETURNING id;`,
