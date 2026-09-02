@@ -449,7 +449,8 @@ export class AutonomousRecruitmentService {
               scheduledDate: interviewDate,
               tenantId: candidate.tenant_id,
               candidateId: candidate.id,
-              interviewId
+              interviewId,
+              isAutomated: true
             });
 
             promoted++;

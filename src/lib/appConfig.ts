@@ -166,6 +166,11 @@ export function hrNotificationsEnabled(): boolean {
   return process.env.ENABLE_HR_EMAIL_NOTIFICATIONS === "true";
 }
 
+/** Whether automated interview schedule emails should be sent to candidates. */
+export function autoInterviewEmailsEnabled(): boolean {
+  return process.env.ENABLE_AUTO_INTERVIEW_SCHEDULE_EMAIL === "true";
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * 5. Pipeline thresholds (kept in one place so every stage agrees)
  * ──────────────────────────────────────────────────────────────────────────── */

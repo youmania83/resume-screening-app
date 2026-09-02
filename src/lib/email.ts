@@ -11,7 +11,7 @@ import { getTenantContext } from "./tenantContext.js";
 import { zohoConfig } from "../integrations/zoho/config/zoho.config.js";
 import { zohoMailService } from "../integrations/zoho/services/zohoMail.service.js";
 import { CircuitBreaker, retryWithBackoff } from "./circuitBreaker.js";
-import { buildAssessmentLink, getFallbackHrEmail, hrNotificationsEnabled, getAcknowledgementCutoff } from "./appConfig.js";
+import { buildAssessmentLink, getFallbackHrEmail, hrNotificationsEnabled, getAcknowledgementCutoff, autoInterviewEmailsEnabled } from "./appConfig.js";
 
 dotenv.config();
 
@@ -810,7 +810,14 @@ export async function sendInterviewScheduleEmail(params: {
   interviewId?: string;
   /** Set true only when the caller has already run canSendEmailToCandidate. */
   skipGuard?: boolean;
+  /** Set true when triggered automatically by background sync or submission side-effects. */
+  isAutomated?: boolean;
 }) {
+  if (params.isAutomated && !autoInterviewEmailsEnabled()) {
+    console.log(`⏭️ [Email] Skipping automated interview schedule email to ${params.candidateEmail} (ENABLE_AUTO_INTERVIEW_SCHEDULE_EMAIL is false).`);
+    return { success: false, mock: false, skipped: true, reason: "Automated interview schedule emails are disabled." };
+  }
+
   const safeCandidateName = escapeHtml(params.candidateName);
   const safeJobTitle = escapeHtml(params.jobTitle);
 

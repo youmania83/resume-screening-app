@@ -1115,6 +1115,7 @@ router.post("/submit", async (req: any, res: any) => {
             tenantId: candidate.tenant_id,
             candidateId: candidate.id,
             interviewId: scheduledInterviewId || undefined,
+            isAutomated: true,
           });
         } catch (mailErr) {
           console.error("⚠️ [Side-Effect] Failed to trigger automated interview emails:", mailErr);
