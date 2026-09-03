@@ -26,16 +26,6 @@ export function inferCandidateRole(cand: {
   name?: string | null;
   recommendation?: string | null;
 }): string {
-  if (cand.currentTitle && cand.currentTitle.trim()) {
-    const t = cand.currentTitle.trim();
-    if (!isGenericRoleTitle(t)) return t;
-  }
-
-  if (cand.role && cand.role.trim()) {
-    const r = cand.role.trim();
-    if (!isGenericRoleTitle(r)) return r;
-  }
-
   const skillsList = cand.skills || [];
   const skillsStr = (Array.isArray(skillsList) ? skillsList.join(" ") : String(skillsList)).toLowerCase();
   const exp = Number(cand.experienceYears) || 0;
@@ -88,6 +78,13 @@ export function inferCandidateRole(cand: {
   }
   if (skillsStr.includes("finance") || skillsStr.includes("accounting") || skillsStr.includes("audit") || skillsStr.includes("gst") || skillsStr.includes("tally")) {
     return `${prefix}Finance & Accounts Specialist`;
+  }
+
+  if (cand.currentTitle && !isGenericRoleTitle(cand.currentTitle)) {
+    return cand.currentTitle.trim();
+  }
+  if (cand.role && !isGenericRoleTitle(cand.role)) {
+    return cand.role.trim();
   }
 
   return `${prefix}Project Engineer`;
