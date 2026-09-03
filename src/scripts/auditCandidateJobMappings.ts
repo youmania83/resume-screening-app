@@ -28,6 +28,7 @@ async function auditCandidateJobMappings() {
     const mismatches: any[] = [];
     const correctlyMatched: any[] = [];
     const unassignedCandidates: any[] = [];
+    const jobBreakdown: Record<string, { total: number; valid: number; zeroMatch: number; sampleMismatches: any[] }> = {};
 
     for (const c of candidates) {
       const skills: string[] = Array.isArray(c.skills) ? c.skills : [];
@@ -44,24 +45,35 @@ async function auditCandidateJobMappings() {
         continue;
       }
 
-      // Candidate is mapped to a job — let's verify skill intersection
+      const jobTitle = c.job_title || "Unknown Job";
+      if (!jobBreakdown[jobTitle]) {
+        jobBreakdown[jobTitle] = { total: 0, valid: 0, zeroMatch: 0, sampleMismatches: [] };
+      }
+      jobBreakdown[jobTitle].total++;
+
+      // Candidate is mapped to a job — verify skill intersection
       const jobText = `${c.job_title || ""} ${c.job_desc || ""}`.toLowerCase();
       const realMatches = skills.filter(s => s && jobText.includes(s.toLowerCase().trim()));
 
       if (realMatches.length === 0) {
-        mismatches.push({
+        jobBreakdown[jobTitle].zeroMatch++;
+        const mismatchItem = {
           id: c.id,
           name: c.name,
           email: c.email,
-          mappedJob: c.job_title || c.role,
+          mappedJob: jobTitle,
           score: c.score,
           matchPercent: c.match_percent,
-          candidateSkills: skills.slice(0, 8),
-          matchedSkillsInDb: matchedSkills,
-          realMatchingSkills: realMatches,
+          candidateSkills: skills.slice(0, 6),
+          matchedSkillsInDb: matchedSkills.slice(0, 6),
           recommendedRole: inferCandidateRole(c)
-        });
+        };
+        mismatches.push(mismatchItem);
+        if (jobBreakdown[jobTitle].sampleMismatches.length < 3) {
+          jobBreakdown[jobTitle].sampleMismatches.push(mismatchItem);
+        }
       } else {
+        jobBreakdown[jobTitle].valid++;
         correctlyMatched.push({
           name: c.name,
           job: c.job_title,
@@ -72,21 +84,33 @@ async function auditCandidateJobMappings() {
     }
 
     console.log("==========================================================================");
-    console.log(`🚨 MISMATCHED CANDIDATES FOUND: ${mismatches.length} (Candidates mapped to jobs with 0 matching skills)`);
+    console.log(`📊 AUDIT SUMMARY (Non-destructive check)`);
     console.log("==========================================================================");
-
-    mismatches.forEach((m, idx) => {
-      console.log(`\n[${idx + 1}] Candidate: ${m.name} (${m.email})`);
-      console.log(`    Mapped Job: "${m.mappedJob}" | Score: ${m.score}% | Match Percent: ${m.matchPercent}%`);
-      console.log(`    Candidate Skills: [${m.candidateSkills.join(", ")}]`);
-      console.log(`    DB Matched Skills: [${m.matchedSkillsInDb.join(", ")}]`);
-      console.log(`    Real Matching Skills with Job: [${m.realMatchingSkills.join(", ")}] (0 MATCH)`);
-      console.log(`    👉 Recommended Inferred Role: "${m.recommendedRole}"`);
-    });
+    console.log(`Total Candidates in DB:          ${candidates.length}`);
+    console.log(`✅ Valid Matches (with real skills): ${correctlyMatched.length} (${Math.round((correctlyMatched.length / candidates.length) * 100)}%)`);
+    console.log(`🚨 Zero-Skill Mismatches:        ${mismatches.length} (${Math.round((mismatches.length / candidates.length) * 100)}%)`);
+    console.log(`ℹ️  Unassigned Candidates:         ${unassignedCandidates.length}`);
 
     console.log("\n==========================================================================");
-    console.log(`✅ CANDIDATES WITH REAL SKILL MATCHES: ${correctlyMatched.length}`);
-    console.log(`ℹ️  UNASSIGNED / GENERAL CANDIDATES: ${unassignedCandidates.length}`);
+    console.log("📋 BREAKDOWN BY JOB OPENING");
+    console.log("==========================================================================");
+    Object.entries(jobBreakdown)
+      .sort((a, b) => b[1].zeroMatch - a[1].zeroMatch)
+      .forEach(([job, stats]) => {
+        const mismatchRate = Math.round((stats.zeroMatch / stats.total) * 100);
+        console.log(`\n• Job: "${job}" (Total: ${stats.total} candidates)`);
+        console.log(`   - Valid Skill Matches: ${stats.valid}`);
+        console.log(`   - Zero-Skill Mismatches: ${stats.zeroMatch} (${mismatchRate}%)`);
+        if (stats.sampleMismatches.length > 0) {
+          console.log(`   - Example Mismatched Profiles:`);
+          stats.sampleMismatches.forEach(sm => {
+            console.log(`     * ${sm.name} | Score: ${sm.score}% | Skills: [${sm.candidateSkills.join(", ") || "None listed"}] -> Inferred Role: "${sm.recommendedRole}"`);
+          });
+        }
+      });
+
+    console.log("\n==========================================================================");
+    console.log("✅ Audit completed. Zero records were modified or deleted.");
     console.log("==========================================================================");
 
     process.exit(0);
