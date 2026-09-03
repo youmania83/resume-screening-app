@@ -53,6 +53,27 @@ export function inferCandidateRole(cand: {
   if (skillsStr.includes("devops") || skillsStr.includes("aws") || skillsStr.includes("docker") || skillsStr.includes("kubernetes") || skillsStr.includes("ci/cd") || skillsStr.includes("cloud")) {
     return `${prefix}DevOps / Cloud Engineer`;
   }
+  if (skillsStr.includes("piping") || skillsStr.includes("isometric") || skillsStr.includes("hydrotesting") || skillsStr.includes("e3d") || skillsStr.includes("pipeline")) {
+    return `${prefix}Piping Engineer`;
+  }
+  if (skillsStr.includes("welding") || skillsStr.includes("tig") || skillsStr.includes("arc welding") || skillsStr.includes("fabrication") || skillsStr.includes("erection")) {
+    return `${prefix}Fabrication & Welding Specialist`;
+  }
+  if (skillsStr.includes("ndt") || skillsStr.includes("qa/qc") || skillsStr.includes("dimensional inspection") || skillsStr.includes("quality inspection") || skillsStr.includes("iso 9001")) {
+    return `${prefix}QA/QC Quality Engineer`;
+  }
+  if (skillsStr.includes("creo") || skillsStr.includes("solidworks") || skillsStr.includes("catia") || skillsStr.includes("ansys") || skillsStr.includes("product design") || skillsStr.includes("drafting")) {
+    return `${prefix}Design / CAD Engineer`;
+  }
+  if (skillsStr.includes("electrical") || skillsStr.includes("ht/lt") || skillsStr.includes("transformer") || skillsStr.includes("plc") || skillsStr.includes("scada")) {
+    return `${prefix}Electrical Engineer`;
+  }
+  if (skillsStr.includes("supply chain") || skillsStr.includes("scm") || skillsStr.includes("procurement") || skillsStr.includes("warehouse") || skillsStr.includes("logistics") || skillsStr.includes("purchase")) {
+    return `${prefix}Supply Chain / Procurement Specialist`;
+  }
+  if (skillsStr.includes("front desk") || skillsStr.includes("receptionist") || skillsStr.includes("office management") || skillsStr.includes("guest relations")) {
+    return `${prefix}Front Desk Executive`;
+  }
   if (skillsStr.includes("qa") || skillsStr.includes("testing") || skillsStr.includes("selenium") || skillsStr.includes("cypress") || skillsStr.includes("automation")) {
     return `${prefix}QA Automation Engineer`;
   }
