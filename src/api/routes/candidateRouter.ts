@@ -188,11 +188,11 @@ router.post("/remap-roles", async (req, res, next) => {
           `UPDATE candidates 
            SET role = $1, 
                job_id = NULL,
-               matched_skills = '[]'::jsonb,
-               missing_skills = '[]'::jsonb,
+               matched_skills = $3,
+               missing_skills = $4,
                last_synced_at = NOW()
            WHERE id = $2;`,
-          [suitableRole, c.id]
+          [suitableRole, c.id, [], []]
         );
         remappedCount++;
         roleInferredCount++;
@@ -266,8 +266,8 @@ router.post("/rescreen-all", async (req, res, next) => {
         const inferredRole = inferCandidateRole(c);
         const baseScore = Math.min(85, Math.max(45, 50 + (expYears >= 5 ? 20 : expYears >= 2 ? 10 : 0)));
         await queryGlobal(
-          `UPDATE candidates SET job_id = NULL, role = $1, score = $2, match_percent = $2, matched_skills = '[]'::jsonb, last_synced_at = NOW() WHERE id = $3;`,
-          [inferredRole, baseScore, c.id]
+          `UPDATE candidates SET job_id = NULL, role = $1, score = $2, match_percent = $2, matched_skills = $4, last_synced_at = NOW() WHERE id = $3;`,
+          [inferredRole, baseScore, c.id, []]
         );
       }
       remediatedCount++;

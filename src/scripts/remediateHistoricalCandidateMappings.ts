@@ -113,11 +113,11 @@ async function remediateHistoricalMappings() {
                  role = $1, 
                  score = $2, 
                  match_percent = $2, 
-                 matched_skills = '[]'::jsonb, 
-                 missing_skills = '[]'::jsonb, 
+                 matched_skills = $4, 
+                 missing_skills = $5, 
                  last_synced_at = NOW() 
              WHERE id = $3;`,
-            [inferredRole, realisticScore, c.id]
+            [inferredRole, realisticScore, c.id, [], []]
           );
           unassignedFromIrrelevantJobs++;
         }
