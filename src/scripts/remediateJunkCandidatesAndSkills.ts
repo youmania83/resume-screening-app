@@ -71,9 +71,9 @@ async function main() {
             }
           }
 
-          matchedSkills = jMatched.length > 0 ? jMatched : skills.slice(0, 5);
+          matchedSkills = jMatched;
         } else {
-          matchedSkills = skills.slice(0, 5);
+          matchedSkills = [];
         }
 
         await pool.query(

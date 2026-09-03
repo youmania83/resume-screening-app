@@ -248,12 +248,10 @@ export function CandidatesView({
                         {(() => {
                           const displaySkills = (c.matchedSkills && c.matchedSkills.length > 0)
                             ? c.matchedSkills
-                            : (c.skills && c.skills.length > 0)
-                            ? c.skills.slice(0, 5)
                             : [];
                           if (displaySkills.length === 0) {
                             return (
-                              <span className="text-[10px] text-muted-foreground italic select-none">No skills listed</span>
+                              <span className="text-[10px] text-muted-foreground italic select-none">No skills matched</span>
                             );
                           }
                           return displaySkills.map(s => (

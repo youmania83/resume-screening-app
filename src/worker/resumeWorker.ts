@@ -68,12 +68,12 @@ function calculateHeuristicMatch(
     }
   }
 
-  // Ensure matchedSkills defaults to data.skills (up to 5) if no explicit match returned
-  const finalMatchedSkills = matchedSkills.length > 0 ? matchedSkills : (data.skills || []).slice(0, 5);
+  // Keep matchedSkills strictly to actual matches against JD
+  const finalMatchedSkills = matchedSkills;
 
   const skillsScore = data.skillsScore ?? (data.skills && data.skills.length > 0 
     ? Math.round((finalMatchedSkills.length / Math.max(1, data.skills.length)) * 100)
-    : 70);
+    : 0);
 
   // Match experience
   let experienceScore = data.experienceScore ?? 75;

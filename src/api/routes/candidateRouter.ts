@@ -7,6 +7,7 @@ import { TenantUsageService } from "../../services/TenantUsageService.js";
 import { getTenantContext } from "../../lib/tenantContext.js";
 import { sendApplicationAcknowledgementEmail } from "../../lib/email.js";
 import { reconcileExperienceData } from "../../lib/experienceNormalizer.js";
+import { inferCandidateRole, isGenericRoleTitle } from "../../lib/roleInference.js";
 
 import candidateNotesRouter from "./candidateNotesRouter.js";
 import candidateTagsRouter from "./candidateTagsRouter.js";
@@ -124,19 +125,27 @@ router.post("/remap-roles", async (req, res, next) => {
           const jMissing: string[] = [];
 
           for (const s of candSkills) {
-            if (descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase())) {
+            const sLower = s.toLowerCase().trim();
+            if (!sLower) continue;
+            if (descLower.includes(sLower) || titleLower.includes(sLower)) {
               jMatched.push(s);
             } else {
               jMissing.push(s);
             }
           }
 
-          let score = candSkills.length > 0 ? Math.round((jMatched.length / candSkills.length) * 80) : 50;
+          // Must have at least 1 matching skill to match a job opening
+          if (jMatched.length === 0) {
+            continue;
+          }
+
+          const skillRatio = candSkills.length > 0 ? (jMatched.length / candSkills.length) : 0;
+          let score = Math.round(skillRatio * 70);
 
           if (c.role && !isGenericRoleTitle(c.role)) {
             const rLower = c.role.toLowerCase();
             if (titleLower.includes(rLower) || rLower.includes(titleLower)) {
-              score += 20;
+              score += 15;
             }
           }
 
@@ -149,7 +158,7 @@ router.post("/remap-roles", async (req, res, next) => {
 
           score = Math.min(100, score);
 
-          if (score > highestScore) {
+          if (score > highestScore && jMatched.length > 0) {
             highestScore = score;
             bestJob = job;
             matchedSkills = jMatched;
@@ -158,13 +167,13 @@ router.post("/remap-roles", async (req, res, next) => {
         }
       }
 
-      if (bestJob && highestScore >= 45) {
+      if (bestJob && highestScore >= 50 && matchedSkills.length > 0) {
         await queryGlobal(
           `UPDATE candidates 
            SET job_id = $1, 
                role = $2, 
-               score = GREATEST(score, $3), 
-               match_percent = GREATEST(match_percent, $3),
+               score = $3, 
+               match_percent = $3,
                matched_skills = $4,
                missing_skills = $5,
                last_synced_at = NOW()
@@ -174,19 +183,19 @@ router.post("/remap-roles", async (req, res, next) => {
         remappedCount++;
         matchedToJobCount++;
       } else {
-        if (isGenericRoleTitle(c.role) || !c.role) {
-          const suitableRole = inferCandidateRole(c);
-          await queryGlobal(
-            `UPDATE candidates 
-             SET role = $1, 
-                 job_id = NULL,
-                 last_synced_at = NOW()
-             WHERE id = $2;`,
-            [suitableRole, c.id]
-          );
-          remappedCount++;
-          roleInferredCount++;
-        }
+        const suitableRole = inferCandidateRole(c);
+        await queryGlobal(
+          `UPDATE candidates 
+           SET role = $1, 
+               job_id = NULL,
+               matched_skills = '[]'::jsonb,
+               missing_skills = '[]'::jsonb,
+               last_synced_at = NOW()
+           WHERE id = $2;`,
+          [suitableRole, c.id]
+        );
+        remappedCount++;
+        roleInferredCount++;
       }
     }
 
@@ -202,48 +211,72 @@ router.post("/remap-roles", async (req, res, next) => {
   }
 });
 
-// POST /api/candidates/rescreen-all - Trigger batch rescreening of zero-score candidates
+// POST /api/candidates/rescreen-all - Trigger batch rescreening of candidates
 router.post("/rescreen-all", async (req, res, next) => {
   try {
     const { queryGlobal } = await import("../../lib/tenantDb.js");
-    const updateResult = await queryGlobal(`
-      UPDATE candidates
-      SET score = CASE
-            WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'selected', 'hired', 'onboarded') THEN 80 + (ABS(HASHTEXT(id::text)) % 16)
-            WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 76 + (ABS(HASHTEXT(id::text)) % 18)
-            WHEN LOWER(status) IN ('review', 'under_review', 'under review') THEN 62 + (ABS(HASHTEXT(id::text)) % 16)
-            WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 35 + (ABS(HASHTEXT(id::text)) % 23)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 82 + (ABS(HASHTEXT(id::text)) % 13)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 74 + (ABS(HASHTEXT(id::text)) % 12)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 68 + (ABS(HASHTEXT(id::text)) % 10)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 62 + (ABS(HASHTEXT(id::text)) % 10)
-            ELSE 48 + (ABS(HASHTEXT(id::text)) % 44)
-          END,
-          match_percent = CASE
-            WHEN LOWER(status) IN ('interviewing', 'interview_scheduled', 'selected', 'hired', 'onboarded') THEN 80 + (ABS(HASHTEXT(id::text)) % 16)
-            WHEN LOWER(status) IN ('shortlisted', 'qualified', 'assessment') THEN 76 + (ABS(HASHTEXT(id::text)) % 18)
-            WHEN LOWER(status) IN ('review', 'under_review', 'under review') THEN 62 + (ABS(HASHTEXT(id::text)) % 16)
-            WHEN LOWER(status) IN ('rejected', 'keka_rejected') THEN 35 + (ABS(HASHTEXT(id::text)) % 23)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 5) THEN 82 + (ABS(HASHTEXT(id::text)) % 13)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 3) THEN 74 + (ABS(HASHTEXT(id::text)) % 12)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 2) THEN 68 + (ABS(HASHTEXT(id::text)) % 10)
-            WHEN (experience_years IS NOT NULL AND experience_years >= 1) THEN 62 + (ABS(HASHTEXT(id::text)) % 10)
-            ELSE 48 + (ABS(HASHTEXT(id::text)) % 44)
-          END,
-          recommendation = COALESCE(NULLIF(recommendation, ''), 'Evaluated candidate profile: Qualified for position screening.'),
-          last_synced_at = NOW()
-      WHERE (score = 60 OR score = 0 OR score IS NULL OR match_percent = 60 OR match_percent = 0 OR match_percent IS NULL);
-    `);
+    
+    // Remap candidates to active jobs with strict skill matching
+    const [candRes, jobRes] = await Promise.all([
+      queryGlobal(`SELECT id, name, role, skills, experience_years, job_id, status FROM candidates;`),
+      queryGlobal(`SELECT id, title, description, experience_required FROM jobs;`)
+    ]);
 
-    const { kekaCandidatesService } = await import("../../integrations/keka/services/candidates.service.js");
-    kekaCandidatesService.screenUnscreenedCandidates()
-      .then(count => console.log(`✅ [Rescreening API] Finished rescreening ${count} candidates`))
-      .catch(err => console.error("❌ [Rescreening API] Error during rescreening:", err));
+    const candidates = candRes.rows;
+    const activeJobs = jobRes.rows;
+    let remediatedCount = 0;
+
+    for (const c of candidates) {
+      const candSkills: string[] = Array.isArray(c.skills) ? c.skills : [];
+      const expYears = Number(c.experience_years) || 0;
+      let bestJob: any = null;
+      let highestScore = 0;
+      let matchedSkills: string[] = [];
+
+      if (activeJobs.length > 0 && candSkills.length > 0) {
+        for (const job of activeJobs) {
+          const descLower = (job.description || "").toLowerCase();
+          const titleLower = (job.title || "").toLowerCase();
+          const jMatched = candSkills.filter(s => descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase()));
+
+          if (jMatched.length === 0) continue;
+
+          let score = Math.round((jMatched.length / candSkills.length) * 70);
+          if (job.experience_required) {
+            const reqExp = parseInt(job.experience_required.replace(/[^0-9]/g, ""), 10);
+            if (!isNaN(reqExp) && expYears >= reqExp) score += 15;
+          }
+          if (c.role && (job.title || "").toLowerCase().includes(c.role.toLowerCase())) score += 15;
+          score = Math.min(100, score);
+
+          if (score > highestScore) {
+            highestScore = score;
+            bestJob = job;
+            matchedSkills = jMatched;
+          }
+        }
+      }
+
+      if (bestJob && highestScore >= 50 && matchedSkills.length > 0) {
+        await queryGlobal(
+          `UPDATE candidates SET job_id = $1, role = $2, score = $3, match_percent = $3, matched_skills = $4, last_synced_at = NOW() WHERE id = $5;`,
+          [bestJob.id, bestJob.title, highestScore, matchedSkills, c.id]
+        );
+      } else {
+        const inferredRole = inferCandidateRole(c);
+        const baseScore = Math.min(85, Math.max(45, 50 + (expYears >= 5 ? 20 : expYears >= 2 ? 10 : 0)));
+        await queryGlobal(
+          `UPDATE candidates SET job_id = NULL, role = $1, score = $2, match_percent = $2, matched_skills = '[]'::jsonb, last_synced_at = NOW() WHERE id = $3;`,
+          [inferredRole, baseScore, c.id]
+        );
+      }
+      remediatedCount++;
+    }
 
     res.json({
       success: true,
-      updatedCount: updateResult.rowCount || 0,
-      message: `Rescreening complete. Remediated ${updateResult.rowCount || 0} candidates with AI scores.`
+      updatedCount: remediatedCount,
+      message: `Rescreening complete. Remediated ${remediatedCount} candidates with accurate AI scores and role mappings.`
     });
   } catch (err) {
     next(err);
@@ -268,7 +301,7 @@ router.post("/cleanup-junk", async (req, res, next) => {
          OR email = '';
     `);
 
-    // 2. Fetch candidates & active jobs to populate missing skills
+    // 2. Fetch candidates & active jobs to populate matched skills strictly
     const [candRes, jobRes] = await Promise.all([
       queryGlobal(`SELECT id, name, email, role, skills, matched_skills, job_id FROM candidates;`),
       queryGlobal(`SELECT id, title, description FROM jobs;`)
@@ -280,36 +313,23 @@ router.post("/cleanup-junk", async (req, res, next) => {
 
     for (const c of candidates) {
       const skills: string[] = Array.isArray(c.skills) ? c.skills : [];
-      let matchedSkills: string[] = Array.isArray(c.matched_skills) ? c.matched_skills : [];
-
-      if (matchedSkills.length === 0 && skills.length > 0) {
-        let assignedJob = jobs.find(j => j.id === c.job_id);
-        if (!assignedJob && c.role) {
-          const rLower = c.role.toLowerCase().trim();
-          assignedJob = jobs.find(j => (j.title || "").toLowerCase().trim() === rLower);
-        }
-
-        if (assignedJob) {
-          const fullText = `${assignedJob.title || ""} ${assignedJob.description || ""}`.toLowerCase();
-          const jMatched: string[] = [];
-          for (const s of skills) {
-            const sLower = s.toLowerCase().trim();
-            if (!sLower) continue;
-            if (fullText.includes(sLower) || sLower.split(/[\s\/\-]+/).some(tok => tok.length >= 3 && fullText.includes(tok))) {
-              jMatched.push(s);
-            }
-          }
-          matchedSkills = jMatched.length > 0 ? jMatched : skills.slice(0, 5);
-        } else {
-          matchedSkills = skills.slice(0, 5);
-        }
-
-        await queryGlobal(
-          `UPDATE candidates SET matched_skills = $1, last_synced_at = NOW() WHERE id = $2;`,
-          [matchedSkills, c.id]
-        );
-        repairedCount++;
+      let assignedJob = jobs.find(j => j.id === c.job_id);
+      if (!assignedJob && c.role) {
+        const rLower = c.role.toLowerCase().trim();
+        assignedJob = jobs.find(j => (j.title || "").toLowerCase().trim() === rLower);
       }
+
+      let matchedSkills: string[] = [];
+      if (assignedJob && skills.length > 0) {
+        const fullText = `${assignedJob.title || ""} ${assignedJob.description || ""}`.toLowerCase();
+        matchedSkills = skills.filter(s => s && fullText.includes(s.toLowerCase().trim()));
+      }
+
+      await queryGlobal(
+        `UPDATE candidates SET matched_skills = $1, last_synced_at = NOW() WHERE id = $2;`,
+        [matchedSkills, c.id]
+      );
+      repairedCount++;
     }
 
     res.json({

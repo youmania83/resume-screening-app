@@ -41,19 +41,24 @@ async function runRemap() {
         const jMissing: string[] = [];
 
         for (const s of candSkills) {
-          if (descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase())) {
+          const sLower = s.toLowerCase().trim();
+          if (!sLower) continue;
+          if (descLower.includes(sLower) || titleLower.includes(sLower)) {
             jMatched.push(s);
           } else {
             jMissing.push(s);
           }
         }
 
-        let score = candSkills.length > 0 ? Math.round((jMatched.length / candSkills.length) * 80) : 50;
+        if (jMatched.length === 0) continue;
+
+        const skillRatio = candSkills.length > 0 ? (jMatched.length / candSkills.length) : 0;
+        let score = Math.round(skillRatio * 70);
 
         if (c.role && !isGenericRoleTitle(c.role)) {
           const rLower = c.role.toLowerCase();
           if (titleLower.includes(rLower) || rLower.includes(titleLower)) {
-            score += 20;
+            score += 15;
           }
         }
 
@@ -66,7 +71,7 @@ async function runRemap() {
 
         score = Math.min(100, score);
 
-        if (score > highestScore) {
+        if (score > highestScore && jMatched.length > 0) {
           highestScore = score;
           bestJob = job;
           matchedSkills = jMatched;
@@ -75,13 +80,13 @@ async function runRemap() {
       }
     }
 
-    if (bestJob && highestScore >= 45) {
+    if (bestJob && highestScore >= 50 && matchedSkills.length > 0) {
       await queryGlobal(
         `UPDATE candidates 
          SET job_id = $1, 
              role = $2, 
-             score = GREATEST(score, $3), 
-             match_percent = GREATEST(match_percent, $3),
+             score = $3, 
+             match_percent = $3,
              matched_skills = $4,
              missing_skills = $5,
              last_synced_at = NOW()
