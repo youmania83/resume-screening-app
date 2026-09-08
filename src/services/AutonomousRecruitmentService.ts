@@ -12,6 +12,12 @@ import {
   isStrictJobMapping,
 } from "../lib/appConfig.js";
 import { syncPipelineStages } from "../scripts/syncPipelineStages.js";
+import {
+  isRoleCompatibleForShortlisting,
+  classifyRoleFamily,
+  getRoleFamilyScore,
+  ROLE_COMPAT_SHORTLIST_THRESHOLD
+} from "../lib/roleCompatibility.js";
 import crypto from "crypto";
 
 export class AutonomousRecruitmentService {
@@ -97,22 +103,58 @@ export class AutonomousRecruitmentService {
       // 2.5 Auto-promote high-scoring candidates to 'shortlisted'.
       // Requires an *open* job opening: a candidate attached to no job, or to a
       // closed/removed requisition, must not be shortlisted or invited.
+      //
+      // IMPORTANT: We do NOT use a single bulk UPDATE here because we must also
+      // enforce role-family compatibility before promoting.  A Welder who
+      // somehow scored ≥80 against a Proposal Engineer role must go to HR Review,
+      // not to 'shortlisted'.  The check is done row-by-row so we can read the
+      // candidate's current title and the matched job's title.
       try {
-        const promoteRes = await queryGlobal(
-          `UPDATE candidates c
-              SET status = 'shortlisted'
+        const promoteCandidatesRes = await queryGlobal(
+          `SELECT c.id, c.role, c.score, j.title AS job_title
+             FROM candidates c
+             JOIN jobs j ON j.id = c.job_id AND ${activeJobSql("j")}
             WHERE c.score >= $1
               AND c.created_at >= $2::timestamptz
-              AND (c.status IS NULL OR LOWER(c.status) IN ('applied', 'not specified'))
-              AND EXISTS (
-                    SELECT 1 FROM jobs j
-                     WHERE j.id = c.job_id
-                       AND ${activeJobSql("j")}
-                  );`,
+              AND (c.status IS NULL OR LOWER(c.status) IN ('applied', 'not specified'))`,
           [PIPELINE_THRESHOLDS.SHORTLIST, cutoffIso]
         );
-        if (promoteRes.rowCount && promoteRes.rowCount > 0) {
-          console.log(`✨ [Autonomous Cycle] Auto-promoted ${promoteRes.rowCount} high-scoring (≥${PIPELINE_THRESHOLDS.SHORTLIST}%) candidates on open roles to 'shortlisted'.`);
+
+        let promoted30 = 0;
+        let hrReviewed30 = 0;
+
+        for (const row of promoteCandidatesRes.rows) {
+          const compatible = isRoleCompatibleForShortlisting(row.role, row.job_title);
+          if (compatible) {
+            await queryGlobal(
+              `UPDATE candidates SET status = 'shortlisted' WHERE id = $1;`,
+              [row.id]
+            );
+            promoted30++;
+          } else {
+            // Incompatible role family — route to HR Review, not shortlisted
+            const candFamily = classifyRoleFamily(row.role);
+            const jobFamily  = classifyRoleFamily(row.job_title);
+            const compatPct  = getRoleFamilyScore(row.role, row.job_title);
+            console.warn(
+              `[Role Guard / Cycle] Candidate ${row.id} "${row.role}" (${candFamily}) ` +
+              `is NOT compatible with "${row.job_title}" (${jobFamily}) — ` +
+              `compat ${compatPct}% < ${ROLE_COMPAT_SHORTLIST_THRESHOLD}%. ` +
+              `Routing to HR Review instead of shortlisting.`
+            );
+            await queryGlobal(
+              `UPDATE candidates SET status = 'Review' WHERE id = $1 AND (status IS NULL OR LOWER(status) IN ('applied', 'not specified'));`,
+              [row.id]
+            );
+            hrReviewed30++;
+          }
+        }
+
+        if (promoted30 > 0) {
+          console.log(`✨ [Autonomous Cycle] Auto-promoted ${promoted30} role-compatible high-scoring (≥${PIPELINE_THRESHOLDS.SHORTLIST}%) candidates to 'shortlisted'.`);
+        }
+        if (hrReviewed30 > 0) {
+          console.log(`🔀 [Autonomous Cycle] Routed ${hrReviewed30} role-incompatible high-scoring candidates to HR Review (not shortlisted).`);
         }
 
         // Run full multi-stage sync (Shortlisted >=80%, Under Review 60-79%, Rejected <60%, Interviewing)

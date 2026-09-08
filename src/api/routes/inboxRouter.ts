@@ -353,7 +353,7 @@ router.post("/email-sync", async (req: any, res: any, next: any) => {
         [tenantId]
       );
       const emailConfig = tenantRes.rows[0]?.email_config || {};
-      provider = emailConfig.incomingProvider || "mock";
+      provider = emailConfig.incomingProvider || "zoho";
     }
 
     console.log(`✉️ [Manual Sync] Triggering background sync for tenant ${tenantId} via ${provider}`);

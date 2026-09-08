@@ -20,6 +20,13 @@ import { isNonResumeFile } from "../lib/fileFilters.js";
 import { inferCandidateRole } from "../lib/roleInference.js";
 import { ACTIVE_JOB_SQL, PIPELINE_THRESHOLDS, isStrictJobMapping } from "../lib/appConfig.js";
 import { ensureNonBlankRemarks } from "../lib/aiEvaluationCache.js";
+import {
+  getRoleFamilyScore,
+  isRoleCompatibleForMapping,
+  isRoleCompatibleForShortlisting,
+  ROLE_COMPAT_SHORTLIST_THRESHOLD,
+  classifyRoleFamily
+} from "../lib/roleCompatibility.js";
 
 dotenv.config();
 
@@ -113,6 +120,32 @@ function calculateHeuristicMatch(
     (educationScore * weights.education) +
     (locationScore * weights.location)
   ) / (totalWeight || 1);
+
+  // Role-family title guard
+  // ─────────────────────────────────────────────────────────────────────────
+  // The keyword overlap above can return a high score even when the candidate
+  // is in a completely different professional domain (e.g., Welder vs Senior
+  // Proposal Engineer), because generic tokens like "steel", "project",
+  // "installation" appear in both.  We cap the score at 39 for clearly
+  // incompatible role families so it can never reach the JOB_MATCH_FLOOR
+  // (50%) or the SHORTLIST threshold (80%) through keyword luck alone.
+  const candidateTitle = data.currentTitle || data.role || "";
+  const familyCompatScore = getRoleFamilyScore(candidateTitle, job.title);
+  if (familyCompatScore < ROLE_COMPAT_SHORTLIST_THRESHOLD) {
+    const capAt = Math.min(39, rawScore);
+    if (rawScore > capAt) {
+      console.log(
+        `[Role Guard] Capping heuristic score from ${Math.round(rawScore)} → ${capAt} for ` +
+        `"${candidateTitle || "(no title)"}" → "${job.title}" ` +
+        `(role-family compat: ${familyCompatScore}% < ${ROLE_COMPAT_SHORTLIST_THRESHOLD}% threshold)`
+      );
+    }
+    return {
+      score: capAt,
+      matchedSkills: finalMatchedSkills,
+      missingSkills: missingSkills.slice(0, 5)
+    };
+  }
 
   return {
     score: Math.round(rawScore),
@@ -806,7 +839,30 @@ export async function parseAndEvalResume(
       let assessmentStatus = null;
 
       if (matchedJobId) {
-        if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
+        // ── Role-compatibility guard ─────────────────────────────────────────
+        // Before auto-shortlisting, verify the candidate's professional role is
+        // in the same domain as the job.  This is the last line of defence:
+        // even if the heuristic score cleared 80%, a Welder must NOT be
+        // shortlisted for a Senior Proposal Engineer opening.
+        //
+        // isRoleCompatibleForShortlisting uses the role-family matrix (threshold
+        // ≥ 60).  Incompatible candidates are placed in HR Review so a human
+        // can decide — they are NOT auto-rejected because the situation may be
+        // legitimate (e.g., a welder transitioning careers).
+        const candidateCurrentTitle = parsedData.currentTitle || parsedData.role || candidateRole;
+        const roleCompatible = isRoleCompatibleForShortlisting(candidateCurrentTitle, matchedJobTitle);
+
+        if (!roleCompatible) {
+          const candFamily = classifyRoleFamily(candidateCurrentTitle);
+          const jobFamily  = classifyRoleFamily(matchedJobTitle);
+          const compatPct  = getRoleFamilyScore(candidateCurrentTitle, matchedJobTitle);
+          console.warn(
+            `[Role Guard] Candidate "${candidateCurrentTitle}" (family: ${candFamily}) is NOT compatible ` +
+            `with job "${matchedJobTitle}" (family: ${jobFamily}) — compat score ${compatPct}% < ${ROLE_COMPAT_SHORTLIST_THRESHOLD}%. ` +
+            `Routing to HR Review instead of shortlisting. Match score: ${highestMatchScore}.`
+          );
+          candidateStatus = "Review";
+        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
           candidateStatus = 'shortlisted';
           assessmentToken = crypto.randomBytes(24).toString("hex");
           assessmentTokenExpiry = new Date();

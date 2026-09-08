@@ -22,8 +22,9 @@ const providerHealthLedger: Record<string, ProviderHealth> = {
   gmail: { connected: false, lastSyncTime: null },
   outlook: { connected: false, lastSyncTime: null },
   zoho: { connected: false, lastSyncTime: null },
-  imap: { connected: false, lastSyncTime: null },
-  mock: { connected: true, lastSyncTime: null }
+  imap: { connected: false, lastSyncTime: null }
+  // NOTE: 'mock' is intentionally excluded — it is a test-only provider and
+  // must never appear as 'connected' in production health dashboards.
 };
 
 export class EmailSyncService {
@@ -149,6 +150,20 @@ export class EmailSyncService {
    */
   static async syncMailbox(tenantId: string, providerType: string): Promise<number> {
     const key = providerType.toLowerCase();
+
+    // Safety guard: the MockEmailProvider generates fake jobs and fake candidates
+    // (John Doe, Bruce Wayne, React Architect JD) every time it runs. It must
+    // NEVER be invoked in a production environment.
+    if (key === "mock" && process.env.NODE_ENV !== "test") {
+      console.warn(
+        `[Email Sync] 🚨 MockEmailProvider was requested for tenant ${tenantId} in a non-test ` +
+        `environment (NODE_ENV=${process.env.NODE_ENV}). ` +
+        `This is blocked to prevent fake data from entering the production database. ` +
+        `Configure a real email provider (zoho, gmail, outlook) in the tenant\'s email_config.`
+      );
+      return 0;
+    }
+
     const provider = EmailSyncManager.getProvider(providerType);
     const storage = StorageManager.getProvider();
     
