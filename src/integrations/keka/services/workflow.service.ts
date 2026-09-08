@@ -15,6 +15,7 @@ import { callDeepSeek } from "../../../lib/deepseek.js";
 import { isKekaEnabled } from "../config/keka.config.js";
 import { computeSHA256Hash, getCachedEvaluation, setCachedEvaluation, evaluateProfileHeuristic, ensureNonBlankRemarks } from "../../../lib/aiEvaluationCache.js";
 import { PIPELINE_THRESHOLDS } from "../../../lib/appConfig.js";
+import { getRoleFamilyScore, ROLE_COMPAT_SHORTLIST_THRESHOLD } from "../../../lib/roleCompatibility.js";
 
 // Define the threshold mapping configurations
 //
@@ -280,10 +281,36 @@ export class KekaWorkflowService {
 
     const rawScore = parsedResult?.score ?? parsedResult?.aiScore ?? parsedResult?.match_score ?? parsedResult?.match_percent ?? parsedResult?.overallScore;
     let score = typeof rawScore === "number" ? rawScore : parseInt(String(rawScore || 0), 10);
-    if (isNaN(score) || score <= 0) {
+
+    // Guard against corrupted/unreadable files getting free points
+    const recText = String(parsedResult?.recommendation || parsedResult?.recommendationReason || "").toLowerCase();
+    const expText = String(parsedResult?.experienceMatch || "").toLowerCase();
+    const isCorruptedOrUnreadable =
+      recText.includes("corrupted") ||
+      recText.includes("unreadable") ||
+      expText.includes("corrupted") ||
+      expText.includes("unreadable");
+
+    if (isCorruptedOrUnreadable) {
+      score = 0;
+      console.warn(`[Auto Screening] Candidate ${candidateId} resume is corrupted or unreadable. Setting score to 0.`);
+    } else if (isNaN(score) || score <= 0) {
       const exp = Number(parsedResult?.experienceYears || candidate.experience_years || 0);
-      score = exp >= 5 ? 85 : exp >= 3 ? 75 : exp >= 2 ? 70 : exp >= 1 ? 65 : 60;
+      score = exp >= 5 ? 75 : exp >= 3 ? 65 : exp >= 2 ? 60 : exp >= 1 ? 50 : 40;
     }
+
+    // Role-family compatibility guard in Keka workflow:
+    // Ensure a Welder or Technician is not given high scores when screened against an Engineering job
+    const candTitle = parsedResult?.role || candidate.role || "";
+    const jobTitleForCompat = jobDescription.split("\n")[0]?.replace("Job Title:", "").trim() || "";
+    if (candTitle && jobTitleForCompat) {
+      const compatScore = getRoleFamilyScore(candTitle, jobTitleForCompat);
+      if (compatScore < ROLE_COMPAT_SHORTLIST_THRESHOLD && score > 55) {
+        console.warn(`[Auto Screening Role Guard] Capping score for ${candidateId} (${candTitle} -> ${jobTitleForCompat}) from ${score} to 55 due to role incompatibility.`);
+        score = 55;
+      }
+    }
+
     console.log(`AI screening complete. Score: ${score}/100`);
 
     // A sparse/low-information resume can leave the AI's own recommendation/
@@ -437,8 +464,15 @@ export class KekaWorkflowService {
     // assessment invitation from a different code path.
     if (!kekaOwnsCandidateStatus()) {
       const mirrored =
-        aiScore < PIPELINE_THRESHOLDS.REVIEW ? "Rejected" : aiScore < PIPELINE_THRESHOLDS.SHORTLIST ? "HR Review" : "Assessment";
-      const localStatus = mirrored === "Rejected" ? "rejected" : mirrored === "HR Review" ? "Review" : "shortlisted";
+        aiScore <= 0
+          ? "HR Review"
+          : aiScore < PIPELINE_THRESHOLDS.REVIEW
+          ? "Rejected"
+          : aiScore < PIPELINE_THRESHOLDS.SHORTLIST
+          ? "HR Review"
+          : "Assessment";
+      const localStatus =
+        aiScore <= 0 ? "Review" : mirrored === "Rejected" ? "rejected" : mirrored === "HR Review" ? "Review" : "shortlisted";
 
       // Mirror OUR decision into Keka so recruiters see the same stage there,
       // AND set the local status using the same thresholds the resume worker

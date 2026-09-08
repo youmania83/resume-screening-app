@@ -45,7 +45,7 @@ const FAMILY_KEYWORDS: Record<RoleFamily, string[]> = {
     "machinist", "millwright", "boilermaker", "sheet metal worker",
     "pipe fitter", "pipefitter", "plumber", "ironworker", "concrete worker",
     "crane operator", "forklift operator", "insulator", "blaster",
-    "tig welder", "mig welder", "arc welder"
+    "tig welder", "mig welder", "arc welder", "welding specialist", "fabrication specialist"
   ],
   engineering: [
     "engineer", "engineering", "proposal engineer", "structural engineer",

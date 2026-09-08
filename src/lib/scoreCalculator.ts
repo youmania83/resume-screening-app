@@ -44,14 +44,14 @@ export function calculatePrecisionCandidateScore(input: ScoreCalculationInput): 
   }
 
   // 3. Compute Skills Match Sub-Score (0-100)
-  let skillsScore = 70; // default baseline
+  let skillsScore = 50; // default baseline
   if (jobRequiredSkills.length > 0 && candidateSkills.length > 0) {
     const matchedCount = candidateSkills.filter(cs =>
       jobRequiredSkills.some(js => js.toLowerCase().includes(cs.toLowerCase()) || cs.toLowerCase().includes(js.toLowerCase()))
     ).length;
-    skillsScore = Math.min(100, Math.max(30, Math.round((matchedCount / jobRequiredSkills.length) * 100)));
+    skillsScore = Math.min(100, Math.max(20, Math.round((matchedCount / jobRequiredSkills.length) * 100)));
   } else if (candidateSkills.length >= 5) {
-    skillsScore = 85;
+    skillsScore = 55; // Neutral baseline when JD has no explicit skills listed
   }
 
   // 4. Role Alignment Sub-Score (0-100)
