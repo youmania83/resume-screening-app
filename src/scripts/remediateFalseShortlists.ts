@@ -24,11 +24,12 @@ export async function remediateFalseShortlists(): Promise<RemediationSummary[]> 
   // Find all candidates from Sept 2026 onwards or candidates currently shortlisted/with tokens
   const candRes = await queryGlobal(
     `SELECT c.id, c.name, c.email, c.role, c.score, c.skills, c.experience_years, 
-            c.education, c.raw_text, c.status, c.assessment_token, c.assessment_status,
+            c.education, rt.raw_text, c.status, c.assessment_token, c.assessment_status,
             c.job_id, j.title AS job_title, j.description AS job_desc, j.experience_required,
             c.tenant_id
        FROM candidates c
        LEFT JOIN jobs j ON c.job_id = j.id
+       LEFT JOIN resume_texts rt ON rt.batch_id = c.id
       WHERE (
         c.created_at >= '2026-09-01'::timestamptz 
         OR LOWER(COALESCE(c.status, '')) IN ('shortlisted', 'qualified', 'assessment')

@@ -109,9 +109,10 @@ export class AutonomousRecruitmentService {
       // experience alignment, education check, and role-family compatibility) before promoting.
       try {
         const promoteCandidatesRes = await queryGlobal(
-          `SELECT c.id, c.role, c.score, c.skills, c.experience_years, c.education, c.raw_text, j.id AS job_id, j.title AS job_title, j.description AS job_desc, j.experience_required
+          `SELECT c.id, c.role, c.score, c.skills, c.experience_years, c.education, rt.raw_text, j.id AS job_id, j.title AS job_title, j.description AS job_desc, j.experience_required
              FROM candidates c
              JOIN jobs j ON j.id = c.job_id AND ${activeJobSql("j")}
+             LEFT JOIN resume_texts rt ON rt.batch_id = c.id
             WHERE c.score >= $1
               AND c.created_at >= $2::timestamptz
               AND (c.status IS NULL OR LOWER(c.status) IN ('applied', 'not specified'))`,
@@ -333,9 +334,10 @@ export class AutonomousRecruitmentService {
       //  - the assessment must not already be completed/passed.
       try {
         const shortlistedRes = await queryGlobal(
-          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.skills, c.experience_years, c.education, c.raw_text, c.score, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc, j.experience_required
+          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.skills, c.experience_years, c.education, rt.raw_text, c.score, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc, j.experience_required
            FROM candidates c
            JOIN jobs j ON c.job_id = j.id AND ${activeJobSql("j")}
+           LEFT JOIN resume_texts rt ON rt.batch_id = c.id
            WHERE c.score >= 80
              AND LOWER(c.status) IN ('shortlisted', 'qualified')
              AND c.assessment_invited_at IS NULL
