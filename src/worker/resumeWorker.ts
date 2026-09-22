@@ -811,11 +811,27 @@ export async function parseAndEvalResume(
           matchedJobId = job.id;
           matchedJobTitle = job.title;
           matchedJobDesc = job.description;
-        } else if (!targetJobIsOpen && match.score > highestMatchScore) {
-          highestMatchScore = match.score;
-          matchedJobId = job.id;
-          matchedJobTitle = job.title;
-          matchedJobDesc = job.description;
+        } else if (!targetJobIsOpen) {
+          // ── Role-family-aware best-job selection ──────────────────────────
+          // When no targetJobId was provided, prefer a job whose role family
+          // matches the candidate's inferred role — even if a cross-domain job
+          // scored slightly higher due to generic keyword overlap.
+          const candidateFamily = classifyRoleFamily(candidateRole);
+          const thisJobFamily = classifyRoleFamily(job.title);
+          const currentBestFamily = classifyRoleFamily(matchedJobTitle);
+          const thisJobFamilyMatch = candidateFamily === thisJobFamily || candidateFamily === "unknown";
+          const currentBestFamilyMatch = candidateFamily === currentBestFamily || candidateFamily === "unknown";
+
+          const shouldSwitch =
+            match.score > highestMatchScore ||
+            (thisJobFamilyMatch && !currentBestFamilyMatch && match.score >= highestMatchScore - 15);
+
+          if (shouldSwitch) {
+            highestMatchScore = match.score;
+            matchedJobId = job.id;
+            matchedJobTitle = job.title;
+            matchedJobDesc = job.description;
+          }
         }
       }
 
@@ -862,6 +878,11 @@ export async function parseAndEvalResume(
             `Routing to HR Review instead of shortlisting. Match score: ${highestMatchScore}.`
           );
           candidateStatus = "Review";
+          // Revoke any assessment tokens — the candidate is mapped to an
+          // incompatible role family, so the assessment would be for the wrong domain.
+          assessmentToken = null;
+          assessmentTokenExpiry = null;
+          assessmentStatus = null;
         } else if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
           candidateStatus = 'shortlisted';
           assessmentToken = crypto.randomBytes(24).toString("hex");

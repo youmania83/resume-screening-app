@@ -150,7 +150,7 @@ const COMPAT_MATRIX: Partial<Record<RoleFamily, Partial<Record<RoleFamily, numbe
     it_software: 65,
     sales_bizdev: 65,
     finance: 60,
-    supply_chain: 60,
+    supply_chain: 45,  // Was 60 — too lenient; SCM candidates were passing the guard into PM roles
     qa_inspection: 50,
     admin_hr: 40,
     trades: 5,
@@ -206,7 +206,7 @@ const COMPAT_MATRIX: Partial<Record<RoleFamily, Partial<Record<RoleFamily, numbe
   },
   supply_chain: {
     supply_chain: 100,
-    management: 60,
+    management: 45,    // Was 60 — too lenient; SCM candidates were passing the guard into PM roles
     engineering: 40,
     finance: 35,
     admin_hr: 30,
