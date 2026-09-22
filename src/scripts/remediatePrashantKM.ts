@@ -173,19 +173,27 @@ async function remediatePrashantKM() {
       ]);
     }
 
-    // 6. Clean up any assessment responses linked to the wrong assessment
+    // 6. Clean up any assessment attempts/sessions linked to the wrong assessment
     if (candidate.assessment_token) {
-      const cleanupRes = await queryGlobal(`
-        DELETE FROM assessment_responses 
-        WHERE candidate_id = $1
-          AND assessment_id IN (
-            SELECT a.id FROM assessments a 
-            JOIN jobs j ON a.job_id = j.id 
-            WHERE LOWER(j.title) LIKE '%semiconductor%' 
-               OR LOWER(j.title) LIKE '%project manager%semiconductor%'
+      try {
+        await queryGlobal(`
+          DELETE FROM assessment_violations WHERE candidate_id = $1;
+        `, [candidate.id]);
+        await queryGlobal(`
+          DELETE FROM assessment_audit WHERE session_id IN (
+            SELECT id FROM assessment_sessions WHERE candidate_id = $1
           );
-      `, [candidate.id]);
-      console.log(`🗑️  Cleaned up ${cleanupRes.rowCount || 0} wrong assessment responses.`);
+        `, [candidate.id]);
+        await queryGlobal(`
+          DELETE FROM assessment_sessions WHERE candidate_id = $1;
+        `, [candidate.id]);
+        const cleanupRes = await queryGlobal(`
+          DELETE FROM assessment_attempts WHERE candidate_id = $1;
+        `, [candidate.id]);
+        console.log(`🗑️  Cleaned up ${cleanupRes.rowCount || 0} wrong assessment attempts/sessions.`);
+      } catch (cleanupErr: any) {
+        console.warn(`⚠️  Assessment cleanup notice (non-fatal):`, cleanupErr?.message);
+      }
     }
 
     // 7. Log timeline entry
