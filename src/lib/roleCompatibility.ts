@@ -64,9 +64,10 @@ const FAMILY_KEYWORDS: Record<RoleFamily, string[]> = {
     "database administrator"
   ],
   management: [
-    "manager", "director", "vp ", "vice president", "ceo", "cto", "coo", "cfo",
-    "head of", "general manager", "country head", "regional head", "team lead",
-    "operations head", "delivery manager", "program manager", "portfolio manager"
+    "manager", "director", "project director", "vp ", "vice president", "ceo", "cto", "coo", "cfo",
+    "head", "project head", "head of", "general manager", "country head", "regional head", "team lead",
+    "operations head", "delivery manager", "program manager", "portfolio manager",
+    "deputy general manager", "assistant general manager", "dgm", "agm", "construction manager", "site manager"
   ],
   admin_hr: [
     "human resources", "hr ", "recruitment", "talent acquisition", "payroll",
