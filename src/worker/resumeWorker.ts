@@ -27,6 +27,10 @@ import {
   ROLE_COMPAT_SHORTLIST_THRESHOLD,
   classifyRoleFamily
 } from "../lib/roleCompatibility.js";
+import {
+  evaluateCandidateDetailedScore,
+  isCandidateEligibleForShortlisting
+} from "../lib/scoreCalculator.js";
 
 dotenv.config();
 
@@ -44,113 +48,39 @@ function validateResumeText(text: string): { valid: boolean; reason?: string } {
 }
 
 /**
- * Heuristically calculates a match score for a job when reusing cached parsed data.
+ * Accurately calculates candidate match score and eligibility using precision scoring.
  */
 function calculateHeuristicMatch(
   data: ParsedResumeData,
-  job: { title: string; description: string; location?: string; experience_required?: string },
-  weights: { skills: number; experience: number; industry: number; education: number; location: number }
+  job: { title: string; description: string; location?: string; experience_required?: string; skills?: string[] },
+  _weights?: { skills: number; experience: number; industry: number; education: number; location: number }
 ): {
   score: number;
   matchedSkills: string[];
   missingSkills: string[];
+  isEligible: boolean;
+  ineligibilityReasons: string[];
+  isDataSufficient: boolean;
 } {
-  const fullText = `${job.title || ""} ${job.description || ""}`.toLowerCase();
-  const matchedSkills: string[] = [];
-  const missingSkills: string[] = [];
-
-  if (data.skills && data.skills.length > 0) {
-    for (const skill of data.skills) {
-      const sLower = skill.toLowerCase().trim();
-      if (!sLower) continue;
-      // Match full skill phrase, word tokens, or title keywords
-      if (
-        fullText.includes(sLower) ||
-        sLower.split(/[\s\/\-]+/).some(tok => tok.length >= 3 && fullText.includes(tok))
-      ) {
-        matchedSkills.push(skill);
-      } else {
-        missingSkills.push(skill);
-      }
-    }
-  }
-
-  // Keep matchedSkills strictly to actual matches against JD
-  const finalMatchedSkills = matchedSkills;
-
-  const skillsScore = data.skillsScore ?? (data.skills && data.skills.length > 0 
-    ? Math.round((finalMatchedSkills.length / Math.max(1, data.skills.length)) * 100)
-    : 0);
-
-  // Match experience
-  let experienceScore = data.experienceScore ?? 75;
-  if (job.experience_required) {
-    const requiredYears = parseInt(job.experience_required.replace(/[^0-9]/g, ""), 10);
-    if (!isNaN(requiredYears)) {
-      if (data.experienceYears >= requiredYears) {
-        experienceScore = 100;
-      } else {
-        experienceScore = Math.max(0, Math.round((data.experienceYears / requiredYears) * 100));
-      }
-    }
-  }
-
-  const industryScore = data.industryScore ?? 75;
-  const educationScore = data.educationScore ?? 80;
-  
-  // Location score
-  let locationScore = 100;
-  if (job.location && job.location.toLowerCase() !== "remote") {
-    const jobLoc = job.location.toLowerCase();
-    const city = data.city?.toLowerCase() || "";
-    const state = data.state?.toLowerCase() || "";
-    if (!city && !state) {
-      locationScore = 60;
-    } else if (!jobLoc.includes(city) && !jobLoc.includes(state)) {
-      locationScore = 50;
-    }
-  }
-
-  // Weighted score calculation
-  const totalWeight = weights.skills + weights.experience + weights.industry + weights.education + weights.location;
-  const rawScore = (
-    (skillsScore * weights.skills) +
-    (experienceScore * weights.experience) +
-    (industryScore * weights.industry) +
-    (educationScore * weights.education) +
-    (locationScore * weights.location)
-  ) / (totalWeight || 1);
-
-  // Role-family title guard
-  // ─────────────────────────────────────────────────────────────────────────
-  // The keyword overlap above can return a high score even when the candidate
-  // is in a completely different professional domain (e.g., Welder vs Senior
-  // Proposal Engineer), because generic tokens like "steel", "project",
-  // "installation" appear in both.  We cap the score at 39 for clearly
-  // incompatible role families so it can never reach the JOB_MATCH_FLOOR
-  // (50%) or the SHORTLIST threshold (80%) through keyword luck alone.
-  const candidateTitle = data.currentTitle || data.role || "";
-  const familyCompatScore = getRoleFamilyScore(candidateTitle, job.title);
-  if (familyCompatScore < ROLE_COMPAT_SHORTLIST_THRESHOLD) {
-    const capAt = Math.min(39, rawScore);
-    if (rawScore > capAt) {
-      console.log(
-        `[Role Guard] Capping heuristic score from ${Math.round(rawScore)} → ${capAt} for ` +
-        `"${candidateTitle || "(no title)"}" → "${job.title}" ` +
-        `(role-family compat: ${familyCompatScore}% < ${ROLE_COMPAT_SHORTLIST_THRESHOLD}% threshold)`
-      );
-    }
-    return {
-      score: capAt,
-      matchedSkills: finalMatchedSkills,
-      missingSkills: missingSkills.slice(0, 5)
-    };
-  }
+  const result = evaluateCandidateDetailedScore({
+    candidateExperienceYears: data.experienceYears || 0,
+    requiredExperienceText: job.experience_required || undefined,
+    candidateSkills: data.skills || [],
+    jobRequiredSkills: Array.isArray(job.skills) ? job.skills : [],
+    candidateRole: data.currentTitle || data.role || "",
+    jobTitle: job.title || "",
+    baseAiScore: data.skillsScore,
+    candidateEducation: data.education || "",
+    jobDescriptionText: job.description || ""
+  });
 
   return {
-    score: Math.round(rawScore),
-    matchedSkills: finalMatchedSkills,
-    missingSkills: missingSkills.slice(0, 5)
+    score: result.score,
+    matchedSkills: result.matchedSkills,
+    missingSkills: result.missingSkills,
+    isEligible: result.isEligible,
+    ineligibilityReasons: result.ineligibilityReasons,
+    isDataSufficient: result.isDataSufficient
   };
 }
 
@@ -173,13 +103,17 @@ export async function parseAndEvalResume(
     try {
       // 1. Fetch file hash from inbox record
       const inboxRes = await queryGlobal(
-        "SELECT created_at, file_hash, file_name, file_url FROM resume_inbox WHERE id = $1 LIMIT 1;",
+        "SELECT created_at, file_hash, file_name, file_url, target_job_id, applied_role FROM resume_inbox WHERE id = $1 LIMIT 1;",
         [inboxId]
       );
       if (inboxRes.rowCount === 0) {
         throw new Error(`Inbox item ${inboxId} not found in database.`);
       }
       const inboxRecord = inboxRes.rows[0];
+      if (!targetJobId && inboxRecord.target_job_id) {
+        targetJobId = inboxRecord.target_job_id;
+        console.log(`[Worker] Using target_job_id preserved from email inbox: ${targetJobId}`);
+      }
       const fileHash = inboxRecord.file_hash || "";
       const fileName = inboxRecord.file_name || "";
       const uploadDuration = Date.now() - new Date(inboxRecord.created_at).getTime();
@@ -855,18 +789,13 @@ export async function parseAndEvalResume(
       let assessmentStatus = null;
 
       if (matchedJobId) {
-        // ── Role-compatibility guard ─────────────────────────────────────────
-        // Before auto-shortlisting, verify the candidate's professional role is
-        // in the same domain as the job.  This is the last line of defence:
-        // even if the heuristic score cleared 80%, a Welder must NOT be
-        // shortlisted for a Senior Proposal Engineer opening.
-        //
-        // isRoleCompatibleForShortlisting uses the role-family matrix (threshold
-        // ≥ 60).  Incompatible candidates are placed in HR Review so a human
-        // can decide — they are NOT auto-rejected because the situation may be
-        // legitimate (e.g., a welder transitioning careers).
+        const activeMatch = jobMatches.find(jm => jm.job.id === matchedJobId)?.match;
         const candidateCurrentTitle = parsedData.currentTitle || parsedData.role || candidateRole;
         const roleCompatible = isRoleCompatibleForShortlisting(candidateCurrentTitle, matchedJobTitle);
+
+        // Strict Eligibility Gate:
+        // Must be role-compatible, have sufficient data, meet experience requirement, and score >= 80
+        const isEligible = roleCompatible && (activeMatch?.isEligible ?? false) && (activeMatch?.isDataSufficient ?? true);
 
         if (!roleCompatible) {
           const candFamily = classifyRoleFamily(candidateCurrentTitle);
@@ -878,12 +807,19 @@ export async function parseAndEvalResume(
             `Routing to HR Review instead of shortlisting. Match score: ${highestMatchScore}.`
           );
           candidateStatus = "Review";
-          // Revoke any assessment tokens — the candidate is mapped to an
-          // incompatible role family, so the assessment would be for the wrong domain.
           assessmentToken = null;
           assessmentTokenExpiry = null;
           assessmentStatus = null;
-        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST) {
+        } else if (activeMatch && !activeMatch.isDataSufficient) {
+          console.warn(
+            `[Sufficiency Guard] Candidate "${candidateCurrentTitle}" has insufficient resume information. ` +
+            `Routing to HR Review with capped score. Match score: ${highestMatchScore}.`
+          );
+          candidateStatus = "Review";
+          assessmentToken = null;
+          assessmentTokenExpiry = null;
+          assessmentStatus = null;
+        } else if (highestMatchScore >= PIPELINE_THRESHOLDS.SHORTLIST && isEligible) {
           candidateStatus = 'shortlisted';
           assessmentToken = crypto.randomBytes(24).toString("hex");
           assessmentTokenExpiry = new Date();
@@ -891,8 +827,14 @@ export async function parseAndEvalResume(
           assessmentStatus = 'pending';
         } else if (highestMatchScore >= PIPELINE_THRESHOLDS.REVIEW) {
           candidateStatus = 'Review';
+          assessmentToken = null;
+          assessmentTokenExpiry = null;
+          assessmentStatus = null;
         } else {
           candidateStatus = 'rejected';
+          assessmentToken = null;
+          assessmentTokenExpiry = null;
+          assessmentStatus = null;
         }
       } else {
         // No matched job (only reachable if strict job mapping is disabled)

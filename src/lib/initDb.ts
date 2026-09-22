@@ -565,6 +565,8 @@ async function init() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE resume_inbox ADD COLUMN IF NOT EXISTS target_job_id VARCHAR REFERENCES jobs(id) ON DELETE SET NULL;
+      ALTER TABLE resume_inbox ADD COLUMN IF NOT EXISTS applied_role VARCHAR;
     `);
 
     await client.query(`

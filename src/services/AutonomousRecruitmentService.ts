@@ -18,6 +18,7 @@ import {
   getRoleFamilyScore,
   ROLE_COMPAT_SHORTLIST_THRESHOLD
 } from "../lib/roleCompatibility.js";
+import { isCandidateEligibleForShortlisting } from "../lib/scoreCalculator.js";
 import crypto from "crypto";
 
 export class AutonomousRecruitmentService {
@@ -68,7 +69,7 @@ export class AutonomousRecruitmentService {
       // 2. Process Queued Inbox Resumes
       try {
         const queuedResumes = await queryGlobal(
-          `SELECT id, tenant_id, file_url, file_name
+          `SELECT id, tenant_id, file_url, file_name, target_job_id, applied_role
            FROM resume_inbox
            WHERE status IN ('Queued', 'Uploaded', 'Pending')
              AND created_at >= $1::timestamptz
@@ -88,7 +89,7 @@ export class AutonomousRecruitmentService {
               console.log(`⏭️ [Autonomous Cycle] Inbox item ${item.id} already being processed. Skipping.`);
               continue;
             }
-            await parseAndEvalResume(item.tenant_id, item.id, item.file_url, "application/pdf");
+            await parseAndEvalResume(item.tenant_id, item.id, item.file_url, "application/pdf", item.target_job_id);
             screened++;
           } catch (evalErr: any) {
             console.error(`[Autonomous Cycle] Resume processing error for inbox item ${item.id}:`, evalErr.message);
@@ -104,14 +105,11 @@ export class AutonomousRecruitmentService {
       // Requires an *open* job opening: a candidate attached to no job, or to a
       // closed/removed requisition, must not be shortlisted or invited.
       //
-      // IMPORTANT: We do NOT use a single bulk UPDATE here because we must also
-      // enforce role-family compatibility before promoting.  A Welder who
-      // somehow scored ≥80 against a Proposal Engineer role must go to HR Review,
-      // not to 'shortlisted'.  The check is done row-by-row so we can read the
-      // candidate's current title and the matched job's title.
+      // IMPORTANT: Enforce strict candidate eligibility gatekeeper (complete information,
+      // experience alignment, education check, and role-family compatibility) before promoting.
       try {
         const promoteCandidatesRes = await queryGlobal(
-          `SELECT c.id, c.role, c.score, j.title AS job_title
+          `SELECT c.id, c.role, c.score, c.skills, c.experience_years, c.education, c.raw_text, j.id AS job_id, j.title AS job_title, j.description AS job_desc, j.experience_required
              FROM candidates c
              JOIN jobs j ON j.id = c.job_id AND ${activeJobSql("j")}
             WHERE c.score >= $1
@@ -124,22 +122,32 @@ export class AutonomousRecruitmentService {
         let hrReviewed30 = 0;
 
         for (const row of promoteCandidatesRes.rows) {
-          const compatible = isRoleCompatibleForShortlisting(row.role, row.job_title);
-          if (compatible) {
+          const eligibility = isCandidateEligibleForShortlisting(
+            {
+              score: Number(row.score) || 0,
+              experienceYears: row.experience_years,
+              skills: row.skills,
+              role: row.role,
+              education: row.education,
+              rawText: row.raw_text
+            },
+            {
+              title: row.job_title,
+              experience_required: row.experience_required,
+              description: row.job_desc
+            }
+          );
+
+          if (eligibility.eligible) {
             await queryGlobal(
               `UPDATE candidates SET status = 'shortlisted' WHERE id = $1;`,
               [row.id]
             );
             promoted30++;
           } else {
-            // Incompatible role family — route to HR Review, not shortlisted
-            const candFamily = classifyRoleFamily(row.role);
-            const jobFamily  = classifyRoleFamily(row.job_title);
-            const compatPct  = getRoleFamilyScore(row.role, row.job_title);
             console.warn(
-              `[Role Guard / Cycle] Candidate ${row.id} "${row.role}" (${candFamily}) ` +
-              `is NOT compatible with "${row.job_title}" (${jobFamily}) — ` +
-              `compat ${compatPct}% < ${ROLE_COMPAT_SHORTLIST_THRESHOLD}%. ` +
+              `[Shortlist Guard / Cycle] Candidate ${row.id} "${row.role}" for job "${row.job_title}" ` +
+              `failed shortlist eligibility: ${eligibility.reasons.join("; ")}. ` +
               `Routing to HR Review instead of shortlisting.`
             );
             await queryGlobal(
@@ -325,9 +333,9 @@ export class AutonomousRecruitmentService {
       //  - the assessment must not already be completed/passed.
       try {
         const shortlistedRes = await queryGlobal(
-          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc
+          `SELECT c.id, c.name, c.email, c.job_id, c.tenant_id, c.role, c.skills, c.experience_years, c.education, c.raw_text, c.score, c.assessment_token, c.assessment_token_expiry, j.title as job_title, j.description as job_desc, j.experience_required
            FROM candidates c
-           LEFT JOIN jobs j ON c.job_id = j.id
+           JOIN jobs j ON c.job_id = j.id AND ${activeJobSql("j")}
            WHERE c.score >= 80
              AND LOWER(c.status) IN ('shortlisted', 'qualified')
              AND c.assessment_invited_at IS NULL
@@ -340,6 +348,36 @@ export class AutonomousRecruitmentService {
           try {
             const jobTitle = candidate.job_title || candidate.role || "Open Position";
             const jobDesc = candidate.job_desc || jobTitle;
+
+            // Strict eligibility gate: only truly qualified candidates with sufficient information and correct role mapping receive assessment invites!
+            const eligibility = isCandidateEligibleForShortlisting(
+              {
+                score: Number(candidate.score) || 0,
+                experienceYears: candidate.experience_years,
+                skills: candidate.skills,
+                role: candidate.role,
+                education: candidate.education,
+                rawText: candidate.raw_text
+              },
+              {
+                title: jobTitle,
+                experience_required: candidate.experience_required,
+                description: jobDesc
+              }
+            );
+
+            if (!eligibility.eligible) {
+              console.warn(
+                `🛑 [Assessment Dispatch Guard] Revoking invite for candidate ${candidate.id} (${candidate.name}) to "${jobTitle}": ${eligibility.reasons.join("; ")}.`
+              );
+              await queryGlobal(
+                `UPDATE candidates
+                 SET status = 'Review', assessment_token = NULL, assessment_token_expiry = NULL, assessment_status = NULL
+                 WHERE id = $1;`,
+                [candidate.id]
+              );
+              continue;
+            }
 
             // Ensure 15 MCQ AI Assessment exists & stored in DB
             await ensureJobAssessment(candidate.job_id, jobTitle, jobDesc);

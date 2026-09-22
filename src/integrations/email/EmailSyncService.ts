@@ -139,6 +139,32 @@ export class EmailSyncService {
           console.log(`[Email Sync] Ambiguous job matching: multiple openings for "${jobTitleExtracted}" with different locations.`);
         }
       }
+
+      // 3. Direct title scanning in subject or body against all active jobs
+      for (const job of jobs) {
+        const jTitle = job.title.toLowerCase().trim();
+        if (jTitle.length >= 4) {
+          const titleRegex = new RegExp(`\\b${jTitle.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+          if (titleRegex.test(subLower)) {
+            console.log(`[Email Sync] Matched active job directly from subject line: "${job.title}"`);
+            return job.id;
+          }
+        }
+      }
+
+      // 4. Role acronym aliases (GET -> Graduate Engineer Trainee, SCM -> SCM Engineer)
+      if (/\b(?:get|graduate engineer trainee)\b/i.test(subLower)) {
+        const getJob = jobs.find(j => j.title.toLowerCase().includes("graduate engineer trainee"));
+        if (getJob) return getJob.id;
+      }
+      if (/\b(?:scm|supply chain)\b/i.test(subLower)) {
+        const scmJob = jobs.find(j => j.title.toLowerCase().includes("scm"));
+        if (scmJob) return scmJob.id;
+      }
+      if (/\b(?:civil|site engineer)\b/i.test(subLower)) {
+        const civilJob = jobs.find(j => j.title.toLowerCase().includes("civil") || j.title.toLowerCase().includes("site engineer"));
+        if (civilJob) return civilJob.id;
+      }
     } catch (err) {
       console.error("[Email Sync] Error finding best matching job:", err);
     }
@@ -241,6 +267,23 @@ export class EmailSyncService {
               }
             }
             break;
+          }
+        }
+
+        // Broad fallback extraction for common subject lines if rules didn't catch title
+        if (!jobTitleExtracted) {
+          const appPatterns = [
+            /(?:applying\s*for|job\s*application|resume\s*for|cv\s*for|application\s*for|applied\s*for|profile\s*for)\s*[:-]?\s*(?:the\s*(?:post|position|role)\s*of\s*)?([^\(\)\[\]\|\n\r]+)/i,
+            /^(?:resume|cv)\s*[-:]\s*(.+)$/i,
+            /(?:job\s*role|position|post)\s*:\s*(.+)$/i,
+            /\bfor\s+(?:the\s+role\s+of\s+)?([A-Za-z\s–-]+?)(?:\s+role|\s+position|\s+at\s+|\s+in\s+|$)/i
+          ];
+          for (const pat of appPatterns) {
+            const m = subject.match(pat);
+            if (m && m[1] && m[1].trim().length >= 3) {
+              jobTitleExtracted = m[1].replace(/[-–].*$/, "").trim();
+              break;
+            }
           }
         }
 
@@ -374,10 +417,10 @@ export class EmailSyncService {
           await fs.promises.writeFile(tempPath, attach.content);
 
           await queryGlobal(
-            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+            `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, file_hash, status, target_job_id, applied_role, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'Queued', $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
              `,
-            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, fileHash]
+            [inboxId, tenantId, attach.fileName, storageMeta.fileUrl, fileHash, targetJobId || null, jobTitleExtracted || null]
           );
 
           await IngestQueue.enqueue(tenantId, inboxId, tempPath, attach.mimeType, targetJobId);
@@ -410,23 +453,25 @@ export class EmailSyncService {
 
               if (downloadRes.success && downloadRes.filePath && downloadRes.mimeType) {
                 await queryGlobal(
-                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, 'Queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
-                  [inboxId, tenantId, downloadRes.fileName, link]
+                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, target_job_id, applied_role, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, 'Queued', $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+                  [inboxId, tenantId, downloadRes.fileName, link, targetJobId || null, jobTitleExtracted || null]
                 );
 
                 await IngestQueue.enqueue(tenantId, inboxId, downloadRes.filePath, downloadRes.mimeType, targetJobId);
               } else {
                 // Fallback to url record
                 await queryGlobal(
-                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, error_message, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, 'Queued', $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+                  `INSERT INTO resume_inbox (id, tenant_id, file_name, file_url, status, error_message, target_job_id, applied_role, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, 'Queued', $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
                   [
                     inboxId, 
                     tenantId, 
                     `Cloud_Resume_${inboxId}.url`, 
                     link, 
-                    "Cloud resume link detected in email body."
+                    "Cloud resume link detected in email body.",
+                    targetJobId || null,
+                    jobTitleExtracted || null
                   ]
                 );
 

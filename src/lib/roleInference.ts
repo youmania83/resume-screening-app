@@ -9,8 +9,9 @@ export function isGenericRoleTitle(title?: string | null): boolean {
     lower === "candidate" ||
     lower === "unassigned" ||
     lower === "unknown" ||
+    lower === "applicant" ||
     lower.endsWith(" role") ||
-    lower.includes("applicant") ||
+    lower.includes("general applicant") ||
     lower === "software engineer"
   ) {
     return true;
@@ -26,6 +27,15 @@ export function inferCandidateRole(cand: {
   name?: string | null;
   recommendation?: string | null;
 }): string {
+  // 1. Prioritize explicit candidate title or applied designation if specific
+  if (cand.currentTitle && !isGenericRoleTitle(cand.currentTitle)) {
+    return cand.currentTitle.trim();
+  }
+  if (cand.role && !isGenericRoleTitle(cand.role)) {
+    return cand.role.trim();
+  }
+
+  // 2. Fall back to domain skills inference
   const skillsList = cand.skills || [];
   const skillsStr = (Array.isArray(skillsList) ? skillsList.join(" ") : String(skillsList)).toLowerCase();
   const exp = Number(cand.experienceYears) || 0;
@@ -38,6 +48,11 @@ export function inferCandidateRole(cand: {
     }
     return skillsStr.includes(kw);
   };
+
+  // Trainee / GET detection
+  if (exp === 0 && (hasKw("mechanical") || hasKw("automobile") || hasKw("catia") || hasKw("solidworks") || hasKw("autocad"))) {
+    return "Graduate Engineer Trainee";
+  }
 
   if (hasKw("react") || hasKw("next.js") || hasKw("node") || hasKw("full stack") || hasKw("fullstack") || hasKw("typescript")) {
     return `${prefix}Full Stack Engineer`;
@@ -69,6 +84,9 @@ export function inferCandidateRole(cand: {
   if (hasKw("supply chain") || hasKw("scm") || hasKw("procurement") || hasKw("warehouse") || hasKw("logistics") || hasKw("purchase")) {
     return `${prefix}Supply Chain / Procurement Specialist`;
   }
+  if (hasKw("civil") || hasKw("construction") || hasKw("structural") || hasKw("billing engineer") || hasKw("site supervision")) {
+    return `${prefix}Site Engineer - Civil`;
+  }
   if (hasKw("front desk") || hasKw("receptionist") || hasKw("office management") || hasKw("guest relations")) {
     return `${prefix}Front Desk Executive`;
   }
@@ -81,19 +99,9 @@ export function inferCandidateRole(cand: {
   if (hasKw("sales") || hasKw("b2b") || hasKw("business development") || hasKw("account executive")) {
     return `${prefix}Sales Executive`;
   }
-  if (hasKw("civil") || hasKw("construction") || hasKw("site") || hasKw("autocad") || hasKw("structural") || hasKw("project")) {
-    return `${prefix}Project Engineer`;
-  }
   if (hasKw("finance") || hasKw("accounting") || hasKw("audit") || hasKw("gst") || hasKw("tally")) {
     return `${prefix}Finance & Accounts Specialist`;
   }
 
-  if (cand.currentTitle && !isGenericRoleTitle(cand.currentTitle)) {
-    return cand.currentTitle.trim();
-  }
-  if (cand.role && !isGenericRoleTitle(cand.role)) {
-    return cand.role.trim();
-  }
-
-  return `${prefix}Project Engineer`;
+  return exp >= 5 ? "Senior Project Engineer" : "Project Engineer";
 }
