@@ -16,6 +16,30 @@ export function isGenericRoleTitle(title?: string | null): boolean {
   ) {
     return true;
   }
+
+  // Standalone seniority/hierarchy titles that lack any functional domain:
+  const standaloneSeniority = [
+    "assistant manager",
+    "deputy manager",
+    "manager",
+    "senior manager",
+    "general manager",
+    "associate",
+    "executive",
+    "senior executive",
+    "team lead",
+    "lead",
+    "officer",
+    "coordinator",
+    "consultant",
+    "specialist",
+    "intern",
+    "trainee"
+  ];
+  if (standaloneSeniority.includes(lower)) {
+    return true;
+  }
+
   return false;
 }
 

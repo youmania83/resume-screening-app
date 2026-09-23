@@ -64,7 +64,7 @@ const FAMILY_KEYWORDS: Record<RoleFamily, string[]> = {
     "database administrator"
   ],
   management: [
-    "manager", "director", "project director", "vp ", "vice president", "ceo", "cto", "coo", "cfo",
+    "manager", "director", "project director", "vp ", "vice president", "ceo", "cto", "coo",
     "head", "project head", "head of", "general manager", "country head", "regional head", "team lead",
     "operations head", "delivery manager", "program manager", "portfolio manager",
     "deputy general manager", "assistant general manager", "dgm", "agm", "construction manager", "site manager"
@@ -87,7 +87,7 @@ const FAMILY_KEYWORDS: Record<RoleFamily, string[]> = {
     "paint inspector", "coating inspector", "third party inspection"
   ],
   finance: [
-    "finance", "financial analyst", "accountant", "accounting", "auditor",
+    "cfo", "chief financial officer", "finance", "financial analyst", "accountant", "accounting", "auditor",
     "taxation", "gst", "tally", "chartered accountant", "cost accountant",
     "treasury", "controller", "bookkeeper"
   ],
@@ -150,7 +150,7 @@ const COMPAT_MATRIX: Partial<Record<RoleFamily, Partial<Record<RoleFamily, numbe
     engineering: 70,
     it_software: 65,
     sales_bizdev: 65,
-    finance: 60,
+    finance: 25,       // Was 60; general management must not auto-qualify for CFO/finance roles
     supply_chain: 45,  // Was 60 — too lenient; SCM candidates were passing the guard into PM roles
     qa_inspection: 50,
     admin_hr: 40,
@@ -195,7 +195,7 @@ const COMPAT_MATRIX: Partial<Record<RoleFamily, Partial<Record<RoleFamily, numbe
   },
   finance: {
     finance: 100,
-    management: 60,
+    management: 25,    // Was 60; finance roles must not auto-shortlist for generic management
     admin_hr: 35,
     supply_chain: 35,
     sales_bizdev: 30,

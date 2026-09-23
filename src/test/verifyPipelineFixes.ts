@@ -347,6 +347,47 @@ async function main() {
     }
   }
 
+  console.log("\n═══ 12. Role-family classification & CFO domain guard ═══");
+  console.log("    (was: CFO was in 'management', causing Assistant Manager to match CFO at 100% compat)");
+  {
+    const { classifyRoleFamily, getRoleFamilyScore, isRoleCompatibleForShortlisting } = await import("../lib/roleCompatibility.js");
+    const { isGenericRoleTitle, inferCandidateRole } = await import("../lib/roleInference.js");
+
+    check("CFO is classified as finance, not management", () => {
+      assert.strictEqual(classifyRoleFamily("Chief Financial Officer (CFO)"), "finance");
+      assert.strictEqual(classifyRoleFamily("CFO"), "finance");
+    });
+
+    check("bare seniority titles without domain are treated as generic", () => {
+      assert.strictEqual(isGenericRoleTitle("Assistant Manager"), true);
+      assert.strictEqual(isGenericRoleTitle("Manager"), true);
+      assert.strictEqual(isGenericRoleTitle("Executive"), true);
+      // Domain-specific titles are NOT generic
+      assert.strictEqual(isGenericRoleTitle("Sales Engineer"), false);
+      assert.strictEqual(isGenericRoleTitle("Civil Engineer"), false);
+    });
+
+    check("candidate with Assistant Manager title and sales skills infers sales role", () => {
+      const role = inferCandidateRole({
+        currentTitle: "Assistant Manager",
+        skills: ["Order management", "Quotation preparation", "Pre-sales", "SAP SD", "CRM"],
+        experienceYears: 11
+      });
+      assert.ok(role.toLowerCase().includes("sales"), `expected role to include 'sales', got: ${role}`);
+      assert.strictEqual(classifyRoleFamily(role), "sales_bizdev");
+    });
+
+    check("sales candidate is blocked from auto-shortlisting for CFO", () => {
+      const compatScore = getRoleFamilyScore("Lead Sales Executive", "Chief Financial Officer (CFO)");
+      assert.ok(compatScore < 60, `expected compat < 60, got ${compatScore}`);
+      assert.strictEqual(isRoleCompatibleForShortlisting("Lead Sales Executive", "Chief Financial Officer (CFO)"), false);
+    });
+
+    check("sales candidate is compatible with Sales Engineer", () => {
+      assert.strictEqual(isRoleCompatibleForShortlisting("Lead Sales Executive", "Sales Engineer"), true);
+    });
+  }
+
   console.log("\n" + "═".repeat(64));
   console.log(`RESULT: ${passed} passed, ${failed} failed`);
   if (failed > 0) {
