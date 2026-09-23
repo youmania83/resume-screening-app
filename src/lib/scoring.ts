@@ -70,7 +70,7 @@ Return ONLY a JSON object with the shape {\"overall\": number, \"criteria\": {\"
 export async function computeScore(batchId: string, jobDescription: string): Promise<ScoreResult> {
   const resumeText = await getResumeText(batchId);
   const prompt = buildPrompt(jobDescription, resumeText);
-  const response = await callDeepSeek(prompt, { maxTokens: 800 });
+  const response = await callDeepSeek(prompt, { maxTokens: 2500 });
   try {
     const parsed = parseCleanJson(response) as ScoreResult;
     if (!Number.isFinite(parsed.overall)) {

@@ -91,6 +91,12 @@ export async function remediateFalseShortlists(): Promise<RemediationSummary[]> 
       }
     }
 
+    // If the candidate already took/passed the assessment, never wipe their assessment status
+    const hasPassedOrAttempt = cand.assessment_status === 'passed' || cand.status === 'interviewing';
+    if (hasPassedOrAttempt) {
+      shouldRevokeToken = false;
+    }
+
     if (shouldRevokeToken && cand.assessment_token) {
       tokenRevoked = true;
     }
@@ -104,7 +110,12 @@ export async function remediateFalseShortlists(): Promise<RemediationSummary[]> 
                 status = $2,
                 assessment_token = CASE WHEN $3 THEN NULL ELSE assessment_token END,
                 assessment_token_expiry = CASE WHEN $3 THEN NULL ELSE assessment_token_expiry END,
-                assessment_status = CASE WHEN $3 THEN NULL ELSE assessment_status END
+                assessment_status = CASE 
+                  WHEN $3 AND COALESCE(assessment_status, '') != 'passed' 
+                   AND NOT EXISTS (SELECT 1 FROM assessment_attempts aa WHERE aa.candidate_id = candidates.id AND aa.status = 'completed' AND aa.score >= 70)
+                  THEN NULL 
+                  ELSE assessment_status 
+                END
           WHERE id = $4;`,
         [newScore, newStatus, tokenRevoked, cand.id]
       );

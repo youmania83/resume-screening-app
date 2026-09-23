@@ -170,10 +170,13 @@ Responsibilities: ${Array.isArray(parsedJD.responsibilities) ? parsedJD.responsi
       parsedResult = cached;
     } else {
       const prompt = buildEvaluatePrompt(formattedJobDescription, rawText);
-      const responseText = await callDeepSeek(prompt, { maxTokens: 800 });
+      const responseText = await callDeepSeek(prompt, { maxTokens: 2500 });
 
       try {
         let cleanedJson = responseText.trim();
+        if (cleanedJson.includes("```")) {
+          cleanedJson = cleanedJson.replace(/```json/gi, "").replace(/```/g, "").trim();
+        }
         const firstBrace = cleanedJson.indexOf("{");
         const lastBrace = cleanedJson.lastIndexOf("}");
         if (firstBrace !== -1 && lastBrace !== -1) {

@@ -260,10 +260,13 @@ export class KekaWorkflowService {
       } else {
         console.log("Calling AI model for resume parsing and score calculation...");
         const prompt = buildEvaluatePrompt(jobDescription, resumeText);
-        const responseText = await callDeepSeek(prompt, { maxTokens: 800 });
+        const responseText = await callDeepSeek(prompt, { maxTokens: 2500 });
 
         try {
           let cleanedJson = responseText.trim();
+          if (cleanedJson.includes("```")) {
+            cleanedJson = cleanedJson.replace(/```json/gi, "").replace(/```/g, "").trim();
+          }
           const firstBrace = cleanedJson.indexOf("{");
           const lastBrace = cleanedJson.lastIndexOf("}");
           if (firstBrace !== -1 && lastBrace !== -1) {
